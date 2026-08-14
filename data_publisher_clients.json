@@ -1,0 +1,32 @@
+[
+  {
+    "id": "pc-1784366783440",
+    "companyName": "GEP",
+    "joinedDate": "2026-07-18",
+    "location": "12 Avenue 2 Mars, Borj Baccouche Ariana",
+    "paymentGateway": "Versement",
+    "status": "active",
+    "packId": "custom"
+  },
+  {
+    "id": "pc-interaffaires",
+    "paymentGateway": "Virement",
+    "companyName": "Inter-Affaires",
+    "packId": "standard",
+    "location": "Tunis",
+    "status": "active",
+    "joinedDate": "2026-07-26"
+  },
+  {
+    "id": "pc-parent-elyssa",
+    "paymentGateway": "Flouci",
+    "location": "Tunis",
+    "companyName": "Inter-Affaires",
+    "joinedDate": "2026-06-22",
+    "isEmailConfirmed": true,
+    "packId": "full",
+    "company_id": "pc-parent-elyssa",
+    "email": "contact@elyssa.pro",
+    "status": "paid"
+  }
+]

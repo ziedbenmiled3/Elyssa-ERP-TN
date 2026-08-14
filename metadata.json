@@ -1,0 +1,11 @@
+{
+  "name": "Elyssa ERP",
+  "description": "Application SaaS complète de CRM et ERP : suivi clientèle, respect des engagements, gestion des réclamations, facturation tunisienne (TND, TVA, Retenue à la Source), gestion de la paie et déclarations CNSS pour la Tunisie, recouvrement, rapports terrain, bourse et analyses de marché assistées par l'IA.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

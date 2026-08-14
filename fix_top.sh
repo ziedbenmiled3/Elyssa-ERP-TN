@@ -1,0 +1,1 @@
+sed -i 's/import React, { useState } from '\''react'\'';/import React, { useState } from '\''react'\'';\nimport { ExecutiveSummaryWidget } from ".\/ExecutiveSummaryWidget";\nimport { AnomalyBadge } from ".\/AnomalyBadge";/g' src/components/Dashboard.tsx

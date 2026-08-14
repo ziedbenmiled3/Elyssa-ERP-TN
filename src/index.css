@@ -1,0 +1,950 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* ==========================================
+   ELEGANT DARK PREMIUM SEAMLESS OVERRIDES
+   ========================================== */
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #0d1220 !important; /* Premium rich midnight sky */
+  color: #f1f5f9 !important; /* Clean soft white text */
+  font-family: var(--font-sans) !important;
+}
+
+/* Adapt main responsive app backgrounds */
+.bg-slate-50,
+.bg-slate-100 {
+  background-color: #090d16 !important; /* Deep dark cosmic background */
+}
+
+/* Light Card Panels mapped to high-end glassmorphic dark container cards */
+.bg-white {
+  background-color: #121a2e !important; /* Polished dark slate card */
+  border-color: #1f2a45 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Fine-tune layout containers */
+main {
+  background-color: #090d16 !important;
+}
+
+/* Sidebar Adaptations */
+aside {
+  background-color: #0d1220 !important;
+  border-right: 1px solid #1f2a45 !important;
+}
+
+/* System-wide borders */
+.border,
+.border-t,
+.border-b,
+.border-l,
+.border-r,
+.border-slate-100,
+.border-slate-150,
+.border-slate-200,
+.border-slate-300 {
+  border-color: #1f2a45 !important;
+}
+
+/* Forms: elegant inputs & input text states */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="date"],
+input[type="search"],
+select,
+textarea {
+  background-color: #070a12 !important;
+  border: 1px solid #28375c !important;
+  color: #f8fafc !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="date"]:focus,
+input[type="search"]:focus,
+select:focus,
+textarea:focus {
+  border-color: #38bdf8 !important; /* Cyan active highlight */
+  box-shadow: 0 0 0 1px #38bdf8 !important;
+  outline: none !important;
+  background-color: #090e1a !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #4b5563 !important;
+}
+
+/* Dynamic Text Overrides */
+.text-slate-950,
+.text-slate-900,
+.text-slate-850 {
+  color: #ffffff !important;
+}
+
+.text-slate-800,
+.text-slate-705 {
+  color: #f1f5f9 !important;
+}
+
+.text-slate-700,
+.text-slate-650,
+.text-slate-550 {
+  color: #e2e8f0 !important;
+}
+
+.text-slate-600,
+.text-slate-500 {
+  color: #cbd5e1 !important;
+}
+
+.text-slate-400,
+.text-slate-455,
+.text-slate-405 {
+  color: #94a3b8 !important;
+}
+
+/* Deep-dark text color remaps to high-contrast pastel colors on dark cards */
+.text-indigo-950 {
+  color: #ffffff !important;
+}
+.text-indigo-900 {
+  color: #e0e7ff !important;
+}
+.text-indigo-800 {
+  color: #c7d2fe !important;
+}
+.text-indigo-750 {
+  color: #a5b4fc !important;
+}
+.text-indigo-700,
+.text-indigo-650,
+.text-indigo-600,
+.text-indigo-550,
+.text-indigo-500 {
+  color: #818cf8 !important;
+}
+.text-amber-950 {
+  color: #ffffff !important;
+}
+.text-amber-900 {
+  color: #fef3c7 !important;
+}
+.text-amber-800 {
+  color: #fde68a !important;
+}
+.text-amber-700,
+.text-amber-600,
+.text-orange-950,
+.text-orange-900,
+.text-orange-800,
+.text-orange-700,
+.text-orange-600 {
+  color: #fcd34d !important;
+}
+.text-emerald-950 {
+  color: #ffffff !important;
+}
+.text-emerald-900 {
+  color: #d1fae5 !important;
+}
+.text-emerald-800,
+.text-emerald-700,
+.text-emerald-600 {
+  color: #34d399 !important;
+}
+.text-rose-950 {
+  color: #ffffff !important;
+}
+.text-rose-900 {
+  color: #ffe4e6 !important;
+}
+.text-rose-800,
+.text-rose-700,
+.text-rose-600 {
+  color: #f87171 !important;
+}
+.text-red-950 {
+  color: #ffffff !important;
+}
+.text-red-900 {
+  color: #ffe4e6 !important;
+}
+.text-red-800,
+.text-red-700,
+.text-red-650,
+.text-red-600 {
+  color: #f87171 !important;
+}
+.text-purple-950 {
+  color: #ffffff !important;
+}
+.text-purple-900 {
+  color: #f3e8ff !important;
+}
+.text-purple-800,
+.text-purple-700,
+.text-purple-600 {
+  color: #c084fc !important;
+}
+
+/* Custom robust fixes for light-to-dark gradient leakages and card overlays */
+[class*="to-slate-50"] {
+  --tw-gradient-to: #090d16 !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #090d16 !important;
+  --gradient-to: #090d16 !important;
+  --gradient-stops: var(--gradient-from), #090d16 !important;
+}
+[class*="to-slate-100"] {
+  --tw-gradient-to: #0d1220 !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #0d1220 !important;
+  --gradient-to: #0d1220 !important;
+  --gradient-stops: var(--gradient-from), #0d1220 !important;
+}
+[class*="to-white"] {
+  --tw-gradient-to: #121a2e !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #121a2e !important;
+  --gradient-to: #121a2e !important;
+  --gradient-stops: var(--gradient-from), #121a2e !important;
+}
+
+/* Remap any white or light-gray gradient panels to deep-dark elegant cards */
+.bg-gradient-to-br[class*="to-slate-5"],
+.bg-gradient-to-br[class*="to-slate-1"],
+.bg-gradient-to-br[class*="to-white"],
+.bg-gradient-to-r[class*="to-slate-5"],
+.bg-gradient-to-r[class*="to-slate-1"],
+.bg-gradient-to-r[class*="to-white"] {
+  background-image: none !important;
+  background-color: #121a2e !important;
+  border-color: #1f2a45 !important;
+}
+
+/* Badges, Alerts, and Highlights mapped to Dark Modes */
+
+/* Success and Paid structures (Emerald) */
+[class*="bg-emerald-50"],
+[class*="bg-emerald-100"] {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+.text-emerald-700,
+.text-emerald-800,
+.text-emerald-600 {
+  color: #34d399 !important; /* Soft neo-green */
+}
+
+/* Purple & Violet status/contract badges (CDD, etc.) & Strategic tabs */
+[class*="bg-purple-50"],
+[class*="bg-purple-100"],
+[class*="bg-violet-50"],
+[class*="bg-violet-100"] {
+  background-color: rgba(139, 92, 246, 0.15) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+}
+.text-purple-850,
+.text-purple-800,
+.text-purple-750,
+.text-purple-700,
+.text-purple-600,
+.text-violet-850,
+.text-violet-800,
+.text-violet-750,
+.text-violet-700,
+.text-violet-650,
+.text-violet-600 {
+  color: #c084fc !important; /* Luminous soft purple/violet */
+}
+
+/* High-contrast explicit dashboard active tab states */
+.dashboard-tab-active-all {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: #818cf8 !important;
+}
+.dashboard-tab-active-finance {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  color: #34d399 !important;
+}
+.dashboard-tab-active-supply {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  color: #60a5fa !important;
+}
+.dashboard-tab-active-production {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+  color: #f87171 !important;
+}
+.dashboard-tab-active-human {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+  color: #fcd34d !important;
+}
+.dashboard-tab-active-strategic {
+  background-color: rgba(139, 92, 246, 0.18) !important;
+  border-color: rgba(139, 92, 246, 0.4) !important;
+  color: #c084fc !important;
+}
+
+/* Orange/Amber status/contract badges (CIVP, warnings, safety guidelines) */
+[class*="bg-orange-50"],
+[class*="bg-orange-100"],
+[class*="bg-amber-50"],
+[class*="bg-amber-100"] {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+.text-orange-800,
+.text-orange-700,
+.text-orange-600,
+.text-amber-800,
+.text-amber-700,
+.text-amber-600 {
+  color: #fcd34d !important; /* Soft luminous gold/orange */
+}
+
+/* Amber text overrides for dark background readability */
+.text-amber-950,
+.text-amber-900 {
+  color: #fef3c7 !important;
+}
+
+[class*="bg-amber-200"],
+[class*="bg-amber-300"],
+[class*="bg-amber-400"],
+[class*="bg-amber-500"] {
+  background-color: rgba(245, 158, 11, 0.25) !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
+  color: #fde68a !important;
+}
+
+/* Blue status/contract badges */
+[class*="bg-blue-50"],
+[class*="bg-blue-100"] {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+.text-blue-800,
+.text-blue-700,
+.text-blue-600 {
+  color: #60a5fa !important; /* Soft luminous blue */
+}
+
+/* Rose and Red status/contract badges */
+[class*="bg-rose-50"],
+[class*="bg-red-50"],
+[class*="bg-rose-100"],
+[class*="bg-red-100"] {
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+.text-rose-850,
+.text-rose-800,
+.text-red-850,
+.text-rose-700,
+.text-red-700,
+.text-rose-600,
+.text-red-600 {
+  color: #f87171 !important; /* Soft neo-red */
+}
+
+/* Indigo status/contract badges & Pill backgrounds */
+[class*="bg-indigo-50"],
+[class*="bg-indigo-100"] {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Slate and Gray status/contract badges */
+[class*="bg-slate-50"],
+[class*="bg-slate-100"] {
+  background-color: rgba(148, 163, 184, 0.15) !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+}
+.text-slate-600,
+.text-slate-700,
+.text-slate-800 {
+  color: #cbd5e1 !important; /* Soft grey */
+}
+
+/* Selected item states in lists (Clients and Invoices) */
+.bg-indigo-50\/50,
+.bg-indigo-50\/60,
+.bg-emerald-50\/20,
+.bg-indigo-50\/20 {
+  background-color: #101c36 !important;
+  border-color: #38bdf8 !important;
+}
+
+/* Deep dark translucent overlays replacing light-grey transparencies in dark mode */
+.bg-slate-50\/50,
+.bg-slate-50\/40,
+.bg-slate-50\/30,
+.bg-slate-50\/20,
+.bg-slate-50\/25,
+.bg-slate-55\/50,
+.bg-slate-100\/50,
+.bg-slate-100\/80,
+.bg-slate-50\/10,
+.hover\:bg-slate-50\/50:hover,
+.hover\:bg-slate-50\/40:hover,
+.hover\:bg-slate-50\/25:hover,
+.hover\:bg-slate-100\/50:hover,
+.hover\:bg-slate-100\/80:hover {
+  background-color: #16223f !important; /* Elegant dark-slate-blue overlay */
+}
+
+.bg-slate-50\/65,
+.bg-slate-50\/70,
+.bg-slate-50\/80 {
+  background-color: #121a2e !important; /* Polished dark slate card */
+  border-color: #1f2a45 !important;
+  color: #f8fafc !important;
+}
+
+/* Direct Action Buttons & General Brand Buttons */
+.bg-indigo-600 {
+  background-color: #2563eb !important; /* Deep sapphire blue */
+  color: #ffffff !important;
+}
+
+.bg-indigo-600:hover {
+  background-color: #3b82f6 !important; /* High contrast active blue */
+}
+
+.hover\:bg-slate-50:hover,
+.bg-slate-50:hover {
+  background-color: #17233f !important;
+}
+
+.hover\:bg-slate-100:hover {
+  background-color: #1b294a !important;
+}
+
+/* Adapt specific banners (like strategic dashboard hero and visit studies) */
+.bg-gradient-to-r.from-blue-700.via-indigo-800.to-slate-900 {
+  background: linear-gradient(135deg, #111a33 0%, #0d1222 100%) !important;
+  border: 1px solid #23335e !important;
+}
+
+/* Adjust scrollbars for elegant consistency */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f2a45;
+  border-radius: 9999px;
+  border: 2px solid #090d16;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2d3e66;
+}
+
+/* Recharts / SVG Dark grid lines and text readability formatting */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #1f2a45 !important;
+  stroke-dasharray: 4 4;
+}
+
+.recharts-text,
+.recharts-label {
+  fill: #94a3b8 !important;
+  font-family: var(--font-mono) !important;
+}
+
+.recharts-legend-item-text {
+  color: #cbd5e1 !important;
+}
+
+/* Modals backdrop & glass sheet */
+.fixed.inset-0.bg-slate-900\/90 {
+  background-color: rgba(9, 13, 22, 0.95) !important;
+}
+
+/* Header dynamic gradient text to match the night sky elegant feel */
+.bg-gradient-to-r.from-indigo-700.to-slate-900 {
+  background: linear-gradient(to right, #38bdf8, #818cf8) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+}
+
+/* ==========================================
+   HIGH-FIDELITY PRINTING CORRECTIONS 
+   ========================================== */
+@media print {
+  /* Hide CRM web navigation chrome, sidebar, and interactive widgets */
+  aside,
+  header,
+  nav,
+  button,
+  .print-hide,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Reset layout constraints so page layout expands beautifully on A4 scale */
+  body, 
+  main,
+  html {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Remap dynamic visual containers into clean light elements for physical paper */
+  .bg-white,
+  .bg-slate-50,
+  .bg-slate-100,
+  .bg-slate-900,
+  .bg-slate-950,
+  .bg-slate-900\/60,
+  .bg-gradient-to-r.from-slate-900.via-indigo-950.to-slate-900 {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+    border-width: 1px !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+  }
+
+  /* Print specific text override for high contrast readability */
+  h1, h2, h3, h4, h5, h6, p, span, li, td, th {
+    color: #0f172a !important;
+    text-shadow: none !important;
+  }
+
+  /* Specific color adjustments for labels and values */
+  .text-indigo-400,
+  .text-indigo-650,
+  .text-indigo-700,
+  .text-indigo-800,
+  .text-sky-400 {
+    color: #1e3a8a !important; /* Deep corporate indigo for printing */
+    font-weight: bold !important;
+  }
+
+  .text-emerald-500,
+  .text-emerald-600,
+  .text-emerald-700 {
+    color: #047857 !important; /* Rich green for objectives hit */
+  }
+
+  .text-rose-500,
+  .text-rose-600,
+  .text-rose-700,
+  .text-red-500,
+  .text-red-650,
+  .text-red-600 {
+    color: #b91c1c !important; /* Solid red for risk points */
+  }
+
+  .text-slate-300,
+  .text-slate-400,
+  .text-slate-500 {
+    color: #475569 !important; /* Elegant gray for labels */
+  }
+
+  /* Ensure grids stack nicely or divide elegantly */
+  .grid {
+    display: grid !important;
+    gap: 1.5rem !important;
+  }
+
+  /* Chart & Graph SVG visibility adjustments */
+  svg,
+  .recharts-responsive-container {
+    filter: invert(1) hue-rotate(180deg) !important; /* Keep charts legible in print by inverting colors cleanly */
+    max-height: 250px !important;
+  }
+
+  /* Specific spacing rules for paper margins */
+  @page {
+    size: A4 portrait;
+    margin: 1cm; /* Slightly smaller margin to prevent accidental 2-page spillover */
+  }
+
+  /* High-fidelity single-page document optimization */
+  #printable-lc-document,
+  #printable-payslip-paper,
+  #printable-rh-doc,
+  #printable-invoice,
+  #printable-judicial-notice,
+  #mpo-contract-document,
+  [id^="mpo-contract-"],
+  .mpo-contract-print-sheet,
+  [id^="printable-saas-doc-"] {
+    max-height: 297mm !important;
+    box-sizing: border-box !important;
+    padding: 1.25rem !important; /* Elegant tighter padding for print */
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    overflow: hidden !important;
+  }
+
+  /* Font size safety override for printing */
+  #printable-lc-document *,
+  #printable-payslip-paper *,
+  #printable-rh-doc *,
+  #printable-invoice *,
+  #printable-judicial-notice *,
+  #mpo-contract-document *,
+  [id^="mpo-contract-"] *,
+  .mpo-contract-print-sheet *,
+  [id^="printable-saas-doc-"] * {
+    font-size: inherit !important;
+    color: #0f172a !important;
+    line-height: inherit !important;
+  }
+
+  /* Specific typography overrides */
+  #printable-lc-document h4,
+  #printable-payslip-paper h2,
+  #printable-rh-doc h2,
+  #printable-invoice h2,
+  #printable-judicial-notice h2,
+  [id^="printable-saas-doc-"] h3 {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  #printable-lc-document p,
+  #printable-payslip-paper p,
+  #printable-rh-doc p,
+  #printable-invoice p,
+  #printable-judicial-notice p,
+  [id^="printable-saas-doc-"] p {
+    margin-bottom: 0.35rem !important;
+  }
+
+  #printable-lc-document table,
+  #printable-payslip-paper table,
+  #printable-invoice table,
+  #printable-judicial-notice table,
+  [id^="printable-saas-doc-"] table {
+    margin-top: 0.4rem !important;
+    margin-bottom: 0.4rem !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  #printable-lc-document td,
+  #printable-lc-document th,
+  #printable-payslip-paper td,
+  #printable-payslip-paper th,
+  #printable-invoice td,
+  #printable-invoice th,
+  #printable-judicial-notice td,
+  #printable-judicial-notice th,
+  [id^="printable-saas-doc-"] td,
+  [id^="printable-saas-doc-"] th {
+    padding: 3px 6px !important;
+    font-size: 9px !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  #printable-lc-document ul,
+  #printable-lc-document ol,
+  #printable-payslip-paper ul,
+  #printable-payslip-paper ol {
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
+    padding-left: 1.2rem !important;
+  }
+
+  #printable-lc-document li,
+  #printable-payslip-paper li {
+    font-size: 8.5px !important;
+    margin-bottom: 0.15rem !important;
+  }
+
+  /* Tighten spacing containers */
+  #printable-lc-document .space-y-4 > * + *,
+  #printable-payslip-paper .space-y-6 > * + *,
+  #printable-invoice .space-y-6 > * + *,
+  #printable-judicial-notice .space-y-4 > * + *,
+  [id^="printable-saas-doc-"] .space-y-6 > * + * {
+    margin-top: 0.35rem !important;
+  }
+
+  /* Hide unnecessary decor lines, badges pulse animations */
+  .animate-pulse {
+    animation: none !important;
+  }
+
+  /* Ensure rubber stamps and signatures align cleanly without overflow */
+  #printable-lc-document .pt-4,
+  #printable-payslip-paper .pt-12,
+  #printable-invoice .pt-12,
+  #printable-judicial-notice .pt-12,
+  [id^="printable-saas-doc-"] .pt-12 {
+    padding-top: 0.5rem !important;
+    margin-top: 0.5rem !important;
+  }
+
+  /* Rubber stamp size and border style */
+  #printable-lc-document .w-24.h-12 {
+    width: 80px !important;
+    height: 40px !important;
+    font-size: 8px !important;
+  }
+}
+
+/* ==========================================
+   ISOLATED ELEMENT HIGH-FIDELITY PRINTING
+   ========================================== */
+.temp-print-root {
+  display: none !important;
+}
+
+@media print {
+  body.print-mode-active > :not(.temp-print-root) {
+    display: none !important;
+  }
+  
+  body.print-mode-active .temp-print-root,
+  body.print-mode-active .hidden.temp-print-root,
+  body.print-mode-active div.hidden.temp-print-root {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  body.print-mode-active .temp-print-root * {
+    color: #0f172a !important;
+  }
+}
+
+/* ==========================================================================
+   SIBTEL TRAITE REALISTIC PAPER PREVIEW FORCE HIGH-CONTRAST LIGHT CHECK THEME
+   ========================================================================== */
+.sibtel-cheque-container {
+  background-color: #fdfaf0 !important; /* Elegant premium physical ivory check paper */
+  border: 1px solid #c5a880 !important;
+  color: #1e293b !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 16px !important;
+}
+
+/* Force dark text for all typography inside the simulated check paper */
+.sibtel-cheque-container h4,
+.sibtel-cheque-container p,
+.sibtel-cheque-container span,
+.sibtel-cheque-container div,
+.sibtel-cheque-container strong {
+  color: #1e293b !important; /* Dark charcoal text for perfect readability */
+  text-shadow: none !important;
+}
+
+/* Sub-panels inside the check paper */
+.sibtel-cheque-inner-box {
+  background-color: #ffffff !important;
+  border: 1px solid #ebdfcc !important;
+  color: #0f172a !important;
+}
+
+.sibtel-cheque-inner-box * {
+  color: #0f172a !important;
+}
+
+/* Highlighted Amount unitaire container */
+.sibtel-amount-box {
+  background-color: #f1f5f9 !important;
+  border: 2px double #cbd5e1 !important;
+  color: #1e3a8a !important; /* Crisp dark blue amount */
+  font-weight: 900 !important;
+}
+
+.sibtel-amount-box span,
+.sibtel-amount-box div {
+  color: #1e3a8a !important;
+}
+
+/* Rib container */
+.sibtel-rib-mono-box {
+  background-color: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  font-family: var(--font-mono) !important;
+}
+
+.sibtel-rib-mono-box * {
+  color: #0f172a !important;
+}
+
+/* SIBTEL Optical Magnetic Character (CMC7) code simulation block */
+.sibtel-cmc7-row {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.sibtel-cmc7-row * {
+  color: #0f172a !important;
+}
+
+/* ==========================================================================
+   REALISTIC SOCIAL MEDIA SHARING PREVIEWS (FACEBOOK & LINKEDIN FORCE LIGHT)
+   ========================================================================== */
+.mock-social-card {
+  background-color: #ffffff !important;
+  border: 1px solid #dadde1 !important;
+  color: #1c1e21 !important;
+}
+
+.mock-social-card,
+.mock-social-card * {
+  text-shadow: none !important;
+}
+
+/* User Info Header & Text inside mock social cards */
+.mock-social-card .text-slate-800 {
+  color: #1c1e21 !important;
+}
+
+.mock-social-card .text-slate-700 {
+  color: #050505 !important;
+}
+
+.mock-social-card .text-slate-600,
+.mock-social-card .text-slate-500 {
+  color: #65676b !important;
+}
+
+.mock-social-card .text-slate-400 {
+  color: #8a8d91 !important;
+}
+
+/* Specific backgrounds inside the mock cards */
+.mock-social-card .bg-[#f2f3f5],
+.mock-social-card .bg-slate-50,
+.mock-social-card .bg-slate-100 {
+  background-color: #f2f3f5 !important;
+}
+
+.mock-social-card.bg-white,
+.mock-social-card .bg-white {
+  background-color: #ffffff !important;
+}
+
+/* Custom borders inside mock social cards */
+.mock-social-card .border,
+.mock-social-card .border-t,
+.mock-social-card .border-b,
+.mock-social-card .border-l,
+.mock-social-card .border-r,
+.mock-social-card .border-slate-150,
+.mock-social-card .border-slate-200 {
+  border-color: #dadde1 !important;
+}
+
+.mock-social-card .hover\:bg-slate-50:hover {
+  background-color: #f8f9fa !important;
+}
+
+/* Elegant and visible custom blinking/pulsing without changing size */
+@keyframes custom-clignote {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(99, 102, 241, 0.8), 0 0 12px rgba(99, 102, 241, 0.4);
+    filter: brightness(1.3);
+  }
+  50% {
+    opacity: 0.35;
+    text-shadow: 0 0 0px rgba(99, 102, 241, 0);
+    filter: brightness(0.85);
+  }
+}
+
+.animate-clignote {
+  animation: custom-clignote 1.4s infinite ease-in-out;
+}
+
+@keyframes green-clignote {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(16, 185, 129, 0.8), 0 0 12px rgba(16, 185, 129, 0.4);
+    filter: brightness(1.3);
+  }
+  50% {
+    opacity: 0.35;
+    text-shadow: 0 0 0px rgba(16, 185, 129, 0);
+    filter: brightness(0.85);
+  }
+}
+
+.animate-clignote-green {
+  animation: green-clignote 1.4s infinite ease-in-out;
+}
+
+@keyframes amber-clignote {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(245, 158, 11, 0.8), 0 0 12px rgba(245, 158, 11, 0.4);
+    filter: brightness(1.3);
+  }
+  50% {
+    opacity: 0.35;
+    text-shadow: 0 0 0px rgba(245, 158, 11, 0);
+    filter: brightness(0.85);
+  }
+}
+
+.animate-clignote-amber {
+  animation: amber-clignote 1.4s infinite ease-in-out;
+}
+
+
+
+
+

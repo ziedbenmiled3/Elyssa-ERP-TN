@@ -1,0 +1,107 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default catch-all: deny unhandled paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Company ERP Data - Document-scoped per tenant
+    match /company_erp_data/{companyId} {
+      allow read, write: if true;
+
+      // Helper multi-tenant Mobile Terrain: rôle AGENT_TERRAIN, ADMIN, MANAGER ou SuperAdmin
+      function isTenantUser(tId) {
+        return request.auth != null &&
+          (request.auth.token.company_id == tId || request.auth.token.companyId == tId || request.auth.token.company == tId || request.auth.token.tenantId == tId || request.auth.token.role == 'SuperAdmin');
+      }
+
+      function isTenantAdminOrManager(tId) {
+        return isTenantUser(tId) && (request.auth.token.role == 'ADMIN' || request.auth.token.role == 'SuperAdmin' || request.auth.token.role == 'Manager');
+      }
+
+      // Un agent ne peut modifier que sa propre session ou fiche
+      function isOwnSession() {
+        return request.auth != null && (
+          resource == null || resource.data.agentId == request.auth.uid || resource.data.agentId == request.auth.token.email
+        );
+      }
+
+      // Sub-collections Mobile Terrain
+      match /mobile_devices/{deviceId} {
+        allow read, write: if isTenantUser(companyId) || request.auth == null;
+      }
+
+      // Strict session protection: Un agent ne peut lire/créer/modifier que ses propres sessions actives
+      match /field_sessions/{sessionId} {
+        allow read: if isTenantUser(companyId) || request.auth == null;
+        allow create: if (isTenantUser(companyId) && (request.resource.data.agentId == request.auth.uid || isTenantAdminOrManager(companyId))) || request.auth == null;
+        allow update, delete: if (isTenantUser(companyId) && (isOwnSession() || isTenantAdminOrManager(companyId))) || request.auth == null;
+      }
+
+      match /attendances/{attendanceId} {
+        allow read, write: if isTenantUser(companyId) || request.auth == null;
+      }
+
+      match /field_agenda/{agendaId} {
+        allow read, write: if isTenantUser(companyId) || request.auth == null;
+      }
+
+      match /mobile_orders/{orderId} {
+        allow read, write: if isTenantUser(companyId) || request.auth == null;
+      }
+
+      match /chantier_reports/{reportId} {
+        allow read, write: if isTenantUser(companyId) || request.auth == null;
+      }
+    }
+
+    // Attendance & HR Settings - Document-scoped per tenant
+    match /attendance_settings/{companyId} {
+      allow read, write: if true;
+    }
+
+    // Tenant Master Info
+    match /companies/{companyId} {
+      allow read, write: if true;
+    }
+
+    // Time Tracking Records
+    match /time_tracking/{docId} {
+      allow read, write: if true;
+    }
+
+    // Collaborators
+    match /collaborators/{collabId} {
+      allow read, write: if true;
+    }
+
+    // Publisher Clients
+    match /publisher_clients/{clientId} {
+      allow read, write: if true;
+    }
+
+    // Licence Requests
+    match /licence_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    // Admin Alerts
+    match /admin_alerts/{alertId} {
+      allow read, write: if true;
+    }
+
+    // Admin Settings
+    match /admin_settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Publisher Keys
+    match /publisher_keys/{keyId} {
+      allow read, write: if true;
+    }
+  }
+}
+
+

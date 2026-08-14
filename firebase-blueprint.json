@@ -1,0 +1,149 @@
+{
+  "entities": {
+    "Collaborator": {
+      "title": "Collaborator",
+      "description": "An employee or collaborator profile with contact details and hashed credentials.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the collaborator" },
+        "email": { "type": "string", "description": "Email address of the collaborator" },
+        "password": { "type": "string", "description": "Hashed password of the collaborator" },
+        "role": { "type": "string", "description": "Role of the collaborator" },
+        "status": { "type": "string", "description": "Status (e.g., Active, Suspended)" },
+        "company": { "type": "string", "description": "Company name the collaborator belongs to" },
+        "assignedTasks": { "type": "array", "description": "List of assigned task descriptions" },
+        "createdDate": { "type": "string", "description": "Date the account was created" }
+      },
+      "required": ["name", "email", "password", "role"]
+    },
+    "PublisherClient": {
+      "title": "PublisherClient",
+      "description": "A client organization utilizing the platform with subscription status.",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string", "description": "Name of the client company" },
+        "location": { "type": "string", "description": "Headquarters location of the client" },
+        "packId": { "type": "string", "description": "Identifier of the selected subscription tier" },
+        "paymentGateway": { "type": "string", "description": "Selected payment gateway" },
+        "status": { "type": "string", "description": "Status of the subscription" },
+        "joinedDate": { "type": "string", "description": "Date the client joined" },
+        "interval": { "type": "string", "description": "Billing frequency interval (yearly or monthly)" }
+      },
+      "required": ["companyName", "status"]
+    },
+    "LicenceRequest": {
+      "title": "LicenceRequest",
+      "description": "A purchase or evaluation license request from a client.",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "packId": { "type": "string" },
+        "interval": { "type": "string" },
+        "price": { "type": "integer" },
+        "requestDate": { "type": "string" },
+        "status": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "modules": { "type": "array" }
+      },
+      "required": ["companyName", "packId", "status"]
+    },
+    "AdminAlert": {
+      "title": "AdminAlert",
+      "description": "An administration audit alert/log entry.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["type", "message", "date"]
+    },
+    "AdminSettings": {
+      "title": "AdminSettings",
+      "description": "Global administration and SEO/analytics settings.",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "currency": { "type": "string" },
+        "googleAnalyticsId": { "type": "string" },
+        "googleAdsId": { "type": "string" },
+        "robotsTxt": { "type": "string" },
+        "sitemapXml": { "type": "string" },
+        "legalForm": { "type": "string" },
+        "shareCapital": { "type": "number" },
+        "rneNumber": { "type": "string" },
+        "legalRepresentative": { "type": "string" },
+        "cityZipCode": { "type": "string" },
+        "website": { "type": "string" }
+      }
+    },
+    "PublisherKey": {
+      "title": "PublisherKey",
+      "description": "Licenses or publisher key records.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "keyValue": { "type": "string" }
+      }
+    },
+    "CompanyErpData": {
+      "title": "CompanyErpData",
+      "description": "The unified ERP module data for an individual company tenant.",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "clients": { "type": "array" },
+        "complaints": { "type": "array" },
+        "invoices": { "type": "array" },
+        "visitReports": { "type": "array" },
+        "competitors": { "type": "array" },
+        "suppliers": { "type": "array" },
+        "products": { "type": "array" },
+        "stockMovements": { "type": "array" },
+        "smtpSettings": { "type": "object" },
+        "imapSettings": { "type": "object" },
+        "incomingEmails": { "type": "array" },
+        "emailTemplates": { "type": "array" },
+        "communicationLogs": { "type": "array" },
+        "bankAccounts": { "type": "array" },
+        "bankTransactions": { "type": "array" },
+        "taxDeclarations": { "type": "array" },
+        "yearEndClosings": { "type": "array" },
+        "documents": { "type": "array" },
+        "employees": { "type": "array" }
+      },
+      "required": ["companyName"]
+    }
+  },
+  "firestore": {
+    "collaborators": {
+      "schema": "Collaborator",
+      "description": "Collection of all collaborator/employee user profiles."
+    },
+    "publisher_clients": {
+      "schema": "PublisherClient",
+      "description": "Collection of all registered publisher clients."
+    },
+    "licence_requests": {
+      "schema": "LicenceRequest",
+      "description": "Collection of all client purchase requests."
+    },
+    "admin_alerts": {
+      "schema": "AdminAlert",
+      "description": "Collection of admin activity and registration logs."
+    },
+    "admin_settings": {
+      "schema": "AdminSettings",
+      "description": "Collection storing the global administration and SEO settings."
+    },
+    "publisher_keys": {
+      "schema": "PublisherKey",
+      "description": "Collection storing client keys and licenses."
+    },
+    "company_erp_data": {
+      "schema": "CompanyErpData",
+      "description": "Collection storing full modular ERP datasets for each registered company."
+    }
+  }
+}
