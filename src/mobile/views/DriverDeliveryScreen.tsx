@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
-import { DeliveryTour, DeliveryTourOrder } from '../../types/mobileTerrain';
+import { DeliveryTour, DeliveryTourOrder, ItemQualification, PaymentCollection, WithholdingTaxRS } from '../../types/mobileTerrain';
 import { 
   Truck, 
   MapPin, 
@@ -16,7 +16,14 @@ import {
   Briefcase,
   X,
   Eraser,
-  PenTool
+  PenTool,
+  AlertTriangle,
+  Receipt,
+  FileText,
+  DollarSign,
+  Wifi,
+  WifiOff,
+  RotateCcw
 } from 'lucide-react';
 
 interface DriverDeliveryScreenProps {
@@ -33,15 +40,82 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
   const [activeTours, setActiveTours] = useState<DeliveryTour[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Signature Modal State
+  // Delivery Modal State
   const [selectedOrderForSignature, setSelectedOrderForSignature] = useState<{ tour: DeliveryTour; order: DeliveryTourOrder } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Item Qualification State for the active modal
+  const [lineQualifications, setLineQualifications] = useState<ItemQualification[]>([]);
+  
+  // Payment Collection State
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CHEQUE' | 'TRAITE' | 'DEJA_PAYE'>('CASH');
+  const [collectedAmount, setCollectedAmount] = useState<number>(0);
+  const [chequeNum, setChequeNum] = useState<string>('');
+  const [bankName, setBankName] = useState<string>('BIAT - Banque Internationale Arabe de Tunisie');
+
+  // Retenue à la Source (RS 1.5%) State
+  const [rsEnabled, setRsEnabled] = useState<boolean>(false);
+  const [rsCertNum, setRsCertNum] = useState<string>('');
+  const [rsRatePercent, setRsRatePercent] = useState<number>(1.5);
+
+  // GPS Location State
+  const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number; address?: string }>({ lat: 36.8065, lng: 10.1815, address: 'Z.I. Charguia II, Tunis' });
+
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  // Online / Offline listener
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncOfflineDeliveries();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Sync Offline Queue stored in localStorage
+  const syncOfflineDeliveries = async () => {
+    try {
+      const rawQueue = localStorage.getItem('ELYSSA_OFFLINE_DELIVERIES');
+      if (!rawQueue) return;
+      const queue = JSON.parse(rawQueue);
+      if (!Array.isArray(queue) || queue.length === 0) return;
+
+      let syncedCount = 0;
+      for (const item of queue) {
+        if (item.tenantId && item.tourId && item.updatedOrders) {
+          await updateDoc(doc(db, 'company_erp_data', item.tenantId, 'delivery_tours', item.tourId), {
+            orders: item.updatedOrders,
+            status: item.newStatus
+          });
+          if (item.orderId) {
+            await updateDoc(doc(db, 'company_erp_data', item.tenantId, 'invoices', item.orderId), {
+              delivery_status: 'livre',
+              signatureUrl: item.signatureDataUrl || undefined
+            });
+          }
+          syncedCount++;
+        }
+      }
+
+      localStorage.removeItem('ELYSSA_OFFLINE_DELIVERIES');
+      showToast(`🔄 Synchronisation réussie: ${syncedCount} livraison(s) hors-ligne transmise(s) !`);
+    } catch (err) {
+      console.warn('Offline sync error:', err);
+    }
   };
 
   useEffect(() => {
@@ -53,12 +127,10 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
       const tours: DeliveryTour[] = [];
       snap.forEach((docSnap) => {
         const t = { id: docSnap.id, ...docSnap.data() } as DeliveryTour;
-        // Keep active or recent tours for driver
         tours.push(t);
       });
       tours.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
-      // Filter by driverId if specified
       const filtered = driverId 
         ? tours.filter(t => t.driver_id === driverId || (driverName && t.driver_name.toLowerCase().includes(driverName.toLowerCase())))
         : tours;
@@ -72,6 +144,44 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
 
     return () => unsub();
   }, [tenantId, driverId, driverName]);
+
+  // When order selection changes for signature/qualification
+  useEffect(() => {
+    if (!selectedOrderForSignature) return;
+
+    const ord = selectedOrderForSignature.order;
+    
+    // Default items to qualify
+    const defaultQualifications: ItemQualification[] = [
+      { articleId: 'ART-001', articleName: 'Ciment HRS 50kg (SOTACIB)', qtyOrdered: 20, qtyDelivered: 20, status: 'LIVRE', unitPriceTTC: 18.5 },
+      { articleId: 'ART-002', articleName: 'Fer à Béton Ø12 HLE (Tonnes)', qtyOrdered: 2, qtyDelivered: 2, status: 'LIVRE', unitPriceTTC: 2450.0 },
+      { articleId: 'ART-003', articleName: 'Peinture BTP Satinée Blanc 20L', qtyOrdered: 5, qtyDelivered: 5, status: 'LIVRE', unitPriceTTC: 115.0 }
+    ];
+
+    setLineQualifications(ord.item_qualifications || defaultQualifications);
+    setCollectedAmount(ord.amount_ttc || 0);
+    setPaymentMethod('CASH');
+    setChequeNum('');
+    setRsEnabled(false);
+    setRsCertNum(`RS-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+    setRsRatePercent(1.5);
+
+    // Fetch GPS coordinates
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setGpsLocation({
+            lat: Number(pos.coords.latitude.toFixed(6)),
+            lng: Number(pos.coords.longitude.toFixed(6)),
+            address: `${ord.address || 'Livraison Client'}`
+          });
+        },
+        () => {
+          setGpsLocation({ lat: 36.8065, lng: 10.1815, address: ord.address });
+        }
+      );
+    }
+  }, [selectedOrderForSignature]);
 
   // Canvas Signature Pad Handlers
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -101,7 +211,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
     ctx.lineTo(clientX - rect.left, clientY - rect.top);
-    ctx.strokeStyle = '#0284c7'; // Sky-600 color for signature ink
+    ctx.strokeStyle = '#0284c7'; // Sky-600 color
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.stroke();
@@ -119,7 +229,34 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  // Confirm Delivery with Signature
+  // Update item qualification
+  const updateQualificationStatus = (index: number, newStatus: 'LIVRE' | 'REFUSE' | 'PARTIEL', reason?: string) => {
+    setLineQualifications(prev => {
+      const copy = [...prev];
+      const item = { ...copy[index] };
+      item.status = newStatus;
+      if (reason !== undefined) item.returnReason = reason;
+      if (newStatus === 'REFUSE') item.qtyDelivered = 0;
+      if (newStatus === 'LIVRE') item.qtyDelivered = item.qtyOrdered;
+      copy[index] = item;
+      return copy;
+    });
+  };
+
+  const updateDeliveredQty = (index: number, qty: number) => {
+    setLineQualifications(prev => {
+      const copy = [...prev];
+      const item = { ...copy[index] };
+      item.qtyDelivered = Math.max(0, Math.min(item.qtyOrdered, qty));
+      if (item.qtyDelivered === 0) item.status = 'REFUSE';
+      else if (item.qtyDelivered < item.qtyOrdered) item.status = 'PARTIEL';
+      else item.status = 'LIVRE';
+      copy[index] = item;
+      return copy;
+    });
+  };
+
+  // Confirm Delivery with Signature, Item Qualifications, Payment & GED BL
   const handleConfirmSignatureAndDeliver = async () => {
     if (!selectedOrderForSignature) return;
     const { tour, order } = selectedOrderForSignature;
@@ -130,22 +267,69 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
       signatureDataUrl = canvas.toDataURL('image/png');
     }
 
-    try {
-      const updatedOrders: DeliveryTourOrder[] = tour.orders.map(o => {
-        if (o.order_id === order.order_id) {
-          return {
-            ...o,
-            delivery_status: 'livre',
-            delivered_at: new Date().toISOString(),
-            signatureUrl: signatureDataUrl || undefined
-          };
-        }
-        return o;
+    const calculatedRSAmount = rsEnabled ? Math.round((order.amount_ttc / 1.19) * (rsRatePercent / 100) * 1000) / 1000 : 0;
+
+    const paymentInfo: PaymentCollection = {
+      method: paymentMethod,
+      amountTTC: collectedAmount,
+      chequeNumber: paymentMethod === 'CHEQUE' ? chequeNum : undefined,
+      bankName: paymentMethod === 'CHEQUE' ? bankName : undefined,
+      collectedAt: new Date().toISOString()
+    };
+
+    const rsInfo: WithholdingTaxRS = {
+      enabled: rsEnabled,
+      certificateNumber: rsEnabled ? rsCertNum : undefined,
+      ratePercent: rsRatePercent,
+      amountRS: calculatedRSAmount,
+      issueDate: rsEnabled ? new Date().toISOString() : undefined
+    };
+
+    const podGps = {
+      lat: gpsLocation.lat,
+      lng: gpsLocation.lng,
+      timestamp: new Date().toISOString(),
+      address: gpsLocation.address
+    };
+
+    const updatedOrders: DeliveryTourOrder[] = tour.orders.map(o => {
+      if (o.order_id === order.order_id) {
+        return {
+          ...o,
+          delivery_status: 'livre',
+          delivered_at: new Date().toISOString(),
+          signatureUrl: signatureDataUrl || undefined,
+          item_qualifications: lineQualifications,
+          payment_collected: paymentInfo,
+          withholding_tax_rs: rsInfo,
+          pod_gps: podGps
+        };
+      }
+      return o;
+    });
+
+    const allDelivered = updatedOrders.every(o => o.delivery_status === 'livre');
+    const newStatus = allDelivered ? 'terminee' : tour.status;
+
+    // Offline handling
+    if (!navigator.onLine) {
+      const offlineQueue = JSON.parse(localStorage.getItem('ELYSSA_OFFLINE_DELIVERIES') || '[]');
+      offlineQueue.push({
+        tenantId,
+        tourId: tour.id,
+        orderId: order.order_id,
+        updatedOrders,
+        newStatus,
+        signatureDataUrl,
+        timestamp: new Date().toISOString()
       });
+      localStorage.setItem('ELYSSA_OFFLINE_DELIVERIES', JSON.stringify(offlineQueue));
+      setSelectedOrderForSignature(null);
+      showToast('⚡ Enregistré en Mode Hors-Ligne (Mémorisé localement, synchro auto au retour réseau)');
+      return;
+    }
 
-      const allDelivered = updatedOrders.every(o => o.delivery_status === 'livre');
-      const newStatus = allDelivered ? 'terminee' : tour.status;
-
+    try {
       // 1. Update Tour in Firestore
       await updateDoc(doc(db, 'company_erp_data', tenantId, 'delivery_tours', tour.id), {
         orders: updatedOrders,
@@ -155,13 +339,78 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
       // 2. Update Invoice in Firestore
       await updateDoc(doc(db, 'company_erp_data', tenantId, 'invoices', order.order_id), {
         delivery_status: 'livre',
-        signatureUrl: signatureDataUrl || undefined
+        signatureUrl: signatureDataUrl || undefined,
+        paymentStatus: paymentMethod === 'DEJA_PAYE' ? 'Paid' : 'Paid',
+        withholdingCertificateReceived: rsEnabled,
+        withholdingCertificateRef: rsEnabled ? rsCertNum : undefined,
+        withholdingAmount: rsEnabled ? calculatedRSAmount : 0
       });
 
+      // 3. Generate & Archive Signed BL into GED
+      const blGedDocId = `BL_GED_${order.order_id}`;
+      const blGedDocument = {
+        id: blGedDocId,
+        name: `BL_SIGNE_${order.order_id}.pdf`,
+        type: 'Invoice',
+        fileSize: '245 KB',
+        fileType: 'application/pdf',
+        base64Data: signatureDataUrl,
+        uploadDate: new Date().toISOString(),
+        linkedToType: 'Client',
+        linkedToId: order.order_id,
+        linkedToName: order.client_name,
+        description: `Bon de Livraison signé avec géolocalisation GPS (${podGps.lat}, ${podGps.lng}) pour la commande ${order.order_id}`,
+        version: 1,
+        uploadedBy: `Livreur PWA (${tour.driver_name})`
+      };
+
+      await setDoc(doc(db, 'company_erp_data', tenantId, 'documents', blGedDocId), blGedDocument, { merge: true });
+
+      // 4. Save Retenue à la Source for TEJ CIMF Module if enabled
+      if (rsEnabled) {
+        const rsDocId = `RS_CERT_${order.order_id}`;
+        await setDoc(doc(db, 'company_erp_data', tenantId, 'withholding_tax_certificates', rsDocId), {
+          id: rsDocId,
+          tenantId,
+          clientName: order.client_name,
+          invoiceNumber: order.order_id,
+          certificateNumber: rsCertNum,
+          ratePercent: rsRatePercent,
+          amountRS: calculatedRSAmount,
+          issuedAt: new Date().toISOString(),
+          status: 'PRE_REMPLI_TEJ_CIMF'
+        }, { merge: true });
+      }
+
+      // 5. Save Stock Reintegration Movements for refused/partial returns
+      const refusedItems = lineQualifications.filter(q => q.status === 'REFUSE' || q.status === 'PARTIEL');
+      if (refusedItems.length > 0) {
+        for (const item of refusedItems) {
+          const returnQty = item.qtyOrdered - item.qtyDelivered;
+          if (returnQty > 0) {
+            const returnDocId = `RETOUR_${order.order_id}_${item.articleId}`;
+            await setDoc(doc(db, 'company_erp_data', tenantId, 'stock_movements', returnDocId), {
+              id: returnDocId,
+              tenantId,
+              orderId: order.order_id,
+              clientName: order.client_name,
+              articleId: item.articleId,
+              articleName: item.articleName,
+              quantity: returnQty,
+              type: 'RETOUR_DEPOT',
+              reason: item.returnReason || 'Refus à la livraison',
+              warehouseLocation: tour.pickup_warehouse || 'Dépôt Central Radès',
+              createdAt: new Date().toISOString(),
+              status: 'A_REINTEGRER'
+            }, { merge: true });
+          }
+        }
+      }
+
       setSelectedOrderForSignature(null);
-      showToast(`✅ Livraison ${order.order_id} validée avec signature client !`);
+      showToast(`✅ Livraison ${order.order_id} validée, BL archivé en GED & RS enregistré !`);
     } catch (err: any) {
-      console.error('Error confirming delivery with signature:', err);
+      console.error('Error confirming delivery:', err);
       showToast('Erreur lors de la validation.');
     }
   };
@@ -239,6 +488,23 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
         </div>
       )}
 
+      {/* Network Connectivity Bar */}
+      <div className={`p-2.5 rounded-2xl text-xs font-bold flex items-center justify-between border ${
+        isOnline 
+          ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60' 
+          : 'bg-amber-950/60 text-amber-300 border-amber-600/60 animate-pulse'
+      }`}>
+        <div className="flex items-center space-x-2">
+          {isOnline ? <Wifi className="w-4 h-4 text-emerald-400" /> : <WifiOff className="w-4 h-4 text-amber-400" />}
+          <span>{isOnline ? 'Connecté au Réseau Elyssa Cloud (Direct)' : 'Mode Hors-Ligne Actif (Stockage Local PWA)'}</span>
+        </div>
+        {!isOnline && (
+          <span className="text-[10px] uppercase tracking-wider font-mono bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
+            Offline-First Active
+          </span>
+        )}
+      </div>
+
       {/* Header Mobile Driver Banner */}
       <div className="bg-gradient-to-r from-sky-900 via-indigo-950 to-slate-900 p-5 rounded-3xl border border-sky-500/30 shadow-xl space-y-2">
         <div className="flex items-center space-x-3">
@@ -255,7 +521,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
           </div>
         </div>
         <p className="text-xs text-slate-300 font-medium">
-          Emplacement des entrepôts de ramassage, adresses clients & signature numérique.
+          Qualification par ligne, COD, Retenue à la Source RS 1.5%, Signature GPS & BL Archivé en GED.
         </p>
       </div>
 
@@ -331,7 +597,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
           {activeTours.map((tour) => {
             const deliveredCount = tour.orders.filter(o => o.delivery_status === 'livre').length;
             const totalCount = tour.orders.length;
-            const isCompleted = tour.status === 'terminee';
+            const isCompleted = tour.status === 'terminee' || tour.status === 'cloturee_validee';
             const pickupWarehouse = tour.pickup_warehouse || tour.warehouse_location || tour.orders[0]?.warehouse_location || 'Dépôt Central';
 
             return (
@@ -355,11 +621,13 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                     </div>
 
                     <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                      isCompleted 
+                      tour.status === 'cloturee_validee'
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                        : isCompleted 
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
                         : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
                     }`}>
-                      {isCompleted ? 'TERMINÉE' : 'EN COURS'}
+                      {tour.status === 'cloturee_validee' ? 'CLÔTURÉE & RAPPROCHÉE' : isCompleted ? 'TERMINÉE' : 'EN COURS'}
                     </span>
                   </div>
 
@@ -425,7 +693,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                           </span>
                         </div>
 
-                        {/* Multi-Warehouse Pickup Stops (Arrêts de Ramassage Chronologiques) */}
+                        {/* Multi-Warehouse Pickup Stops */}
                         {ord.pickup_stops && ord.pickup_stops.length > 0 && (
                           <div className="space-y-2 pt-1 border-t border-slate-800">
                             <span className="text-[10px] font-black uppercase text-amber-400 font-mono block">
@@ -497,13 +765,36 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                           </span>
                         </div>
 
-                        {/* Signature preview if already signed */}
-                        {ord.signatureUrl && (
-                          <div className="p-2 bg-slate-900 rounded-xl border border-emerald-500/30 flex items-center justify-between text-xs">
-                            <span className="text-emerald-400 font-bold text-[10px] uppercase font-mono">
-                              Signature Réceptionnée
-                            </span>
-                            <img src={ord.signatureUrl} alt="Signature Client" className="h-8 max-w-[100px] object-contain invert" />
+                        {/* Signature & Qualification Preview if signed */}
+                        {isLivre && (
+                          <div className="p-3 bg-slate-900 rounded-xl border border-emerald-500/30 space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-emerald-400 font-bold text-[10px] uppercase font-mono">
+                                ✅ Signature & Coordonnées GPS Reçues
+                              </span>
+                              {ord.signatureUrl && (
+                                <img src={ord.signatureUrl} alt="Signature Client" className="h-7 max-w-[90px] object-contain invert" />
+                              )}
+                            </div>
+
+                            {/* RS Certificate Badge */}
+                            {ord.withholding_tax_rs?.enabled && (
+                              <div className="bg-amber-950/40 border border-amber-500/30 p-2 rounded-lg text-[11px] text-amber-300 flex items-center justify-between">
+                                <div className="flex items-center space-x-1.5">
+                                  <Receipt className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>RS 1.5%: N° {ord.withholding_tax_rs.certificateNumber}</span>
+                                </div>
+                                <span className="font-mono font-bold">{ord.withholding_tax_rs.amountRS.toFixed(3)} TND</span>
+                              </div>
+                            )}
+
+                            {/* GPS info */}
+                            {ord.pod_gps && (
+                              <div className="text-[10px] text-slate-400 font-mono flex items-center space-x-1">
+                                <MapPin className="w-3 h-3 text-sky-400" />
+                                <span>GPS: {ord.pod_gps.lat}, {ord.pod_gps.lng} • {new Date(ord.pod_gps.timestamp).toLocaleTimeString()}</span>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -512,7 +803,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                           {isLivre ? (
                             <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs font-mono">
                               <CheckCircle2 className="w-4 h-4" />
-                              <span>LIVRAISON VALIDÉE</span>
+                              <span>LIVRAISON VALIDÉE (BL ARCHIVÉ GED)</span>
                             </div>
                           ) : (
                             <button
@@ -521,7 +812,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                               id={`btn-open-signature-order-${ord.order_id}`}
                             >
                               <PenTool className="w-4 h-4" />
-                              <span>Prendre Signature & Valider</span>
+                              <span>Qualifier Lignes, COD, RS & Valider Signature</span>
                             </button>
                           )}
                         </div>
@@ -539,18 +830,18 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
 
       </div>
 
-      {/* SIGNATURE MODAL OVERLAY */}
+      {/* FULL-FEATURED DELIVERY QUALIFICATION & SIGNATURE MODAL */}
       {selectedOrderForSignature && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md p-4 flex items-center justify-center animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-4 text-slate-100">
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md p-4 flex items-center justify-center overflow-y-auto animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-3xl p-5 shadow-2xl space-y-4 text-slate-100 my-8">
             
             <div className="flex justify-between items-start border-b border-slate-800 pb-3">
               <div>
                 <span className="text-[10px] font-black uppercase text-sky-400 font-mono block">
-                  ÉTAPES DE VALIDATION LIVRAISON
+                  QUALIFICATION TERRAIN • CROSS-MODULE PIPELINE
                 </span>
                 <h3 className="text-base font-black text-white">
-                  Signature du Client
+                  Livraison & Encaissement COD Client
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Client: {selectedOrderForSignature.order.client_name} ({selectedOrderForSignature.order.order_id})
@@ -559,20 +850,202 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
 
               <button
                 onClick={() => setSelectedOrderForSignature(null)}
-                className="p-1 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+                className="p-1 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Canvas Area */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-xs text-slate-400 font-medium">
-                <span>Veuillez faire signer le client ci-dessous :</span>
+            {/* STEP 1: QUALIFICATION PAR LIGNE */}
+            <div className="space-y-2 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-black uppercase text-sky-400 font-mono flex items-center space-x-1.5">
+                  <Package className="w-4 h-4 text-sky-400" />
+                  <span>1. Qualification des Articles par Ligne</span>
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">
+                  {lineQualifications.filter(q => q.status === 'LIVRE').length}/{lineQualifications.length} Livrés
+                </span>
+              </div>
+
+              <div className="space-y-2.5 pt-1">
+                {lineQualifications.map((item, qIdx) => (
+                  <div key={item.articleId || qIdx} className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h5 className="font-bold text-white leading-snug">{item.articleName}</h5>
+                        <span className="text-[10px] font-mono text-slate-400">Commandé: {item.qtyOrdered} unité(s)</span>
+                      </div>
+                      
+                      {/* Status Selector */}
+                      <div className="flex items-center space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => updateQualificationStatus(qIdx, 'LIVRE')}
+                          className={`px-2 py-1 rounded text-[10px] font-black uppercase transition cursor-pointer ${
+                            item.status === 'LIVRE' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          LIVRÉ
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateQualificationStatus(qIdx, 'PARTIEL')}
+                          className={`px-2 py-1 rounded text-[10px] font-black uppercase transition cursor-pointer ${
+                            item.status === 'PARTIEL' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          PARTIEL
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateQualificationStatus(qIdx, 'REFUSE', 'Produit endommagé')}
+                          className={`px-2 py-1 rounded text-[10px] font-black uppercase transition cursor-pointer ${
+                            item.status === 'REFUSE' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          REFUSÉ / RETOUR
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quantity or Return reason input */}
+                    {item.status === 'PARTIEL' && (
+                      <div className="flex items-center space-x-2 pt-1">
+                        <span className="text-[11px] text-amber-300 font-bold">Qté Livrée Effective:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={item.qtyOrdered}
+                          value={item.qtyDelivered}
+                          onChange={(e) => updateDeliveredQty(qIdx, parseInt(e.target.value) || 0)}
+                          className="w-20 bg-slate-950 border border-amber-500/50 rounded p-1 text-xs text-amber-300 font-mono font-bold text-center"
+                        />
+                        <span className="text-[10px] text-slate-400">/ {item.qtyOrdered}</span>
+                      </div>
+                    )}
+
+                    {item.status === 'REFUSE' && (
+                      <div className="pt-1 flex items-center space-x-2">
+                        <span className="text-[11px] text-rose-300 font-bold">Motif du Retour:</span>
+                        <select
+                          value={item.returnReason || 'Produit endommagé'}
+                          onChange={(e) => updateQualificationStatus(qIdx, 'REFUSE', e.target.value)}
+                          className="flex-1 bg-slate-950 border border-rose-500/50 text-rose-300 text-xs rounded p-1 font-mono"
+                        >
+                          <option value="Produit endommagé">Produit endommagé en transport</option>
+                          <option value="Commande non conforme">Commande non conforme au BC</option>
+                          <option value="Refus client">Refus client à la réception</option>
+                          <option value="Erreur de reference">Erreur de référence dépôt</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* STEP 2: ENCAISSEMENT COD & RETENUE À LA SOURCE (RS 1.5%) */}
+            <div className="space-y-3 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+              <span className="text-xs font-black uppercase text-amber-400 font-mono flex items-center space-x-1.5">
+                <DollarSign className="w-4 h-4 text-amber-400" />
+                <span>2. Encaissement COD & Retenue à la Source (RS 1.5%)</span>
+              </span>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold mb-1">Montant TTC à Régler :</label>
+                  <input
+                    type="number"
+                    value={collectedAmount}
+                    onChange={(e) => setCollectedAmount(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-emerald-400 font-mono font-bold text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-bold mb-1">Mode d'Encaissement :</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as any)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-white font-bold text-xs"
+                  >
+                    <option value="CASH">💵 Espèces (Cash)</option>
+                    <option value="CHEQUE">💳 Chèque Bancaire</option>
+                    <option value="TRAITE">📄 Traite / Virement</option>
+                    <option value="DEJA_PAYE">🟢 Déjà Payé à la Commande</option>
+                  </select>
+                </div>
+              </div>
+
+              {paymentMethod === 'CHEQUE' && (
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                  <div>
+                    <label className="block text-[10px] text-slate-400 font-bold mb-1">N° du Chèque :</label>
+                    <input
+                      type="text"
+                      placeholder="ex: CHQ-908212"
+                      value={chequeNum}
+                      onChange={(e) => setChequeNum(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-white font-mono text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 font-bold mb-1">Banque Émettrice :</label>
+                    <input
+                      type="text"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-white text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Retenue à la source checkbox */}
+              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
+                <label className="flex items-center space-x-2 text-xs font-bold text-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rsEnabled}
+                    onChange={(e) => setRsEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-amber-500 rounded"
+                  />
+                  <span>📜 Remise Certificat Retenue à la Source (RS 1.5%) par le client</span>
+                </label>
+
+                {rsEnabled && (
+                  <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-bold mb-0.5">N° Certificat RS :</label>
+                      <input
+                        type="text"
+                        value={rsCertNum}
+                        onChange={(e) => setRsCertNum(e.target.value)}
+                        className="w-full bg-slate-950 border border-amber-500/50 rounded-lg p-1.5 text-amber-300 font-mono font-bold text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-bold mb-0.5">Montant RS (Calculé 1.5%) :</label>
+                      <div className="bg-slate-950 border border-amber-500/50 rounded-lg p-1.5 text-amber-400 font-mono font-black text-xs">
+                        {((selectedOrderForSignature.order.amount_ttc / 1.19) * 0.015).toFixed(3)} TND
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* STEP 3: SIGNATURE & GPS HORODATAGE */}
+            <div className="space-y-2 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+              <div className="flex justify-between items-center text-xs text-slate-300 font-bold">
+                <span className="text-sky-400 uppercase font-mono">3. Signature Client & Géolocalisation GPS</span>
                 <button
                   type="button"
                   onClick={clearSignature}
-                  className="text-amber-400 hover:text-amber-300 text-[11px] font-bold flex items-center space-x-1"
+                  className="text-amber-400 hover:text-amber-300 text-[11px] font-bold flex items-center space-x-1 cursor-pointer"
                 >
                   <Eraser className="w-3.5 h-3.5" />
                   <span>Effacer</span>
@@ -583,7 +1056,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                 <canvas
                   ref={canvasRef}
                   width={340}
-                  height={180}
+                  height={150}
                   onMouseDown={startDrawing}
                   onMouseMove={draw}
                   onMouseUp={stopDrawing}
@@ -591,14 +1064,15 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                   onTouchStart={startDrawing}
                   onTouchMove={draw}
                   onTouchEnd={stopDrawing}
-                  className="w-full h-[180px] cursor-crosshair bg-white"
+                  className="w-full h-[150px] cursor-crosshair bg-white"
                   id="delivery-signature-canvas"
                 />
               </div>
-            </div>
 
-            <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-slate-400 leading-relaxed">
-              ✍️ En appuyant sur "Valider la Livraison", la preuve de réception avec signature sera archivée électroniquement dans le dossier client Firestore.
+              <div className="text-[10px] text-slate-400 font-mono flex items-center space-x-2 pt-1">
+                <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                <span>GPS Fix: {gpsLocation.lat}, {gpsLocation.lng} • Horodaté au {new Date().toLocaleTimeString()}</span>
+              </div>
             </div>
 
             {/* Submit Buttons */}
@@ -618,7 +1092,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                 id="btn-confirm-delivery-with-signature"
               >
                 <FileCheck2 className="w-4 h-4" />
-                <span>Valider la Livraison</span>
+                <span>Valider Livraison (BL GED & Synchro Cloud)</span>
               </button>
             </div>
 

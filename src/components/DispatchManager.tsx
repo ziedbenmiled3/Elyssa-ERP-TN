@@ -7,7 +7,7 @@ import {
   updateDoc 
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
-import { DeliveryTour, DeliveryTourOrder, FleetInventoryItem, PickingOrder, DeliveryPickupStop } from '../types/mobileTerrain';
+import { DeliveryTour, DeliveryTourOrder, FleetInventoryItem, PickingOrder, DeliveryPickupStop, EveningTourClosure } from '../types/mobileTerrain';
 import { Invoice, Employee } from '../types';
 import { 
   Truck, 
@@ -32,7 +32,14 @@ import {
   Building2,
   Filter,
   Boxes,
-  AlertTriangle
+  AlertTriangle,
+  Scale,
+  Receipt,
+  DollarSign,
+  X,
+  CreditCard,
+  Gauge,
+  Lock
 } from 'lucide-react';
 
 interface DispatchManagerProps {
@@ -63,6 +70,15 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
   const [selectedVehicleName, setSelectedVehicleName] = useState('');
   const [tourNotes, setTourNotes] = useState('');
 
+  // Evening Tour Closure Modal State
+  const [closingTour, setClosingTour] = useState<DeliveryTour | null>(null);
+  const [actualCashCounted, setActualCashCounted] = useState<number>(0);
+  const [actualChequesCounted, setActualChequesCounted] = useState<number>(0);
+  const [actualRSCounted, setActualRSCounted] = useState<number>(0);
+  const [endingOdometer, setEndingOdometer] = useState<number>(120480);
+  const [fuelExpenses, setFuelExpenses] = useState<number>(120);
+  const [tollExpenses, setTollExpenses] = useState<number>(18);
+
   // Zone 3 View Mode & Search / Filters
   const [zone3ViewMode, setZone3ViewMode] = useState<'by_driver' | 'all_tours'>('by_driver');
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,26 +106,95 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
     { id: 'emp_drv_04', name: 'Nizar Trabelsi (Conducteur Utilitaire)' }
   ];
 
-  // Dynamic drivers list combining HR collaborators & default drivers
+  // Dynamic drivers list combining HR collaborators & default drivers filtered by driver roles
   const driversList = useMemo(() => {
     const list = [...defaultDrivers];
     const existingIds = new Set(list.map(d => d.id));
 
     if (Array.isArray(employees) && employees.length > 0) {
       employees.forEach(emp => {
-        if (emp && emp.id && !existingIds.has(emp.id)) {
-          const title = emp.jobTitle || 'Collaborateur';
+        if (!emp || !emp.id) return;
+        const job = (emp.jobTitle || '').toLowerCase();
+        const role = (emp.role || '').toLowerCase();
+        const dept = (emp.department || '').toLowerCase();
+
+        const isDriver = job.includes('chauffeur') || job.includes('livreur') || job.includes('conducteur') ||
+                         job.includes('agent') || job.includes('logistique') || dept.includes('logistique') ||
+                         dept.includes('transport') || role === 'chauffeur' || role === 'livreur' || role === 'agent';
+
+        if (isDriver && !existingIds.has(emp.id)) {
           list.push({
             id: emp.id,
-            name: `${emp.name} (${title})`
+            name: `${emp.name} (${emp.jobTitle || 'Chauffeur Terrain'})`
           });
           existingIds.add(emp.id);
         }
       });
     }
 
-    return list;
-  }, [employees]);
+    return list.map(d => {
+      const activeTour = deliveryTours.find(t => t.driver_id === d.id && t.status === 'en_cours');
+      return {
+        ...d,
+        activeTourNumber: activeTour?.tour_number,
+        availabilityStatus: activeTour ? 'EN_TOURNEE' : 'DISPONIBLE'
+      };
+    });
+  }, [employees, deliveryTours]);
+
+  // Filtered vehicles (only Available or EN CIRCULATION)
+  const filteredVehicles = useMemo(() => {
+    return availableVehicles.filter(v => {
+      const st = (v.status || '').toUpperCase();
+      return st === 'AVAILABLE' || st === 'EN CIRCULATION' || st === 'ACTIF' || st === 'ASSIGNED';
+    }).map(v => {
+      let maxPayloadKg = v.maxPayloadKg;
+      if (!maxPayloadKg) {
+        const name = (v.device_name || '').toLowerCase();
+        if (name.includes('12t') || name.includes('12 tonne')) maxPayloadKg = 12000;
+        else if (name.includes('partner') || name.includes('utilitaire')) maxPayloadKg = 1200;
+        else if (name.includes('toupie') || name.includes('malaxeur')) maxPayloadKg = 20000;
+        else maxPayloadKg = 8000;
+      }
+      return { ...v, maxPayloadKg };
+    });
+  }, [availableVehicles]);
+
+  // Payload calculation for selected invoices
+  const selectedInvoicesList = useMemo(() => {
+    return pendingInvoices.filter(i => selectedInvoiceIds.includes(i.id));
+  }, [pendingInvoices, selectedInvoiceIds]);
+
+  const totalPayloadWeightKg = useMemo(() => {
+    return selectedInvoicesList.reduce((acc, inv) => {
+      const estWeight = inv.estimatedWeightKg || Math.round((inv.amountHT || inv.amountTTC * 0.8) * 0.25) || 450;
+      return acc + estWeight;
+    }, 0);
+  }, [selectedInvoicesList]);
+
+  const selectedVehicleObj = useMemo(() => {
+    return filteredVehicles.find(v => v.id === selectedVehicleId);
+  }, [filteredVehicles, selectedVehicleId]);
+
+  const selectedVehicleMaxPayloadKg = selectedVehicleObj?.maxPayloadKg || 12000;
+  const payloadRatioPercent = selectedVehicleMaxPayloadKg > 0 ? Math.round((totalPayloadWeightKg / selectedVehicleMaxPayloadKg) * 100) : 0;
+  const isPayloadOverloaded = totalPayloadWeightKg > selectedVehicleMaxPayloadKg;
+
+  // Helper to calculate client credit status
+  const getClientCreditInfo = (inv: Invoice) => {
+    const creditLimit = 10000;
+    const clientInvoices = pendingInvoices.filter(i => i.clientId === inv.clientId || i.clientName === inv.clientName);
+    const currentOutstanding = clientInvoices.reduce((sum, i) => sum + (i.amountNetToPay || i.amountTTC || 0), 0);
+    const overdueCount = clientInvoices.filter(i => i.status === 'Unpaid' && i.dueDate && new Date(i.dueDate) < new Date()).length;
+    const isExceeded = currentOutstanding > creditLimit || overdueCount > 0;
+
+    return {
+      creditLimit,
+      currentOutstanding,
+      overdueCount,
+      isExceeded
+    };
+  };
 
   // 1. Listen to Invoices awaiting delivery
   useEffect(() => {
@@ -151,7 +236,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
     return () => unsub();
   }, [tenantId]);
 
-  // Helper to resolve picking readiness and multi-warehouse stops for an invoice
+  // Helper to resolve picking readiness & loading dock assignment
   const getInvoicePickingInfo = (inv: Invoice) => {
     const matching = pickingOrders.filter(
       p => p.orderId === inv.id || p.orderId === inv.invoiceNumber
@@ -161,23 +246,33 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
       const warehouses = Array.from(new Set(matching.map(p => p.warehouseName)));
       const allReady = matching.every(p => p.status === 'pret_chargement');
       const readyCount = matching.filter(p => p.status === 'pret_chargement').length;
+      
+      const dockList = matching
+        .map(p => p.dockNumber)
+        .filter((d): d is string => Boolean(d && d !== 'Quai Non Attribué'));
+      const dockNumber = dockList.length > 0 ? Array.from(new Set(dockList)).join(' / ') : 'Quai Non Attribué';
 
       return {
         pickingOrders: matching,
         warehouses,
         allReady,
+        isReadyForDispatch: allReady,
+        dockNumber,
         readyCount,
         totalCount: matching.length,
         hasPickingOrders: true
       };
     }
 
+    // Orders without picking orders in warehouse_picking are pending picking setup (blocked for tour creation)
     const whName = inv.warehouse_location || 'Dépôt Central - Radès (Tunis)';
     return {
       pickingOrders: [],
       warehouses: [whName],
-      allReady: true,
-      readyCount: 1,
+      allReady: false,
+      isReadyForDispatch: false,
+      dockNumber: 'Quai Non Attribué',
+      readyCount: 0,
       totalCount: 1,
       hasPickingOrders: false
     };
@@ -227,13 +322,13 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
     return () => unsub();
   }, [tenantId]);
 
-  // Seed demo pending invoices covering all 3 multi-channel sales paths
+  // Seed Demo Data
   const handleSeedDemoInvoices = async () => {
     const demoInvoices: Partial<Invoice>[] = [
       {
         id: 'FAC-2026-0801',
         clientId: 'CLI-001',
-        clientName: 'SOCIÉTÉ DU SAHEL DISTRIBUTION',
+        clientName: 'SOCIÉTÉ TUNISIENNE DE CONSTRUCTION (STC)',
         invoiceNumber: 'FAC-2026-0801',
         sales_channel: 'web',
         warehouse_location: 'Dépôt Central - Radès (Tunis)',
@@ -246,7 +341,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
         amountTTC: 4998,
         status: 'Unpaid',
         delivery_status: 'en_attente',
-        delivery_address: 'Zone Industrielle Akouda, Lot 14, Sousse',
+        delivery_address: 'Z.I. Ben Arous, Rue 8600, Tunis',
         issuedDate: new Date().toISOString(),
         dueDate: new Date(Date.now() + 15 * 86400000).toISOString(),
         recouvrementSteps: [],
@@ -295,33 +390,63 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
         dueDate: new Date().toISOString(),
         recouvrementSteps: [],
         withholdingCertificateReceived: true
-      },
-      {
-        id: 'FAC-2026-0804',
-        clientId: 'CLI-004',
-        clientName: 'TRABELSI EQUIPEMENTS & SERVICES',
-        invoiceNumber: 'FAC-2026-0804',
-        sales_channel: 'web',
-        warehouse_location: 'Entrepôt Principal - Z.I. Charguia II',
-        amountHT: 5600,
-        vatRate: 19,
-        vatAmount: 1064,
-        withholdingTaxRate: 1.5,
-        withholdingAmount: 84,
-        amountNetToPay: 6580,
-        amountTTC: 6664,
-        status: 'Unpaid',
-        delivery_status: 'en_attente',
-        delivery_address: 'Route de Gabès km 3, Sfax',
-        issuedDate: new Date().toISOString(),
-        dueDate: new Date(Date.now() + 20 * 86400000).toISOString(),
-        recouvrementSteps: [],
-        withholdingCertificateReceived: false
       }
     ];
 
     for (const inv of demoInvoices) {
       await setDoc(doc(db, 'company_erp_data', tenantId, 'invoices', inv.id!), inv, { merge: true });
+    }
+
+    // Seed matching picking orders with various readiness statuses (Ready vs In Progress / Pending)
+    const demoPickingOrders: PickingOrder[] = [
+      {
+        id: 'PICK-FAC-2026-0801',
+        tenantId,
+        orderId: 'FAC-2026-0801',
+        clientName: 'SOCIÉTÉ TUNISIENNE DE CONSTRUCTION (STC)',
+        deliveryAddress: 'Z.I. Ben Arous, Rue 8600, Tunis',
+        warehouseId: 'wh_central',
+        warehouseName: 'Dépôt Central Radès',
+        dockNumber: 'Quai 1 - Dépôt Central Radès',
+        status: 'pret_chargement',
+        createdAt: new Date().toISOString(),
+        preparedAt: new Date().toISOString(),
+        preparedBy: 'Mounir Sfaxi (Chef Dépôt)',
+        totalAmountTTC: 4998,
+        items: [{ productId: 'MAT-01', productName: 'Ciment Portland 50kg', quantity: 50, warehouseName: 'Dépôt Central Radès' }]
+      },
+      {
+        id: 'PICK-FAC-2026-0802',
+        tenantId,
+        orderId: 'FAC-2026-0802',
+        clientName: 'COMPTOIR INDUSTRIEL BTP',
+        deliveryAddress: 'Chantier Rocade Sud, km 12, Sfax',
+        warehouseId: 'wh_sfax',
+        warehouseName: 'Magasin & Showroom Sfax',
+        dockNumber: 'Quai Non Attribué',
+        status: 'en_cours',
+        createdAt: new Date().toISOString(),
+        totalAmountTTC: 10115,
+        items: [{ productId: 'MAT-02', productName: 'Briques Creuses 12 Trous', quantity: 20, warehouseName: 'Magasin & Showroom Sfax' }]
+      },
+      {
+        id: 'PICK-FAC-2026-0803',
+        tenantId,
+        orderId: 'FAC-2026-0803',
+        clientName: 'BEN AHMED MATÉRIAUX',
+        deliveryAddress: 'Avenue Habib Bourguiba, Nabeul',
+        warehouseId: 'wh_sousse',
+        warehouseName: 'Stock Logistique Sousse',
+        dockNumber: 'Quai Non Attribué',
+        status: 'en_attente',
+        createdAt: new Date().toISOString(),
+        totalAmountTTC: 3689,
+        items: [{ productId: 'MAT-03', productName: 'Peinture Mat Satiné 20L', quantity: 10, warehouseName: 'Stock Logistique Sousse' }]
+      }
+    ];
+
+    for (const po of demoPickingOrders) {
+      await setDoc(doc(db, 'company_erp_data', tenantId, 'picking_orders', po.id), po, { merge: true });
     }
 
     if (availableVehicles.length === 0) {
@@ -334,7 +459,8 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
           serial_reference: 'TN-9021',
           category: 'Véhicule Poids Lourd',
           status: 'Available',
-          registeredAt: new Date().toISOString()
+          registeredAt: new Date().toISOString(),
+          maxPayloadKg: 12000
         },
         {
           id: 'v_utilitaire_van',
@@ -344,17 +470,8 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
           serial_reference: 'TN-8840',
           category: 'Véhicule Utilitaire',
           status: 'Available',
-          registeredAt: new Date().toISOString()
-        },
-        {
-          id: 'v_camion_toupie',
-          tenantId: tenantId,
-          fleet_park: 'Flotte Chantiers',
-          device_name: 'Camion Malaxeur Toupie BTP',
-          serial_reference: 'TN-7712',
-          category: 'Engin Chantier',
-          status: 'Available',
-          registeredAt: new Date().toISOString()
+          registeredAt: new Date().toISOString(),
+          maxPayloadKg: 1200
         }
       ];
       for (const veh of demoVehicles) {
@@ -362,11 +479,23 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
       }
     }
 
-    showToast('Commandes multi-canaux et Véhicules de démonstration générés.', 'success');
+    showToast('Commandes, Bons de Préparation et Véhicules générés avec succès.', 'success');
   };
 
-  // Toggle Selection
+  // Toggle Selection (Blocked if picking status is not PRÊT AU QUAI / PRÉPARÉ)
   const toggleSelectInvoice = (id: string) => {
+    const inv = pendingInvoices.find(i => i.id === id);
+    if (inv) {
+      const pickInfo = getInvoicePickingInfo(inv);
+      if (!pickInfo.isReadyForDispatch) {
+        showToast(
+          `🔒 Affectation camion impossible : La commande ${inv.invoiceNumber || inv.id} est en cours de préparation au dépôt (Quai non attribué). Validation "PRÊT AU QUAI" requise.`,
+          'error'
+        );
+        return;
+      }
+    }
+
     setSelectedInvoiceIds(prev => 
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
@@ -374,46 +503,27 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
 
   // Filter awaiting invoices
   const awaitingInvoices = useMemo(() => {
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
     return pendingInvoices.filter(i => {
       const isPending = (i.delivery_status || 'en_attente') === 'en_attente';
       const matchChannel = channelFilter === 'ALL' || (i.sales_channel || 'web') === channelFilter;
-
-      let matchDate = true;
-      if (i.issuedDate) {
-        const invDateStr = i.issuedDate.split('T')[0];
-        const invDate = new Date(i.issuedDate);
-
-        if (dateFilter === 'today') {
-          matchDate = invDateStr === todayStr;
-        } else if (dateFilter === 'yesterday') {
-          matchDate = invDateStr === yesterdayStr;
-        } else if (dateFilter === 'this_week') {
-          matchDate = invDate >= sevenDaysAgo;
-        } else if (dateFilter === 'custom') {
-          if (customStartDate && invDateStr < customStartDate) matchDate = false;
-          if (customEndDate && invDateStr > customEndDate) matchDate = false;
-        }
-      }
-
-      return isPending && matchChannel && matchDate;
+      return isPending && matchChannel;
     });
-  }, [pendingInvoices, channelFilter, dateFilter, customStartDate, customEndDate]);
+  }, [pendingInvoices, channelFilter]);
 
   const toggleSelectAll = () => {
-    if (selectedInvoiceIds.length === awaitingInvoices.length) {
-      setSelectedInvoiceIds([]);
+    const readyInvoices = awaitingInvoices.filter(inv => getInvoicePickingInfo(inv).isReadyForDispatch);
+    const readyIds = readyInvoices.map(i => i.id);
+
+    if (readyIds.length === 0) {
+      showToast('⚠️ Aucune commande "PRÊT AU QUAI" disponible à sélectionner.', 'error');
+      return;
+    }
+
+    const allReadySelected = readyIds.every(id => selectedInvoiceIds.includes(id));
+    if (allReadySelected) {
+      setSelectedInvoiceIds(prev => prev.filter(id => !readyIds.includes(id)));
     } else {
-      setSelectedInvoiceIds(awaitingInvoices.map(i => i.id));
+      setSelectedInvoiceIds(prev => Array.from(new Set([...prev, ...readyIds])));
     }
   };
 
@@ -431,22 +541,14 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
       return;
     }
 
+    if (isPayloadOverloaded) {
+      showToast(`⚠️ Attention: Le poids total (${totalPayloadWeightKg} kg) dépasse la charge utile max du véhicule (${selectedVehicleMaxPayloadKg} kg). Risque de surcharge!`, 'error');
+    }
+
     const tourId = `TOUR-${Date.now()}`;
     const tourNumber = `TR-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
 
     const selectedInvoicesList = pendingInvoices.filter(i => selectedInvoiceIds.includes(i.id));
-    
-    // Check if any selected invoice has unready picking orders
-    for (const inv of selectedInvoicesList) {
-      const info = getInvoicePickingInfo(inv);
-      if (info.hasPickingOrders && !info.allReady) {
-        showToast(
-          `⚠️ Impossible de créer la tournée: La commande ${inv.invoiceNumber} a ${info.readyCount}/${info.totalCount} dépôt(s) 'Prêt au Quai'. Veuillez valider les préparations en dépôt.`,
-          'error'
-        );
-        return;
-      }
-    }
 
     // Determine primary pickup warehouse from selected invoices
     const primaryWarehouse = selectedInvoicesList[0]?.warehouse_location || 'Dépôt Central - Radès (Tunis)';
@@ -460,17 +562,9 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
           stop_id: `STOP-${po.id}`,
           warehouse_id: po.warehouseId || `wh_${idx + 1}`,
           warehouse_name: po.warehouseName,
-          address: `${po.warehouseName} - Quai de Ramassage #${idx + 1}`,
+          dock_number: po.dockNumber || info.dockNumber || `Quai 1 - ${po.warehouseName}`,
+          address: `${po.warehouseName} (${po.dockNumber || info.dockNumber || 'Quai 1'})`,
           items: po.items.map(i => ({ productName: i.productName, quantity: i.quantity })),
-          status: 'en_attente'
-        }));
-      } else if (inv.warehouses_involved && Array.isArray(inv.warehouses_involved) && inv.warehouses_involved.length > 0) {
-        pickupStops = inv.warehouses_involved.map((whName, idx) => ({
-          stop_id: `STOP-${inv.id}-${idx + 1}`,
-          warehouse_id: `wh_${idx + 1}`,
-          warehouse_name: whName,
-          address: `${whName} - Quai de Ramassage #${idx + 1}`,
-          items: inv.items ? inv.items.map(item => ({ productName: item.description || item.code, quantity: item.quantity })) : [{ productName: `Colis ${whName}`, quantity: 1 }],
           status: 'en_attente'
         }));
       } else {
@@ -479,22 +573,28 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
           stop_id: `STOP-${inv.id}-DEF`,
           warehouse_id: 'wh_default',
           warehouse_name: whName,
-          address: `${whName} - Quai de Ramassage`,
+          dock_number: info.dockNumber || 'Quai 1 - Dépôt Central',
+          address: `${whName} - ${info.dockNumber || 'Quai 1'}`,
           items: [{ productName: `Colis commande ${inv.invoiceNumber}`, quantity: 1 }],
           status: 'en_attente'
         }];
       }
+
+      const creditInfo = getClientCreditInfo(inv);
 
       return {
         order_id: inv.id,
         client_name: inv.clientName,
         address: inv.delivery_address || 'Adresse Siège Client',
         amount_ttc: inv.amountTTC,
+        amount_ht: inv.amountHT,
         delivery_status: 'en_transit',
         sales_channel: inv.sales_channel || 'web',
         warehouse_location: info.warehouses.join(' + '),
+        dock_number: info.dockNumber || 'Quai 1 - Dépôt Central',
         warehouses_involved: info.warehouses,
-        pickup_stops: pickupStops
+        pickup_stops: pickupStops,
+        clientCreditAlert: creditInfo
       };
     });
 
@@ -511,21 +611,35 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
       orders: tourOrders,
       status: 'en_cours',
       created_at: new Date().toISOString(),
-      notes: tourNotes.trim() || ''
+      notes: tourNotes.trim() || '',
+      total_weight_kg: totalPayloadWeightKg,
+      vehicle_max_payload_kg: selectedVehicleMaxPayloadKg,
+      payload_ratio_percent: payloadRatioPercent
     };
 
     // 1. Save Tour in Firestore
     await setDoc(doc(db, 'company_erp_data', tenantId, 'delivery_tours', tourId), newTour);
 
-    // 2. Update selected Invoices status to 'en_transit'
-    for (const invId of selectedInvoiceIds) {
-      await updateDoc(doc(db, 'company_erp_data', tenantId, 'invoices', invId), {
+    // 2. Reserve Stock in Firestore for each invoice item
+    for (const inv of selectedInvoicesList) {
+      await updateDoc(doc(db, 'company_erp_data', tenantId, 'invoices', inv.id), {
         delivery_status: 'en_transit'
       });
+
+      const stockResDocId = `RES_${inv.id}`;
+      await setDoc(doc(db, 'company_erp_data', tenantId, 'stock_reservations', stockResDocId), {
+        id: stockResDocId,
+        tenantId,
+        invoiceId: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        clientName: inv.clientName,
+        status: 'RESERVE_EN_PREPARATION',
+        tourNumber,
+        reservedAt: new Date().toISOString()
+      }, { merge: true });
     }
 
-    // 3. Toast and Reset
-    showToast(`Tournée de livraison ${tourNumber} générée pour ${selectedDriverName}.`, 'success');
+    showToast(`Tournée ${tourNumber} créée avec succès. Stock réservé & Tournée notifiée au chauffeur.`, 'success');
     setSelectedInvoiceIds([]);
     setTourNotes('');
     setSelectedDriverName('');
@@ -534,69 +648,118 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
     setSelectedVehicleName('');
   };
 
-  // Mark tour order delivered manually from admin
-  const handleMarkOrderDelivered = async (tour: DeliveryTour, orderId: string) => {
-    const updatedOrders = tour.orders.map(ord => {
-      if (ord.order_id === orderId) {
-        return { ...ord, delivery_status: 'livre' as const, delivered_at: new Date().toISOString() };
+  // Open Evening Closure Modal
+  const handleOpenEveningClosure = (tour: DeliveryTour) => {
+    let cash = 0;
+    let cheques = 0;
+    let rs = 0;
+
+    tour.orders.forEach(o => {
+      if (o.delivery_status === 'livre' && o.payment_collected) {
+        if (o.payment_collected.method === 'CASH') cash += o.payment_collected.amountTTC || 0;
+        if (o.payment_collected.method === 'CHEQUE') cheques += o.payment_collected.amountTTC || 0;
       }
-      return ord;
+      if (o.withholding_tax_rs?.enabled) rs += o.withholding_tax_rs.amountRS || 0;
     });
 
-    const allDelivered = updatedOrders.every(ord => ord.delivery_status === 'livre');
-    const newTourStatus = allDelivered ? 'terminee' : tour.status;
-
-    await updateDoc(doc(db, 'company_erp_data', tenantId, 'delivery_tours', tour.id), {
-      orders: updatedOrders,
-      status: newTourStatus
-    });
-
-    await updateDoc(doc(db, 'company_erp_data', tenantId, 'invoices', orderId), {
-      delivery_status: 'livre'
-    });
-
-    showToast(`Commande ${orderId} marquée comme LIVRÉE.`, 'success');
+    setActualCashCounted(cash);
+    setActualChequesCounted(cheques);
+    setActualRSCounted(rs);
+    setClosingTour(tour);
   };
 
-  // Filtered tours
-  const filteredTours = useMemo(() => {
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+  // Confirm Evening Tour Closure & Treasury Injection
+  const handleConfirmEveningClosure = async () => {
+    if (!closingTour) return;
 
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    let expectedCash = 0;
+    let expectedCheques = 0;
+    let expectedRS = 0;
 
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    closingTour.orders.forEach(o => {
+      if (o.delivery_status === 'livre' && o.payment_collected) {
+        if (o.payment_collected.method === 'CASH') expectedCash += o.payment_collected.amountTTC || 0;
+        if (o.payment_collected.method === 'CHEQUE') expectedCheques += o.payment_collected.amountTTC || 0;
+      }
+      if (o.withholding_tax_rs?.enabled) expectedRS += o.withholding_tax_rs.amountRS || 0;
+    });
 
-    return deliveryTours.filter(t => {
-      const matchStatus = tourStatusFilter === 'ALL' || t.status === tourStatusFilter;
-      const search = searchTerm.toLowerCase();
-      const matchSearch = t.tour_number.toLowerCase().includes(search) ||
-                          t.driver_name.toLowerCase().includes(search) ||
-                          t.vehicle_name.toLowerCase().includes(search);
+    const totalExpected = expectedCash + expectedCheques;
+    const totalActual = actualCashCounted + actualChequesCounted;
+    const cashGap = totalActual - totalExpected;
 
-      let matchDate = true;
-      if (t.created_at) {
-        const tourDateStr = t.created_at.split('T')[0];
-        const tourDate = new Date(t.created_at);
+    const closureStatus = cashGap === 0 ? 'CONFORME' : 'ARBITRAGE_REQUIS';
 
-        if (dateFilter === 'today') {
-          matchDate = tourDateStr === todayStr;
-        } else if (dateFilter === 'yesterday') {
-          matchDate = tourDateStr === yesterdayStr;
-        } else if (dateFilter === 'this_week') {
-          matchDate = tourDate >= sevenDaysAgo;
-        } else if (dateFilter === 'custom') {
-          if (customStartDate && tourDateStr < customStartDate) matchDate = false;
-          if (customEndDate && tourDateStr > customEndDate) matchDate = false;
-        }
+    const eveningClosureObj: EveningTourClosure = {
+      closedAt: new Date().toISOString(),
+      closedBy: 'Responsable Caisse & Dispatch',
+      expectedCash,
+      actualCash: actualCashCounted,
+      expectedCheques,
+      actualCheques: actualChequesCounted,
+      expectedRSAmount: expectedRS,
+      actualRSAmount: actualRSCounted,
+      cashGap,
+      status: closureStatus,
+      endingOdometerKm: endingOdometer,
+      startingOdometerKm: 120000,
+      distanceTraveledKm: Math.max(0, endingOdometer - 120000),
+      fuelExpensesTND: fuelExpenses,
+      tollExpensesTND: tollExpenses
+    };
+
+    try {
+      // 1. Update Tour status & evening_closure object in Firestore
+      await updateDoc(doc(db, 'company_erp_data', tenantId, 'delivery_tours', closingTour.id), {
+        status: 'cloturee_validee',
+        evening_closure: eveningClosureObj
+      });
+
+      // 2. Inject Treasury Cash/Cheque entry in company_erp_data/{tenantId}/bank_transactions
+      const txId = `TX_DISPATCH_${closingTour.tour_number}`;
+      await setDoc(doc(db, 'company_erp_data', tenantId, 'bank_transactions', txId), {
+        id: txId,
+        tenantId,
+        date: new Date().toISOString(),
+        description: `Recette Tournée ${closingTour.tour_number} - Chauffeur ${closingTour.driver_name}`,
+        amount: totalActual,
+        type: 'Credit',
+        category: 'Encaissement Livraison Client',
+        account: 'Caisse Centrale Tunis',
+        reconciled: true,
+        reference: closingTour.tour_number,
+        notes: cashGap !== 0 ? `⚠️ Écart de caisse livreur: ${cashGap.toFixed(3)} TND` : 'Décharge caisse conforme'
+      }, { merge: true });
+
+      // 3. Update Vehicle Odometer in fleet_inventory
+      if (closingTour.vehicle_id && endingOdometer > 0) {
+        await setDoc(doc(db, 'company_erp_data', tenantId, 'fleet_inventory', closingTour.vehicle_id), {
+          mileage: endingOdometer,
+          registeredAt: new Date().toISOString()
+        }, { merge: true });
       }
 
-      return matchStatus && matchSearch && matchDate;
+      setClosingTour(null);
+      showToast(`✅ Clôture de la tournée ${closingTour.tour_number} effectuée et injectée en trésorerie !`, 'success');
+    } catch (err) {
+      console.error('Error closing tour:', err);
+      showToast('Erreur lors de la clôture de tournée.', 'error');
+    }
+  };
+
+  // Filtered tours for Zone 3
+  const filteredTours = useMemo(() => {
+    return deliveryTours.filter(tour => {
+      const matchSearch = !searchTerm || 
+        tour.tour_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tour.driver_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tour.vehicle_name.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchStatus = tourStatusFilter === 'ALL' || tour.status === tourStatusFilter;
+
+      return matchSearch && matchStatus;
     });
-  }, [deliveryTours, tourStatusFilter, searchTerm, dateFilter, customStartDate, customEndDate]);
+  }, [deliveryTours, searchTerm, tourStatusFilter]);
 
   // Dynamic Driver Grouping for Zone 3
   const driverGroups = useMemo(() => {
@@ -618,28 +781,28 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
         return (
           <span className="inline-flex items-center space-x-1 bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded text-[10px] font-bold">
             <Globe className="w-3 h-3 text-sky-600 shrink-0" />
-            <span>Commande Web / En Ligne</span>
+            <span>Web</span>
           </span>
         );
       case 'pos':
         return (
           <span className="inline-flex items-center space-x-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-bold">
             <ShoppingCart className="w-3 h-3 text-emerald-600 shrink-0" />
-            <span>Vente Caisse / POS</span>
+            <span>Caisse POS</span>
           </span>
         );
       case 'field_sales':
         return (
           <span className="inline-flex items-center space-x-1 bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded text-[10px] font-bold">
             <Briefcase className="w-3 h-3 text-purple-600 shrink-0" />
-            <span>Commercial Terrain</span>
+            <span>Commercial</span>
           </span>
         );
       default:
         return (
           <span className="inline-flex items-center space-x-1 bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-bold">
             <Globe className="w-3 h-3 text-slate-500 shrink-0" />
-            <span>Commande Standard</span>
+            <span>Commande</span>
           </span>
         );
     }
@@ -671,7 +834,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                 Expéditions & Dispatching des Tournées
               </h1>
               <p className="text-xs text-slate-400 font-medium">
-                Dispatching multi-canaux & Suivi dynamique par Chauffeur / Livreur
+                Pipeline Intégral : RH Chauffeurs, Flotte, Contrôle Payload, Sécurité Crédit Client & Décharge Caisse
               </p>
             </div>
           </div>
@@ -683,7 +846,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
           id="btn-seed-demo-invoices"
         >
           <Sparkles className="w-4 h-4 text-sky-200" />
-          <span>Générer Factures Multi-Canaux</span>
+          <span>Générer Factures & Flotte Démo</span>
         </button>
       </div>
 
@@ -705,7 +868,6 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
               </div>
             </div>
 
-            {/* Filter by Channel */}
             <div className="flex items-center space-x-2 w-full sm:w-auto">
               <select
                 value={channelFilter}
@@ -741,35 +903,51 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                 <p className="text-xs font-bold text-slate-600">
                   Aucune commande en attente dans ce canal.
                 </p>
-                <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                  Cliquez sur "Générer Factures Multi-Canaux" dans le bandeau supérieur pour tester l'affectation.
-                </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {awaitingInvoices.map((inv) => {
                   const isSelected = selectedInvoiceIds.includes(inv.id);
                   const pickInfo = getInvoicePickingInfo(inv);
+                  const creditInfo = getClientCreditInfo(inv);
+                  const isReady = pickInfo.isReadyForDispatch;
 
                   return (
                     <div
                       key={inv.id}
-                      onClick={() => toggleSelectInvoice(inv.id)}
-                      className={`p-4 rounded-2xl border transition cursor-pointer flex items-start space-x-3 ${
-                        isSelected 
-                          ? 'bg-sky-50/90 border-sky-400 shadow-xs ring-1 ring-sky-300' 
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                      onClick={() => {
+                        if (!isReady) {
+                          showToast(
+                            `🔒 Affectation camion impossible : La commande ${inv.invoiceNumber || inv.id} est en cours de préparation au dépôt (Quai non attribué).`,
+                            'error'
+                          );
+                          return;
+                        }
+                        toggleSelectInvoice(inv.id);
+                      }}
+                      className={`p-4 rounded-2xl border transition flex items-start space-x-3 ${
+                        !isReady
+                          ? 'bg-slate-50/90 border-slate-200 opacity-80 cursor-not-allowed'
+                          : isSelected 
+                          ? 'bg-sky-50/90 border-sky-400 shadow-xs ring-1 ring-sky-300 cursor-pointer' 
+                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60 cursor-pointer'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() => {}}
-                        className="mt-1 rounded text-sky-600 focus:ring-sky-500 h-4 w-4 cursor-pointer"
+                        disabled={!isReady}
+                        onChange={() => {
+                          if (isReady) toggleSelectInvoice(inv.id);
+                        }}
+                        className={`mt-1 rounded h-4 w-4 ${
+                          isReady
+                            ? 'text-sky-600 focus:ring-sky-500 cursor-pointer'
+                            : 'text-slate-300 opacity-50 cursor-not-allowed'
+                        }`}
                       />
 
                       <div className="flex-1 space-y-2">
-                        {/* Header line: BL/Invoice # + Sales Channel Badge + Amount */}
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center space-x-2">
                             <span className="font-mono text-[10px] font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded border border-sky-200">
@@ -782,115 +960,55 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                           </span>
                         </div>
 
-                        {/* Client Name */}
                         <h4 className="font-extrabold text-slate-900 text-sm">
                           {inv.clientName}
                         </h4>
 
-                        {/* Multi-depot visual tag badge */}
-                        {(inv.multi_depot_tag || pickInfo.warehouses.length > 1) && (
-                          <div className="pt-1">
-                            <span className="inline-flex items-center space-x-1 bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-xl text-xs font-black shadow-xs">
-                              <span>{inv.multi_depot_tag || `📍 ${pickInfo.warehouses.length} Dépôts impliqués (${pickInfo.warehouses.join(' + ')})`}</span>
+                        {/* Picking Readiness & Loading Dock Number Badge */}
+                        {isReady ? (
+                          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-xl text-[11px] text-emerald-800 font-bold flex items-center justify-between">
+                            <span className="flex items-center space-x-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              <span>✅ PRÊT AU QUAI - Colisage Validé</span>
+                            </span>
+                            <span className="bg-emerald-700 text-white font-mono text-[10px] px-2.5 py-0.5 rounded shadow-xs font-black">
+                              📍 {pickInfo.dockNumber}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="bg-amber-50 border border-amber-200 p-2 rounded-xl text-[11px] text-amber-800 font-bold flex items-center justify-between">
+                            <span className="flex items-center space-x-1.5">
+                              <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+                              <span>⏳ En cours de préparation au dépôt (Quai non attribué)</span>
+                            </span>
+                            <span className="bg-amber-200 text-amber-900 font-mono text-[10px] px-2 py-0.5 rounded border border-amber-300 font-black">
+                              🔒 Affectation bloquée
                             </span>
                           </div>
                         )}
 
-                        {/* Explicit Warehouse & Delivery Address */}
+                        {/* CRM Credit Limit Alert Badge */}
+                        {creditInfo.isExceeded ? (
+                          <div className="bg-rose-50 border border-rose-200 p-2 rounded-xl text-[11px] text-rose-800 font-bold flex items-center space-x-1.5">
+                            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                            <span>⚠️ ALERTE ENCOURS CLIENT : Encours {creditInfo.currentOutstanding.toLocaleString()} TND &gt; Plafond {creditInfo.creditLimit.toLocaleString()} TND</span>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-emerald-700 font-bold flex items-center space-x-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Encours & Crédit Client Conformes</span>
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100">
-                          <div className="flex items-center space-x-1.5 text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-150">
+                          <div className="flex items-center space-x-1 text-slate-600">
                             <Warehouse className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span className="font-medium truncate">
-                              <strong>Départ:</strong> {pickInfo.warehouses.join(' + ')}
-                            </span>
+                            <span className="truncate">{inv.warehouse_location || 'Dépôt Central Radès'}</span>
                           </div>
-
-                          <div className="flex items-center space-x-1.5 text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-150">
+                          <div className="flex items-center space-x-1 text-slate-600">
                             <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                            <span className="font-medium truncate">
-                              <strong>Livraison:</strong> {inv.delivery_address || 'Adresse Siège Client'}
-                            </span>
+                            <span className="truncate">{inv.delivery_address || 'Adresse Siège'}</span>
                           </div>
-                        </div>
-
-                        {/* Detailed breakdown of pickup warehouses & articles */}
-                        {pickInfo.warehouses.length > 1 && (
-                          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-3 text-xs space-y-2 mt-2 shadow-inner">
-                            <div className="flex items-center space-x-1.5 font-black text-amber-400 text-[11px] uppercase tracking-wider font-mono">
-                              <Warehouse className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                              <span>Plan de Ramassage Multi-Dépôts Détaillé ({pickInfo.warehouses.length} Arrêts) :</span>
-                            </div>
-                            <div className="space-y-1.5 pl-1">
-                              {pickInfo.pickingOrders.length > 0 ? (
-                                pickInfo.pickingOrders.map((po, idx) => (
-                                  <div key={po.id} className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
-                                    <div>
-                                      <span className="font-black text-amber-300 font-mono text-[12px] block">
-                                        Arrêt #{idx + 1} : {po.warehouseName}
-                                      </span>
-                                      <p className="text-slate-300 text-[11px] mt-0.5 font-sans font-medium">
-                                        {po.items.map(i => `${i.productName} (x${i.quantity})`).join(', ')}
-                                      </p>
-                                    </div>
-                                    <span className={`px-2.5 py-1 rounded-lg font-black text-[10px] uppercase tracking-wider self-start sm:self-auto ${
-                                      po.status === 'pret_chargement' 
-                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
-                                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                                    }`}>
-                                      {po.status === 'pret_chargement' ? '🟢 Prêt au quai' : '⏳ Préparation'}
-                                    </span>
-                                  </div>
-                                ))
-                              ) : (
-                                pickInfo.warehouses.map((whName, idx) => {
-                                  const matchingItem = inv.items && inv.items[idx];
-                                  return (
-                                    <div key={idx} className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
-                                      <div>
-                                        <span className="font-black text-amber-300 font-mono text-[12px] block">
-                                          Arrêt #{idx + 1} : {whName}
-                                        </span>
-                                        {matchingItem && (
-                                          <p className="text-slate-300 text-[11px] mt-0.5 font-sans font-medium">
-                                            {matchingItem.description || matchingItem.code} (x{matchingItem.quantity})
-                                          </p>
-                                        )}
-                                      </div>
-                                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg font-black text-[10px] uppercase tracking-wider self-start sm:self-auto">
-                                        🟢 Prêt au quai
-                                      </span>
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Multi-Warehouse Picking Preparation Badge */}
-                        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-1 text-xs">
-                          <span className="text-[11px] font-extrabold text-slate-600 flex items-center space-x-1">
-                            <Boxes className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span>{pickInfo.warehouses.length} dépôt(s) impliqué(s)</span>
-                          </span>
-
-                          <span className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider border ${
-                            pickInfo.allReady 
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
-                              : 'bg-amber-100 text-amber-900 border-amber-300'
-                          }`}>
-                            {pickInfo.allReady ? (
-                              <>
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                                <span>🟢 Prêt au Quai</span>
-                              </>
-                            ) : (
-                              <>
-                                <Clock className="w-3 h-3 text-amber-600 shrink-0 animate-spin" />
-                                <span>⏳ En attente Dépôt ({pickInfo.readyCount}/{pickInfo.totalCount})</span>
-                              </>
-                            )}
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -899,533 +1017,398 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
               </div>
             )}
           </div>
-
-          <div className="p-4 bg-slate-50 border-t border-slate-150 flex justify-between items-center text-xs font-bold text-slate-700">
-            <span>{selectedInvoiceIds.length} commande(s) sélectionnée(s)</span>
-            <span className="text-sky-700 font-mono">
-              Total TTC : {
-                pendingInvoices
-                  .filter(i => selectedInvoiceIds.includes(i.id))
-                  .reduce((acc, i) => acc + i.amountTTC, 0)
-                  .toLocaleString('fr-FR', { minimumFractionDigits: 2 })
-              } TND
-            </span>
-          </div>
         </div>
 
-        {/* ZONE 2: Constructeur de Tournée (5 Cols) */}
-        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between space-y-6">
-          <div>
-            <div className="flex items-center space-x-2 border-b border-slate-150 pb-4 mb-4">
-              <Navigation className="w-5 h-5 text-indigo-600 shrink-0" />
-              <div>
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider font-display">
-                  2. Constructeur de Tournée & Dispatching
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Affectation du Chauffeur, du Véhicule et de l'Entrepôt
-                </p>
+        {/* ZONE 2: Formulaire de Création de Tournée & Contrôle Payload (5 Cols) */}
+        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-3xl shadow-sm p-5 space-y-4">
+          <div className="border-b border-slate-150 pb-3 flex items-center space-x-2">
+            <Truck className="w-5 h-5 text-indigo-600" />
+            <div>
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider font-display">
+                2. Configuration Tournée & Payload
+              </h3>
+              <p className="text-xs text-slate-500">
+                Affectation RH, Flotte et Contrôle de Poids Utile.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleCreateTour} className="space-y-4">
+            
+            {/* Payload Weight Control Bar */}
+            <div className={`p-3.5 rounded-2xl border space-y-2 ${
+              isPayloadOverloaded ? 'bg-rose-50 border-rose-300 text-rose-900 animate-pulse' :
+              payloadRatioPercent > 85 ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-slate-50 border-slate-200 text-slate-800'
+            }`}>
+              <div className="flex justify-between items-center text-xs font-bold">
+                <span className="flex items-center space-x-1.5 font-mono uppercase text-[11px]">
+                  <Scale className="w-4 h-4 text-indigo-600" />
+                  <span>Jauge Charge Utile :</span>
+                </span>
+                <span className="font-mono font-black">{totalPayloadWeightKg.toLocaleString()} / {selectedVehicleMaxPayloadKg.toLocaleString()} kg ({payloadRatioPercent}%)</span>
               </div>
+
+              <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isPayloadOverloaded ? 'bg-rose-600' :
+                    payloadRatioPercent > 85 ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`}
+                  style={{ width: `${Math.min(100, payloadRatioPercent)}%` }}
+                ></div>
+              </div>
+
+              {isPayloadOverloaded && (
+                <div className="text-[10px] font-bold text-rose-700 flex items-center space-x-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>⚠️ SURCHARGE : Réduisez le nombre de commandes ou choisissez un camion poids lourd.</span>
+                </div>
+              )}
             </div>
 
-            <form onSubmit={handleCreateTour} className="space-y-4 text-xs font-sans">
-              
-              {/* Select Driver */}
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700 uppercase text-[10px] tracking-wider block">
-                  CHAUFFEUR / LIVREUR RESPONSABLE *
-                </label>
-                <select
-                  required
-                  value={selectedDriverId}
-                  onChange={(e) => {
-                    const drvId = e.target.value;
-                    setSelectedDriverId(drvId);
-                    const found = driversList.find(d => d.id === drvId);
-                    if (found) setSelectedDriverName(found.name);
-                  }}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white font-bold text-slate-800"
-                  id="select-tour-driver"
-                >
-                  <option value="">-- Sélectionner un Chauffeur Habilité --</option>
-                  {driversList.map(drv => (
-                    <option key={drv.id} value={drv.id}>
-                      {drv.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Select Vehicle from fleet_inventory */}
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700 uppercase text-[10px] tracking-wider block flex justify-between">
-                  <span>VÉHICULE DE LIVRAISON (`fleet_inventory`) *</span>
-                  <span className="text-[9px] text-emerald-600 font-bold">{availableVehicles.length} disponible(s)</span>
-                </label>
-                <select
-                  required
-                  value={selectedVehicleId}
-                  onChange={(e) => {
-                    const vehId = e.target.value;
-                    setSelectedVehicleId(vehId);
-                    const found = availableVehicles.find(v => v.id === vehId);
-                    if (found) setSelectedVehicleName(`${found.device_name} [${found.serial_reference}]`);
-                  }}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white font-bold text-slate-800"
-                  id="select-tour-vehicle"
-                >
-                  <option value="">-- Choisir un Véhicule du Parc --</option>
-                  {availableVehicles.map(veh => (
-                    <option key={veh.id} value={veh.id}>
-                      {veh.device_name} — VIN/Réf: {veh.serial_reference} ({veh.category || 'Véhicule'})
-                    </option>
-                  ))}
-                  <option value="v_camion_12t">Camion Isuzu 12 Tonnes [Immat TN-9021]</option>
-                  <option value="v_utilitaire_van">Utilitaire Peugot Partner [Immat TN-8840]</option>
-                </select>
-              </div>
-
-              {/* Route Notes */}
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700 uppercase text-[10px] tracking-wider block">
-                  CONSIGNES DE ROUTE & CONSIGNES CHAUFFEUR
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="ex: Récupérer la commande au Dépôt Radès à 07:30, faire signer le BL client..."
-                  value={tourNotes}
-                  onChange={(e) => setTourNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white font-medium text-slate-800 resize-none"
-                  id="textarea-tour-notes"
-                />
-              </div>
-
-              <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-sky-900 text-[11px] leading-relaxed">
-                💡 Les commandes sélectionnées basculeront en <code>'en_transit'</code> et apparaîtront directement sur l'application mobile <strong>Elyssa Pocket</strong> du chauffeur.
-              </div>
-
-              <button
-                type="submit"
-                disabled={selectedInvoiceIds.length === 0}
-                className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-lg transition cursor-pointer ${
-                  selectedInvoiceIds.length > 0
-                    ? 'bg-sky-600 hover:bg-sky-500 text-white shadow-sky-600/20'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                }`}
-                id="btn-generate-delivery-tour"
+            {/* Selected Driver RH Dropdown */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Chauffeur / Livreur Affecté (RH) :
+              </label>
+              <select
+                value={selectedDriverId}
+                onChange={(e) => {
+                  const drv = driversList.find(d => d.id === e.target.value);
+                  setSelectedDriverId(e.target.value);
+                  setSelectedDriverName(drv ? drv.name : '');
+                }}
+                className="w-full p-2.5 text-xs border border-slate-200 rounded-xl bg-white font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
               >
-                <Truck className="w-4 h-4 stroke-[2.5]" />
-                <span>GÉNÉRER LA TOURNÉE ({selectedInvoiceIds.length} LIVRAISONS)</span>
-              </button>
-            </form>
-          </div>
+                <option value="">-- Sélectionner un Chauffeur Filtré --</option>
+                {driversList.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} [{d.availabilityStatus}]
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Selected Vehicle Dropdown */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Véhicule de la Flotte (En Circulation) :
+              </label>
+              <select
+                value={selectedVehicleId}
+                onChange={(e) => {
+                  const veh = filteredVehicles.find(v => v.id === e.target.value);
+                  setSelectedVehicleId(e.target.value);
+                  setSelectedVehicleName(veh ? `${veh.device_name} (${veh.serial_reference})` : '');
+                }}
+                className="w-full p-2.5 text-xs border border-slate-200 rounded-xl bg-white font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                <option value="">-- Sélectionner un Véhicule Filtré --</option>
+                {filteredVehicles.map(v => (
+                  <option key={v.id} value={v.id}>
+                    🚗 {v.device_name} ({v.serial_reference}) - Max {v.maxPayloadKg?.toLocaleString()} kg
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Selected Orders Dock Preview */}
+            {selectedInvoiceIds.length > 0 && (
+              <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-2 text-xs">
+                <div className="flex justify-between items-center text-emerald-900 font-extrabold">
+                  <span>📦 Commandes Validées au Quai ({selectedInvoiceIds.length}) :</span>
+                  <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-mono font-bold">Quais Attribués</span>
+                </div>
+                <div className="max-h-28 overflow-y-auto space-y-1.5 pr-1">
+                  {pendingInvoices.filter(i => selectedInvoiceIds.includes(i.id)).map(inv => {
+                    const info = getInvoicePickingInfo(inv);
+                    return (
+                      <div key={inv.id} className="flex justify-between items-center bg-white p-2 rounded-xl border border-emerald-100 text-[11px] shadow-2xs">
+                        <span className="font-bold text-slate-800 font-mono truncate max-w-[180px]">{inv.invoiceNumber} - {inv.clientName}</span>
+                        <span className="font-mono text-emerald-800 font-black bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 text-[10px] shrink-0">
+                          📍 {info.dockNumber}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Tour Notes */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Consignes Spéciales / Notes Dispatch :
+              </label>
+              <textarea
+                rows={2}
+                value={tourNotes}
+                onChange={(e) => setTourNotes(e.target.value)}
+                placeholder="ex: Vérifier bon de décharge au quai, livraison prioritaire avant 12h..."
+                className="w-full p-2.5 text-xs border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none"
+              />
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={selectedInvoiceIds.length === 0}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white p-3 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-md transition cursor-pointer disabled:opacity-50 border-0"
+              id="btn-create-tour-dispatch"
+            >
+              <Navigation className="w-4 h-4 text-sky-400" />
+              <span>Générer Tournée ({selectedInvoiceIds.length} cmd)</span>
+            </button>
+
+          </form>
         </div>
 
       </div>
 
-      {/* ZONE 3: Vues Dynamiques par Livreur & Suivi des Tournées */}
-      <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden space-y-4">
-        
-        {/* Zone 3 Header Controls */}
-        <div className="px-6 py-4 border-b border-slate-150 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50">
-          <div>
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider font-display flex items-center space-x-2">
-              <Layers className="w-4 h-4 text-sky-600" />
-              <span>Suivi & Logistique des Tournées Déployées (`delivery_tours`)</span>
-            </h3>
-            <p className="text-xs text-slate-500">
-              {deliveryTours.length} tournée(s) au registre d'expéditions.
-            </p>
+      {/* ZONE 3: Suivi Dynamic des Tournées & Clôture Soirée */}
+      <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-6 space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-150 pb-4">
+          <div className="flex items-center space-x-3">
+            <Layers className="w-6 h-6 text-indigo-600" />
+            <div>
+              <h3 className="text-base font-black text-slate-900 uppercase font-display tracking-wider">
+                3. Tableau de Suivi des Tournées & Clôture de Caisse Soirée
+              </h3>
+              <p className="text-xs text-slate-500">
+                Suivi en temps réel des livraisons terrain et décharge caissier fin de journée.
+              </p>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* Date Range Filter */}
-            <div className="flex items-center space-x-1 bg-slate-900 border border-slate-700/80 p-1 rounded-2xl text-xs font-bold shadow-inner">
-              <button
-                onClick={() => setDateFilter('all')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer font-bold ${
-                  dateFilter === 'all'
-                    ? 'bg-sky-500 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                Toutes Dates
-              </button>
-              <button
-                onClick={() => setDateFilter('today')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer font-bold ${
-                  dateFilter === 'today'
-                    ? 'bg-sky-500 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                Aujourd'hui
-              </button>
-              <button
-                onClick={() => setDateFilter('yesterday')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer font-bold ${
-                  dateFilter === 'yesterday'
-                    ? 'bg-sky-500 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                Hier
-              </button>
-              <button
-                onClick={() => setDateFilter('this_week')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer font-bold ${
-                  dateFilter === 'this_week'
-                    ? 'bg-sky-500 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                Cette Semaine
-              </button>
-              <button
-                onClick={() => setDateFilter('custom')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer font-bold ${
-                  dateFilter === 'custom'
-                    ? 'bg-sky-500 text-white shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                Personnalisé
-              </button>
-            </div>
-
-            {dateFilter === 'custom' && (
-              <div className="flex items-center space-x-1 text-xs">
-                <input 
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="px-2.5 py-1.5 border border-slate-700 rounded-xl bg-slate-900 text-white text-xs font-mono font-bold"
-                />
-                <span className="text-slate-400 font-bold">-</span>
-                <input 
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="px-2.5 py-1.5 border border-slate-700 rounded-xl bg-slate-900 text-white text-xs font-mono font-bold"
-                />
-              </div>
-            )}
-
-            {/* View Mode Toggle: Driver Cards vs All Tours */}
-            <div className="bg-slate-900 border border-slate-700/80 p-1 rounded-2xl flex items-center space-x-1 text-xs font-bold shadow-inner">
-              <button
-                onClick={() => setZone3ViewMode('by_driver')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center space-x-1.5 font-bold ${
-                  zone3ViewMode === 'by_driver' 
-                    ? 'bg-indigo-600 text-white shadow-md' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <UserCheck className="w-3.5 h-3.5 text-indigo-300" />
-                <span>🚚 Vues par Livreur</span>
-              </button>
-
-              <button
-                onClick={() => setZone3ViewMode('all_tours')}
-                className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center space-x-1.5 font-bold ${
-                  zone3ViewMode === 'all_tours' 
-                    ? 'bg-sky-600 text-white shadow-md' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <Truck className="w-3.5 h-3.5 text-sky-300" />
-                <span>📋 Toutes les Tournées</span>
-              </button>
-            </div>
-
-            {/* Search */}
-            <div className="relative flex-1 md:w-44">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Rechercher tournée..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white"
-              />
-            </div>
-
-            {/* Status Filter */}
+          <div className="flex items-center space-x-2">
             <select
               value={tourStatusFilter}
               onChange={(e) => setTourStatusFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs border border-slate-200 rounded-xl bg-white font-bold text-slate-700 focus:outline-none cursor-pointer"
+              className="px-3 py-1.5 text-xs border border-slate-200 rounded-xl bg-slate-50 font-bold text-slate-700"
             >
-              <option value="ALL">Tous Statuts</option>
-              <option value="en_cours">En Cours (En Transit)</option>
-              <option value="terminee">Terminée (Livrée)</option>
+              <option value="ALL">Tous les Statuts</option>
+              <option value="en_cours">🚚 Tournée En Cours</option>
+              <option value="terminee">✅ Tournée Terminée</option>
+              <option value="cloturee_validee">🔐 Clôturée & Rapprochée</option>
             </select>
           </div>
         </div>
 
-        <div className="p-6">
-          {loadingTours ? (
-            <div className="py-12 text-center text-slate-400 font-mono text-xs flex items-center justify-center space-x-2">
-              <Clock className="w-4 h-4 animate-spin text-sky-500" />
-              <span>Chargement des tournées...</span>
-            </div>
-          ) : filteredTours.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 font-mono text-xs">
-              Aucune tournée enregistrée.
-            </div>
-          ) : zone3ViewMode === 'by_driver' ? (
-            /* VUES DYNAMIQUES PAR LIVREUR */
-            <div className="space-y-6" id="dynamic-driver-views-container">
-              {driverGroups.map((group) => {
-                const totalOrdersAllTours = group.tours.reduce((acc, t) => acc + t.orders.length, 0);
-                const totalDeliveredAllTours = group.tours.reduce((acc, t) => acc + t.orders.filter(o => o.delivery_status === 'livre').length, 0);
-                const overallProgressPct = Math.round((totalDeliveredAllTours / totalOrdersAllTours) * 100) || 0;
+        {/* Tour List */}
+        {loadingTours ? (
+          <div className="py-12 text-center text-slate-400 font-mono text-xs flex items-center justify-center space-x-2">
+            <Clock className="w-4 h-4 animate-spin text-sky-500" />
+            <span>Chargement des tournées...</span>
+          </div>
+        ) : filteredTours.length === 0 ? (
+          <div className="py-12 text-center text-slate-400 font-sans">
+            <p className="text-xs font-bold text-slate-600">Aucune tournée active enregistrée.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredTours.map((tour) => {
+              const deliveredCount = tour.orders.filter(o => o.delivery_status === 'livre').length;
+              const totalCount = tour.orders.length;
+              const isTerminee = tour.status === 'terminee';
+              const isCloturee = tour.status === 'cloturee_validee';
 
-                return (
-                  <div key={group.driverName} className="bg-gradient-to-br from-slate-900 via-slate-900 to-sky-950 text-white rounded-3xl p-6 border border-slate-800 shadow-xl space-y-5">
-                    
-                    {/* Driver Card Header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 font-black text-xl">
-                          🚚
-                        </div>
-
-                        <div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-sky-400 font-mono block">
-                            FICHE LIVREUR ACTIVE
-                          </span>
-                          <h3 className="text-lg font-black text-white font-display flex items-center space-x-2">
-                            <span>Tournée : {group.driverName}</span>
-                          </h3>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-4 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
-                        <div className="text-right">
-                          <span className="text-[10px] text-slate-400 font-mono block">Avancement Global Chauffeur</span>
-                          <span className="text-sm font-black text-emerald-400 font-mono">
-                            {totalDeliveredAllTours} / {totalOrdersAllTours} Livrés ({overallProgressPct}%)
-                          </span>
-                        </div>
-                        <div className="w-24 bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
-                          <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${overallProgressPct}%` }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Tours for this driver */}
-                    <div className="space-y-4">
-                      {group.tours.map((tour) => {
-                        const deliveredCount = tour.orders.filter(o => o.delivery_status === 'livre').length;
-                        const totalCount = tour.orders.length;
-                        const progressPct = Math.round((deliveredCount / totalCount) * 100) || 0;
-                        const pickupWarehouse = tour.pickup_warehouse || tour.warehouse_location || tour.orders[0]?.warehouse_location || 'Dépôt Central';
-
-                        return (
-                          <div key={tour.id} className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-mono text-xs font-black text-sky-300 bg-sky-950 px-2.5 py-0.5 rounded border border-sky-800">
-                                  {tour.tour_number}
-                                </span>
-
-                                {/* Entrepôt de ramassage */}
-                                <span className="inline-flex items-center space-x-1 text-xs font-bold text-amber-300 bg-amber-950/60 px-2.5 py-0.5 rounded border border-amber-800">
-                                  <Warehouse className="w-3.5 h-3.5 shrink-0" />
-                                  <span>Ramassage : {pickupWarehouse}</span>
-                                </span>
-
-                                {/* Assigned Vehicle */}
-                                <span className="inline-flex items-center space-x-1 text-xs font-medium text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded border border-slate-700">
-                                  <Car className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                                  <span>{tour.vehicle_name}</span>
-                                </span>
-                              </div>
-
-                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border self-start sm:self-auto ${
-                                tour.status === 'terminee'
-                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                                  : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                              }`}>
-                                {tour.status === 'terminee' ? 'LIVRÉE / TERMINÉE' : 'EN COURS DE LIVRAISON'}
-                              </span>
-                            </div>
-
-                            {/* BL Numbers Badge List */}
-                            <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-300">
-                              <span className="text-[10px] uppercase font-bold text-slate-400 font-mono">
-                                BLs Associés :
-                              </span>
-                              {tour.orders.map(ord => (
-                                <span key={ord.order_id} className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold border ${
-                                  ord.delivery_status === 'livre'
-                                    ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
-                                    : 'bg-slate-800 text-sky-300 border-slate-700'
-                                }`}>
-                                  {ord.order_id} {ord.delivery_status === 'livre' ? '✓' : ''}
-                                </span>
-                              ))}
-                            </div>
-
-                            {/* Stops Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-                              {tour.orders.map((ord, idx) => (
-                                <div key={ord.order_id} className={`p-3 rounded-xl border text-xs space-y-1.5 ${
-                                  ord.delivery_status === 'livre'
-                                    ? 'bg-emerald-950/20 border-emerald-500/30 text-slate-200'
-                                    : 'bg-slate-950 border-slate-800 text-slate-200'
-                                }`}>
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-mono text-[10px] font-bold text-slate-400">
-                                      Stop #{idx + 1} • {ord.order_id}
-                                    </span>
-                                    {renderChannelBadge(ord.sales_channel)}
-                                  </div>
-
-                                  <strong className="text-white font-extrabold block text-sm">{ord.client_name}</strong>
-                                  
-                                  <div className="text-slate-400 text-[11px] flex items-center space-x-1">
-                                    <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
-                                    <span className="truncate">{ord.address}</span>
-                                  </div>
-
-                                  <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-[11px]">
-                                    <span className="font-bold text-emerald-400 font-mono">{ord.amount_ttc.toLocaleString('fr-FR')} TND</span>
-                                    {ord.delivery_status === 'livre' ? (
-                                      <span className="text-[10px] font-bold text-emerald-400 flex items-center space-x-1">
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                        <span>LIVRÉ</span>
-                                      </span>
-                                    ) : (
-                                      <button
-                                        onClick={() => handleMarkOrderDelivered(tour, ord.order_id)}
-                                        className="text-[10px] font-bold text-emerald-300 hover:text-white bg-emerald-900/60 px-2 py-0.5 rounded border border-emerald-700 cursor-pointer"
-                                      >
-                                        Valider
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            /* VUE TOUTES LES TOURNÉES (STANDARD) */
-            <div className="space-y-4" id="all-tours-view-container">
-              {filteredTours.map((tour) => {
-                const deliveredCount = tour.orders.filter(o => o.delivery_status === 'livre').length;
-                const totalCount = tour.orders.length;
-                const progressPct = Math.round((deliveredCount / totalCount) * 100) || 0;
-                const pickupWarehouse = tour.pickup_warehouse || tour.warehouse_location || 'Dépôt Central';
-
-                return (
-                  <div key={tour.id} className="border border-slate-200 rounded-2xl p-5 bg-white shadow-xs space-y-4 hover:border-slate-300 transition">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-150 pb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black ${
-                          tour.status === 'terminee' 
-                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-600' 
-                            : 'bg-sky-50 border border-sky-200 text-sky-600'
-                        }`}>
-                          <Truck className="w-5 h-5" />
-                        </div>
-
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-mono text-xs font-black text-slate-900">{tour.tour_number}</span>
-                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                              tour.status === 'terminee'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-sky-50 text-sky-700 border-sky-200'
-                            }`}>
-                              {tour.status === 'terminee' ? 'LIVRÉE / TERMINÉE' : 'EN COURS DE LIVRAISON'}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium mt-1">
-                            <span className="flex items-center space-x-1">
-                              <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
-                              <strong className="text-slate-800">{tour.driver_name}</strong>
-                            </span>
-                            <span className="flex items-center space-x-1">
-                              <Warehouse className="w-3.5 h-3.5 text-amber-600" />
-                              <span className="text-slate-700">Ramassage : {pickupWarehouse}</span>
-                            </span>
-                            <span className="flex items-center space-x-1">
-                              <Car className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{tour.vehicle_name}</span>
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-400 font-mono block">
-                          Créée le {new Date(tour.created_at).toLocaleDateString('fr-FR')}
+              return (
+                <div key={tour.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition space-y-3">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                          {tour.tour_number}
                         </span>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <span className="text-xs font-bold text-slate-700">Progression: {deliveredCount} / {totalCount} livrés</span>
-                          <div className="w-24 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
-                            <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
-                          </div>
-                        </div>
+                        <h4 className="font-black text-slate-900 text-sm font-display">
+                          {tour.driver_name}
+                        </h4>
                       </div>
+                      <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                        Véhicule: {tour.vehicle_name} • Dépôt Ramassage: {tour.pickup_warehouse || 'Dépôt Central'}
+                      </span>
                     </div>
 
-                    {/* Orders in Tour */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {tour.orders.map((ord, idx) => (
-                        <div key={ord.order_id} className={`p-3 rounded-xl border text-xs space-y-1.5 ${
-                          ord.delivery_status === 'livre'
-                            ? 'bg-emerald-50/60 border-emerald-200'
-                            : 'bg-slate-50 border-slate-200'
-                        }`}>
-                          <div className="flex justify-between items-center">
-                            <span className="font-mono text-[10px] font-bold text-slate-700">
-                              Étape #{idx + 1} • {ord.order_id}
-                            </span>
-                            {renderChannelBadge(ord.sales_channel)}
-                          </div>
+                    <div className="flex items-center space-x-3">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        isCloturee ? 'bg-purple-100 text-purple-800 border border-purple-300' :
+                        isTerminee ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                        'bg-sky-100 text-sky-800 border border-sky-300'
+                      }`}>
+                        {isCloturee ? '🔐 CLÔTURÉE & RAPPROCHÉE' : isTerminee ? '✅ TERMINÉE (À RAPPROCHER)' : '🚚 EN COURS'}
+                      </span>
 
-                          <strong className="text-slate-900 font-bold block">{ord.client_name}</strong>
-                          <div className="text-slate-500 text-[11px] flex items-center space-x-1">
-                            <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
-                            <span className="truncate">{ord.address}</span>
-                          </div>
+                      {/* Evening Closure Action Button */}
+                      {!isCloturee && (
+                        <button
+                          onClick={() => handleOpenEveningClosure(tour)}
+                          className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs uppercase flex items-center space-x-1.5 shadow-sm transition cursor-pointer border-0"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-purple-200" />
+                          <span>Clôturer & Décharge Soirée</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-                          <div className="pt-1 border-t border-slate-200/60 flex justify-between items-center text-[11px]">
-                            <span className="font-bold text-slate-800">{ord.amount_ttc.toLocaleString('fr-FR')} TND</span>
-                            {ord.delivery_status !== 'livre' && (
-                              <button
-                                onClick={() => handleMarkOrderDelivered(tour, ord.order_id)}
-                                className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 cursor-pointer"
-                              >
-                                Valider Livraison
-                              </button>
-                            )}
+                  {/* Orders Summary inside tour */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs space-y-2">
+                    <div className="flex justify-between items-center text-slate-700 font-bold border-b border-slate-100 pb-2">
+                      <span>Commandes Incluses ({deliveredCount}/{totalCount} livrées)</span>
+                      <span className="font-mono text-indigo-600">{tour.orders.reduce((sum, o) => sum + o.amount_ttc, 0).toLocaleString()} TND</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                      {tour.orders.map((o) => (
+                        <div key={o.order_id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-150 flex justify-between items-center text-[11px]">
+                          <div>
+                            <span className="font-bold text-slate-900 block">{o.client_name}</span>
+                            <div className="flex items-center space-x-1.5 mt-0.5">
+                              <span className="font-mono text-slate-500 text-[10px]">{o.order_id}</span>
+                              <span className="font-mono text-[10px] font-bold text-sky-800 bg-sky-100 px-1.5 py-0.2 rounded border border-sky-200">
+                                📍 {o.dock_number || 'Quai 1'}
+                              </span>
+                            </div>
                           </div>
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-black ${
+                            o.delivery_status === 'livre' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {o.delivery_status === 'livre' ? 'LIVRÉ' : 'EN TRANSIT'}
+                          </span>
                         </div>
                       ))}
                     </div>
-
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* EVENING TOUR CLOSURE & CASHIER RECONCILIATION MODAL */}
+      {closingTour && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md p-4 flex items-center justify-center overflow-y-auto animate-in fade-in">
+          <div className="bg-white border border-slate-200 w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4 my-8">
+            <div className="flex justify-between items-start border-b border-slate-150 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase text-purple-600 font-mono block">
+                  CLÔTURE SOIRÉE & DECHARGE CAISSIER
+                </span>
+                <h3 className="text-base font-black text-slate-900">
+                  Rapprochement Caisse Tournée {closingTour.tour_number}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Chauffeur: {closingTour.driver_name} • Véhicule: {closingTour.vehicle_name}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setClosingTour(null)}
+                className="p-1 rounded-xl bg-slate-100 text-slate-500 hover:text-slate-900 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Inputs Form */}
+            <div className="space-y-3 text-xs">
+              
+              <div className="bg-purple-50 border border-purple-200 p-3 rounded-2xl space-y-2 text-purple-900 font-bold">
+                <span className="uppercase text-[10px] font-mono block">1. Décharge Encaissements Livreur</span>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-slate-600 mb-1">Espèces Comptées (TND) :</label>
+                    <input
+                      type="number"
+                      value={actualCashCounted}
+                      onChange={(e) => setActualCashCounted(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-slate-600 mb-1">Chèques Remis (TND) :</label>
+                    <input
+                      type="number"
+                      value={actualChequesCounted}
+                      onChange={(e) => setActualChequesCounted(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-600 mb-1">Certificats Retenue à la Source RS 1.5% (TND) :</label>
+                  <input
+                    type="number"
+                    value={actualRSCounted}
+                    onChange={(e) => setActualRSCounted(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl space-y-2">
+                <span className="uppercase text-[10px] font-mono text-slate-600 font-bold block">2. Compteur Odomètre & Frais de Route</span>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-slate-600 font-bold mb-1">Odomètre Fin (km) :</label>
+                    <input
+                      type="number"
+                      value={endingOdometer}
+                      onChange={(e) => setEndingOdometer(parseInt(e.target.value) || 0)}
+                      className="w-full bg-white border border-slate-300 rounded-xl p-1.5 font-mono text-slate-900 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-slate-600 font-bold mb-1">Frais Carburant (TND) :</label>
+                    <input
+                      type="number"
+                      value={fuelExpenses}
+                      onChange={(e) => setFuelExpenses(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-white border border-slate-300 rounded-xl p-1.5 font-mono text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-slate-600 font-bold mb-1">Frais Péage (TND) :</label>
+                    <input
+                      type="number"
+                      value={tollExpenses}
+                      onChange={(e) => setTollExpenses(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-white border border-slate-300 rounded-xl p-1.5 font-mono text-slate-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Submit */}
+            <div className="flex items-center space-x-3 pt-2">
+              <button
+                onClick={() => setClosingTour(null)}
+                className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs uppercase cursor-pointer"
+              >
+                Annuler
+              </button>
+
+              <button
+                onClick={handleConfirmEveningClosure}
+                className="flex-2 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-md cursor-pointer border-0"
+              >
+                <Lock className="w-4 h-4 text-purple-200" />
+                <span>Valider Clôture & Injecter Trésorerie</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

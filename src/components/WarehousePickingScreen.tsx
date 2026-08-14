@@ -122,8 +122,11 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
         deliveryAddress: 'Zone Industrielle Akouda, Lot 14, Sousse',
         warehouseId: 'wh_charguia',
         warehouseName: 'Dépôt Charguia (Z.I.)',
-        status: 'en_attente',
+        dockNumber: 'Quai 1 - Dépôt Charguia',
+        status: 'pret_chargement',
         createdAt: new Date().toISOString(),
+        preparedAt: new Date().toISOString(),
+        preparedBy: 'Mounir Sfaxi (Magasinier)',
         totalAmountTTC: 3450.000,
         items: [
           { productId: 'P01', productName: 'Ciment PORTLAND 50kg Hifi', quantity: 40, warehouseName: 'Dépôt Charguia (Z.I.)' },
@@ -138,8 +141,11 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
         deliveryAddress: 'Zone Industrielle Akouda, Lot 14, Sousse',
         warehouseId: 'wh_tunis',
         warehouseName: 'Magasin Tunis Principal',
-        status: 'en_cours',
+        dockNumber: 'Quai 2 - Magasin Tunis',
+        status: 'pret_chargement',
         createdAt: new Date(Date.now() - 3600000).toISOString(),
+        preparedAt: new Date(Date.now() - 1800000).toISOString(),
+        preparedBy: 'Habib Ben Ammar',
         totalAmountTTC: 1280.000,
         items: [
           { productId: 'P03', productName: 'Peinture Satine Blanche 20L', quantity: 6, warehouseName: 'Magasin Tunis Principal' },
@@ -154,10 +160,9 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
         deliveryAddress: 'Chantier Rocade Sud, km 12, Sfax',
         warehouseId: 'wh_sfax',
         warehouseName: 'Dépôt Sfax - Poudrière',
-        status: 'pret_chargement',
-        createdAt: new Date(Date.now() - 28800000).toISOString(), // 8 hours ago
-        preparedAt: new Date(Date.now() - 25200000).toISOString(), // 7 hours ago (SLA Alert Quai > 6h!)
-        preparedBy: 'Mounir Sfaxi (Magasinier)',
+        dockNumber: 'Quai Non Attribué',
+        status: 'en_cours',
+        createdAt: new Date(Date.now() - 28800000).toISOString(),
         totalAmountTTC: 5800.000,
         items: [
           { productId: 'P05', productName: 'Fer à Béton FeE500 Diam 12mm (Barres)', quantity: 100, warehouseName: 'Dépôt Sfax - Poudrière' }
@@ -171,6 +176,7 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
         deliveryAddress: 'Avenue Habib Bourguiba, Nabeul',
         warehouseId: 'wh_sousse',
         warehouseName: 'Stock Logistique Sousse',
+        dockNumber: 'Quai Non Attribué',
         status: 'annule',
         cancellationReason: 'Demande d\'annulation urgente du client suite erreur de commande',
         cancellationDate: new Date(Date.now() - 1800000).toISOString(),
@@ -195,18 +201,23 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
   const handleUpdateStatus = async (pickingOrder: PickingOrder, newStatus: PickingOrderStatus) => {
     try {
       const operator = currentUser?.name || 'Chef de Dépôt';
+      const defaultDock = pickingOrder.dockNumber && pickingOrder.dockNumber !== 'Quai Non Attribué'
+        ? pickingOrder.dockNumber 
+        : `Quai ${Math.floor(Math.random() * 3) + 1} - ${pickingOrder.warehouseName}`;
+
       const updateData: Partial<PickingOrder> = {
         status: newStatus,
         ...(newStatus === 'pret_chargement' ? {
           preparedAt: new Date().toISOString(),
-          preparedBy: operator
+          preparedBy: operator,
+          dockNumber: defaultDock
         } : {})
       };
 
       await updateDoc(doc(db, 'company_erp_data', tenantId, 'picking_orders', pickingOrder.id), updateData);
 
       if (newStatus === 'pret_chargement') {
-        showToast(`🟢 Order ${pickingOrder.id} validé "Prêt au Quai" par ${operator}!`, 'success');
+        showToast(`🟢 Order ${pickingOrder.id} validé "Prêt au Quai" (${defaultDock}) par ${operator}!`, 'success');
       } else if (newStatus === 'en_cours') {
         showToast(`⚙️ Démarrage de la préparation pour ${pickingOrder.id}`, 'info');
       }
@@ -709,6 +720,11 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
                       <Warehouse className="w-4 h-4 text-amber-400 shrink-0" />
                       <span>{po.warehouseName}</span>
                     </h3>
+                    {po.dockNumber && (
+                      <span className="text-[10px] font-mono font-bold text-sky-400 bg-sky-950/80 px-2 py-0.5 rounded border border-sky-800/80 inline-block mt-1">
+                        📍 {po.dockNumber}
+                      </span>
+                    )}
                   </div>
 
                   {/* Status Badge */}

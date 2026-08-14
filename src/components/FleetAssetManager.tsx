@@ -355,7 +355,9 @@ export const FleetAssetManager: React.FC<FleetAssetManagerProps> = ({ tenantId }
                     Available: { label: 'En Stock (Available)', style: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
                     Assigned: { label: 'En Service (Assigned)', style: 'bg-blue-50 text-blue-700 border-blue-200' },
                     Maintenance: { label: 'En Réparation (Maintenance)', style: 'bg-amber-50 text-amber-800 border-amber-200' },
-                    Decommissioned: { label: 'Hors Service (Decommissioned)', style: 'bg-red-50 text-red-700 border-red-200' }
+                    Decommissioned: { label: 'Hors Service (Decommissioned)', style: 'bg-red-50 text-red-700 border-red-200' },
+                    Garage: { label: 'Au Garage (Garage)', style: 'bg-purple-50 text-purple-700 border-purple-200' },
+                    'En Panne': { label: 'En Panne', style: 'bg-rose-50 text-rose-800 border-rose-300' }
                   };
                   const badge = statusBadges[item.status] || statusBadges.Available;
                   const itemCategory = item.category || 'Terminal Mobile';

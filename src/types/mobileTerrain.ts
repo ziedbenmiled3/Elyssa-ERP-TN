@@ -21,6 +21,7 @@ export interface PickingOrder {
   deliveryAddress: string;
   warehouseId: string;
   warehouseName: string;
+  dockNumber?: string; // e.g. "Quai 2 - Dépôt Charguia"
   items: PickingOrderItem[];
   status: PickingOrderStatus;
   createdAt: string;
@@ -73,10 +74,37 @@ export interface DeliveryPickupStop {
   stop_id: string;
   warehouse_id: string;
   warehouse_name: string;
+  dock_number?: string;
   address?: string;
   items: { productName: string; quantity: number }[];
   status: 'en_attente' | 'charge';
   loaded_at?: string;
+}
+
+export interface ItemQualification {
+  articleId: string;
+  articleName: string;
+  qtyOrdered: number;
+  qtyDelivered: number;
+  status: 'LIVRE' | 'REFUSE' | 'PARTIEL';
+  returnReason?: string;
+  unitPriceTTC?: number;
+}
+
+export interface PaymentCollection {
+  method: 'CASH' | 'CHEQUE' | 'TRAITE' | 'DEJA_PAYE';
+  amountTTC: number;
+  chequeNumber?: string;
+  bankName?: string;
+  collectedAt?: string;
+}
+
+export interface WithholdingTaxRS {
+  enabled: boolean;
+  certificateNumber?: string;
+  ratePercent: number;
+  amountRS: number;
+  issueDate?: string;
 }
 
 export interface DeliveryTourOrder {
@@ -84,13 +112,44 @@ export interface DeliveryTourOrder {
   client_name: string;
   address: string;
   amount_ttc: number;
-  delivery_status: 'en_attente' | 'en_transit' | 'livre';
+  amount_ht?: number;
+  delivery_status: 'en_attente' | 'en_transit' | 'livre' | 'refuse';
   sales_channel?: 'web' | 'pos' | 'field_sales';
   warehouse_location?: string;
+  dock_number?: string;
   warehouses_involved?: string[];
   pickup_stops?: DeliveryPickupStop[];
   signatureUrl?: string;
   delivered_at?: string;
+  notes?: string;
+  // Cross-Module Pipeline Fields
+  item_qualifications?: ItemQualification[];
+  payment_collected?: PaymentCollection;
+  withholding_tax_rs?: WithholdingTaxRS;
+  pod_gps?: { lat: number; lng: number; timestamp: string; address?: string };
+  signed_bl_document_id?: string;
+  clientCreditAlert?: { creditLimit: number; currentOutstanding: number; overdueCount: number; isExceeded: boolean };
+  estimatedWeightKg?: number;
+}
+
+export interface EveningTourClosure {
+  closedAt: string;
+  closedBy: string;
+  expectedCash: number;
+  actualCash: number;
+  expectedCheques: number;
+  actualCheques: number;
+  expectedRSAmount: number;
+  actualRSAmount: number;
+  cashGap: number;
+  status: 'CONFORME' | 'ARBITRAGE_REQUIS';
+  endingOdometerKm: number;
+  startingOdometerKm: number;
+  distanceTraveledKm: number;
+  fuelExpensesTND: number;
+  tollExpensesTND: number;
+  receiptRef?: string;
+  treasuryTxId?: string;
   notes?: string;
 }
 
@@ -105,12 +164,17 @@ export interface DeliveryTour {
   pickup_warehouse?: string;
   warehouse_location?: string;
   orders: DeliveryTourOrder[];
-  status: 'en_preparation' | 'en_cours' | 'terminee';
+  status: 'en_preparation' | 'en_cours' | 'terminee' | 'cloturee_validee';
   created_at: string;
   notes?: string;
+  // Cross-Module Payload & Closure
+  total_weight_kg?: number;
+  vehicle_max_payload_kg?: number;
+  payload_ratio_percent?: number;
+  evening_closure?: EveningTourClosure;
 }
 
-export type FleetDeviceStatus = 'Available' | 'Assigned' | 'Maintenance' | 'Decommissioned';
+export type FleetDeviceStatus = 'Available' | 'Assigned' | 'Maintenance' | 'Decommissioned' | 'Garage' | 'En Panne';
 
 export interface FleetInventoryItem {
   id: string;
@@ -124,6 +188,7 @@ export interface FleetInventoryItem {
   assignedDriver?: string;
   registeredAt: string;
   mileage?: number;
+  maxPayloadKg?: number;
 }
 
 export interface MobileDevice {

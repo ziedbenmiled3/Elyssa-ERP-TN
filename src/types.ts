@@ -84,6 +84,7 @@ export interface Invoice {
   seller_name?: string;
   commercial_id?: string;
   commercial_name?: string;
+  estimatedWeightKg?: number;
 }
 
 export interface VisitReport {
