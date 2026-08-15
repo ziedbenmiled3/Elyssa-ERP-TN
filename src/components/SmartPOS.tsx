@@ -417,7 +417,8 @@ export default function SmartPOS({
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             p.sku.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-      return matchesSearch && matchesCategory;
+      const isFinishedGood = p.type !== 'MATIERE_PREMIERE' && p.category !== 'Matières Premières';
+      return matchesSearch && matchesCategory && isFinishedGood;
     });
   }, [products, searchQuery, selectedCategory]);
 

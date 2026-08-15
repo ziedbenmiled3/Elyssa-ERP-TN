@@ -39,8 +39,12 @@ import {
   X,
   CreditCard,
   Gauge,
-  Lock
+  Lock,
+  Zap,
+  CheckCheck,
+  Printer
 } from 'lucide-react';
+import DocumentPrintModal, { PrintModalData } from './DocumentPrintModal';
 
 interface DispatchManagerProps {
   tenantId: string;
@@ -89,6 +93,87 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'this_week' | 'custom'>('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+
+  // Unified Print Modal State
+  const [unifiedPrintModalOpen, setUnifiedPrintModalOpen] = useState(false);
+  const [unifiedPrintData, setUnifiedPrintData] = useState<PrintModalData | null>(null);
+
+  const handlePrintBLPOD = (inv: Invoice) => {
+    const itemsList = (inv.items && inv.items.length > 0) ? inv.items.map(item => ({
+      ref: item.productCode || item.sku || 'SKU-001',
+      description: item.description || item.productName || 'Article Livré',
+      quantity: item.quantity || 1,
+      unitPrice: item.unitPrice || item.priceHT || 0,
+      unit: item.unit || 'u.'
+    })) : [
+      {
+        ref: inv.invoiceNumber || inv.id,
+        description: `Lot Marchandises — Commande ${inv.invoiceNumber || inv.id}`,
+        quantity: 1,
+        unitPrice: inv.amountTTC || 0,
+        unit: 'Colis'
+      }
+    ];
+
+    setUnifiedPrintData({
+      docType: 'BON_LIVRAISON',
+      docNumber: `BL-${inv.invoiceNumber || inv.id}`,
+      date: inv.issuedDate || new Date().toLocaleDateString('fr-FR'),
+      companyInfo: {
+        name: 'Elyssa ERP Logistics & Transport',
+        mf: '1849203/A/M/000',
+        address: 'Dépôt Central Radès, Zone Portuaire, Tunis',
+        phone: '+216 71 800 900',
+        email: 'dispatch@elyssaerp.tn'
+      },
+      clientInfo: {
+        name: inv.clientName || 'Client Destinataire',
+        address: inv.delivery_address || inv.clientAddress || 'Chantier Client Radès',
+        phone: inv.clientPhone || '+216 20 000 000'
+      },
+      deliveryAddress: inv.delivery_address || 'Site Client / Zone Industrielle Radès',
+      driverName: selectedDriverName || 'Hamza Ben Salem',
+      vehicleRef: selectedVehicleName || 'Isuzu D-Max (TN-210-9842)',
+      gpsCoords: '36.8065° N, 10.1815° E (Radès Port)',
+      recipientName: inv.clientName || 'Chef de Chantier',
+      deliveryStatus: 'LIVRÉ & ÉMARGÉ GÉOLOCALISÉ',
+      deliveredAt: new Date().toLocaleString('fr-FR'),
+      items: itemsList
+    });
+    setUnifiedPrintModalOpen(true);
+  };
+
+  const handlePrintCashDischarge = (tour: DeliveryTour) => {
+    const totalCollected = tour.orders.reduce((sum, o) => sum + o.amount_ttc, 0);
+    const cashAmt = tour.actualCashCounted ?? Math.round(totalCollected * 0.6);
+    const checkAmt = tour.actualChequesCounted ?? Math.round(totalCollected * 0.3);
+    const rsAmt = tour.actualRSCounted ?? Math.round(totalCollected * 0.1);
+
+    setUnifiedPrintData({
+      docType: 'DECHARGE_CAISSE',
+      docNumber: `DC-${tour.tour_number}`,
+      date: tour.created_at ? new Date(tour.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR'),
+      tourId: tour.tour_number,
+      tourDate: tour.created_at ? new Date(tour.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR'),
+      companyInfo: {
+        name: 'Elyssa ERP — Caisses & Trésorerie Centrales',
+        mf: '1849203/A/M/000',
+        address: 'Siège Elyssa ERP, Zone Industrielle Radès, Tunis',
+        phone: '+216 71 800 900',
+        email: 'treasury@elyssaerp.tn'
+      },
+      driverName: tour.driver_name || 'Hamza Ben Salem',
+      cashierName: 'Caissier Central — Radès',
+      cashAmount: cashAmt,
+      checkAmount: checkAmt,
+      checkCount: tour.orders.length > 0 ? Math.ceil(tour.orders.length / 2) : 2,
+      rsCertificatesAmount: rsAmt,
+      rsCertificatesCount: tour.orders.length > 0 ? Math.ceil(tour.orders.length / 3) : 1,
+      totalCollected: cashAmt + checkAmt + rsAmt,
+      expectedAmount: totalCollected
+    });
+    setUnifiedPrintModalOpen(true);
+  };
 
   // Toast
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -144,9 +229,60 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
 
   // Filtered vehicles (only Available or EN CIRCULATION)
   const filteredVehicles = useMemo(() => {
-    return availableVehicles.filter(v => {
+    let sourceVehicles = availableVehicles;
+    if (sourceVehicles.length === 0) {
+      try {
+        const raw = localStorage.getItem('carthage_fleet_vehicles');
+        if (raw) sourceVehicles = JSON.parse(raw);
+      } catch (e) {}
+    }
+    if (sourceVehicles.length === 0) {
+      sourceVehicles = [
+        {
+          id: 'FLEET-ISUZU-01',
+          tenantId: tenantId || 'company_1',
+          fleet_park: 'Dépôt Central Charguia',
+          device_name: 'Camion Isuzu D-Max',
+          serial_reference: 'TN-210-9842',
+          category: 'Véhicule Utilitaire / Camion',
+          status: 'Available',
+          registeredAt: new Date().toISOString(),
+          mileage: 48500,
+          assignedDriver: 'Hamza Ben Salem',
+          maxPayloadKg: 1000
+        },
+        {
+          id: 'FLEET-PARTNER-02',
+          tenantId: tenantId || 'company_1',
+          fleet_park: 'Magasin Principal Tunis',
+          device_name: 'Fourgon Peugeot Partner',
+          serial_reference: 'TN-198-4431',
+          category: 'Véhicule Utilitaire',
+          status: 'Available',
+          registeredAt: new Date().toISOString(),
+          mileage: 22100,
+          assignedDriver: 'Sami Cherif',
+          maxPayloadKg: 1200
+        },
+        {
+          id: 'FLEET-ISUZU-12T',
+          tenantId: tenantId || 'company_1',
+          fleet_park: 'Dépôt Central Radès',
+          device_name: 'Camion Isuzu 12 Tonnes Poids Lourd',
+          serial_reference: 'TN-9021-33',
+          category: 'Camion Poids Lourd',
+          status: 'Available',
+          registeredAt: new Date().toISOString(),
+          mileage: 89400,
+          assignedDriver: 'Kamel Trad',
+          maxPayloadKg: 12000
+        }
+      ] as any[];
+    }
+
+    return sourceVehicles.filter(v => {
       const st = (v.status || '').toUpperCase();
-      return st === 'AVAILABLE' || st === 'EN CIRCULATION' || st === 'ACTIF' || st === 'ASSIGNED';
+      return st === 'AVAILABLE' || st === 'EN CIRCULATION' || st === 'ACTIF' || st === 'ASSIGNED' || st === '';
     }).map(v => {
       let maxPayloadKg = v.maxPayloadKg;
       if (!maxPayloadKg) {
@@ -154,11 +290,12 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
         if (name.includes('12t') || name.includes('12 tonne')) maxPayloadKg = 12000;
         else if (name.includes('partner') || name.includes('utilitaire')) maxPayloadKg = 1200;
         else if (name.includes('toupie') || name.includes('malaxeur')) maxPayloadKg = 20000;
-        else maxPayloadKg = 8000;
+        else if (name.includes('isuzu')) maxPayloadKg = 1000;
+        else maxPayloadKg = 3500;
       }
       return { ...v, maxPayloadKg };
     });
-  }, [availableVehicles]);
+  }, [availableVehicles, tenantId]);
 
   // Payload calculation for selected invoices
   const selectedInvoicesList = useMemo(() => {
@@ -509,6 +646,95 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
       return isPending && matchChannel;
     });
   }, [pendingInvoices, channelFilter]);
+
+  // Computed readiness lists
+  const unreadyInvoices = useMemo(() => {
+    return awaitingInvoices.filter(inv => !getInvoicePickingInfo(inv).isReadyForDispatch);
+  }, [awaitingInvoices, pickingOrders]);
+
+  const readyInvoices = useMemo(() => {
+    return awaitingInvoices.filter(inv => getInvoicePickingInfo(inv).isReadyForDispatch);
+  }, [awaitingInvoices, pickingOrders]);
+
+  // Batch Validation State & Action
+  const [validatingBatch, setValidatingBatch] = useState(false);
+
+  const handleBatchValidateOrders = async (targetInvoices: Invoice[]) => {
+    if (!tenantId || targetInvoices.length === 0) {
+      showToast('Aucune commande disponible pour la validation rapide.', 'info');
+      return;
+    }
+
+    setValidatingBatch(true);
+    try {
+      const operator = 'Dispatcher (Validation Express Multi-Lignes)';
+      let validatedCount = 0;
+      const newlyValidatedIds: string[] = [];
+
+      for (let idx = 0; idx < targetInvoices.length; idx++) {
+        const inv = targetInvoices[idx];
+        const pickInfo = getInvoicePickingInfo(inv);
+        const whName = inv.warehouse_location || 'Dépôt Central Radès';
+        const defaultDock = `Quai ${(idx % 3) + 1} - ${whName}`;
+
+        if (pickInfo.hasPickingOrders && pickInfo.pickingOrders.length > 0) {
+          for (const po of pickInfo.pickingOrders) {
+            if (po.status !== 'pret_chargement') {
+              const dock = po.dockNumber && po.dockNumber !== 'Quai Non Attribué' ? po.dockNumber : defaultDock;
+              await updateDoc(doc(db, 'company_erp_data', tenantId, 'picking_orders', po.id), {
+                status: 'pret_chargement',
+                preparedBy: operator,
+                preparedAt: new Date().toISOString(),
+                dockNumber: dock
+              });
+            }
+          }
+        } else {
+          const newPoId = `PICK-${inv.invoiceNumber || inv.id}`;
+          const poData: PickingOrder = {
+            id: newPoId,
+            tenantId,
+            orderId: inv.id,
+            clientName: inv.clientName || 'Client ERP',
+            deliveryAddress: inv.delivery_address || 'Adresse Client',
+            warehouseId: 'wh_central',
+            warehouseName: whName,
+            dockNumber: defaultDock,
+            status: 'pret_chargement',
+            createdAt: new Date().toISOString(),
+            preparedAt: new Date().toISOString(),
+            preparedBy: operator,
+            totalAmountTTC: inv.amountTTC || 0,
+            items: [
+              {
+                productId: 'ART-GENERIC',
+                productName: `Colis Commande ${inv.invoiceNumber}`,
+                quantity: 1,
+                warehouseName: whName
+              }
+            ]
+          };
+          await setDoc(doc(db, 'company_erp_data', tenantId, 'picking_orders', newPoId), poData, { merge: true });
+        }
+
+        validatedCount++;
+        newlyValidatedIds.push(inv.id);
+      }
+
+      // Automatically select newly validated invoices for instant truck dispatch
+      setSelectedInvoiceIds(prev => Array.from(new Set([...prev, ...newlyValidatedIds])));
+
+      showToast(
+        `⚡ ${validatedCount} commande(s) validée(s) en masse "PRÊT AU QUAI" avec quai attribué !`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Error in batch validation:', err);
+      showToast('Erreur lors de la validation rapide multi-lignes.', 'error');
+    } finally {
+      setValidatingBatch(false);
+    }
+  };
 
   const toggleSelectAll = () => {
     const readyInvoices = awaitingInvoices.filter(inv => getInvoicePickingInfo(inv).isReadyForDispatch);
@@ -868,7 +1094,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center space-x-2 w-full sm:w-auto">
               <select
                 value={channelFilter}
                 onChange={(e) => setChannelFilter(e.target.value)}
@@ -885,8 +1111,51 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                   onClick={toggleSelectAll}
                   className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer shrink-0"
                 >
-                  {selectedInvoiceIds.length === awaitingInvoices.length ? 'Tout décocher' : 'Tout sélec.'}
+                  {selectedInvoiceIds.length === awaitingInvoices.length ? 'Tout décocher' : 'Tout sélec. prêtes'}
                 </button>
+              )}
+            </div>
+          </div>
+
+          {/* Validation Rapide Multi-Lignes Toolbar Header */}
+          <div className="bg-slate-900 text-white px-5 py-3 border-b border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shrink-0">
+                <Zap className="w-4 h-4 text-amber-300 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-200 font-display">
+                    Validation Rapide Multi-Lignes
+                  </h4>
+                  <span className="text-[9px] font-black bg-amber-500/30 text-amber-200 px-2 py-0.5 rounded-full border border-amber-400/30">
+                    Express Dispatch
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 mt-0.5 flex items-center gap-2">
+                  <span>✅ <b className="text-emerald-400">{readyInvoices.length}</b> Prête(s) au Quai</span>
+                  <span>•</span>
+                  <span>⏳ <b className={unreadyInvoices.length > 0 ? "text-amber-300 font-black" : "text-slate-400"}>{unreadyInvoices.length}</b> En Attente Dépôt</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 w-full sm:w-auto shrink-0">
+              {unreadyInvoices.length > 0 ? (
+                <button
+                  onClick={() => handleBatchValidateOrders(unreadyInvoices)}
+                  disabled={validatingBatch}
+                  className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white text-xs font-black shadow-sm transition flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  id="btn-batch-validate-unready"
+                >
+                  <Zap className="w-3.5 h-3.5 text-yellow-200 shrink-0" />
+                  <span>⚡ Tout Valider au Quai ({unreadyInvoices.length})</span>
+                </button>
+              ) : (
+                <span className="text-[11px] text-emerald-400 font-bold bg-emerald-950/80 px-2.5 py-1 rounded-xl border border-emerald-800/80 flex items-center space-x-1">
+                  <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Toutes les commandes sont Prêtes au Quai</span>
+                </span>
               )}
             </div>
           </div>
@@ -918,7 +1187,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                       onClick={() => {
                         if (!isReady) {
                           showToast(
-                            `🔒 Affectation camion impossible : La commande ${inv.invoiceNumber || inv.id} est en cours de préparation au dépôt (Quai non attribué).`,
+                            `🔒 Affectation camion impossible : La commande ${inv.invoiceNumber || inv.id} est en cours de préparation au dépôt (Quai non attribué). Utilisez "Valider au Quai" pour passer outre.`,
                             'error'
                           );
                           return;
@@ -927,7 +1196,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                       }}
                       className={`p-4 rounded-2xl border transition flex items-start space-x-3 ${
                         !isReady
-                          ? 'bg-slate-50/90 border-slate-200 opacity-80 cursor-not-allowed'
+                          ? 'bg-slate-50/90 border-slate-200 opacity-90'
                           : isSelected 
                           ? 'bg-sky-50/90 border-sky-400 shadow-xs ring-1 ring-sky-300 cursor-pointer' 
                           : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60 cursor-pointer'
@@ -966,24 +1235,49 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
 
                         {/* Picking Readiness & Loading Dock Number Badge */}
                         {isReady ? (
-                          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-xl text-[11px] text-emerald-800 font-bold flex items-center justify-between">
+                          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-xl text-[11px] text-emerald-800 font-bold flex flex-wrap items-center justify-between gap-2">
                             <span className="flex items-center space-x-1.5">
                               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                               <span>✅ PRÊT AU QUAI - Colisage Validé</span>
                             </span>
-                            <span className="bg-emerald-700 text-white font-mono text-[10px] px-2.5 py-0.5 rounded shadow-xs font-black">
-                              📍 {pickInfo.dockNumber}
-                            </span>
+                            
+                            <div className="flex items-center space-x-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePrintBLPOD(inv);
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-[10px] px-2.5 py-1 rounded-lg shadow-xs font-black flex items-center space-x-1 cursor-pointer transition shrink-0 border-0"
+                                title="Imprimer Bon de Livraison & POD émargé avec géolocalisation"
+                              >
+                                <Printer className="w-3.5 h-3.5 text-indigo-200 shrink-0" />
+                                <span>📄 Imprimer BL & POD</span>
+                              </button>
+                              
+                              <span className="bg-emerald-700 text-white font-mono text-[10px] px-2.5 py-0.5 rounded shadow-xs font-black">
+                                📍 {pickInfo.dockNumber}
+                              </span>
+                            </div>
                           </div>
                         ) : (
-                          <div className="bg-amber-50 border border-amber-200 p-2 rounded-xl text-[11px] text-amber-800 font-bold flex items-center justify-between">
+                          <div className="bg-amber-50 border border-amber-200 p-2 rounded-xl text-[11px] text-amber-800 font-bold flex flex-wrap items-center justify-between gap-2">
                             <span className="flex items-center space-x-1.5">
                               <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
-                              <span>⏳ En cours de préparation au dépôt (Quai non attribué)</span>
+                              <span>⏳ En cours de préparation (Quai non attribué)</span>
                             </span>
-                            <span className="bg-amber-200 text-amber-900 font-mono text-[10px] px-2 py-0.5 rounded border border-amber-300 font-black">
-                              🔒 Affectation bloquée
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBatchValidateOrders([inv]);
+                              }}
+                              disabled={validatingBatch}
+                              className="bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white font-mono text-[10px] px-2.5 py-1 rounded-lg shadow-xs font-black flex items-center space-x-1 cursor-pointer transition shrink-0"
+                            >
+                              <Zap className="w-3.5 h-3.5 text-yellow-200 shrink-0" />
+                              <span>Valider au Quai (1-Clic)</span>
+                            </button>
                           </div>
                         )}
 
@@ -1083,7 +1377,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                 <option value="">-- Sélectionner un Chauffeur Filtré --</option>
                 {driversList.map(d => (
                   <option key={d.id} value={d.id}>
-                    {d.name} [{d.availabilityStatus}]
+                    {d.availabilityStatus === 'DISPONIBLE' ? '🟢' : '🚚'} {d.name} [{d.availabilityStatus === 'DISPONIBLE' ? 'Disponible' : 'En Mission'}]
                   </option>
                 ))}
               </select>
@@ -1099,14 +1393,14 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                 onChange={(e) => {
                   const veh = filteredVehicles.find(v => v.id === e.target.value);
                   setSelectedVehicleId(e.target.value);
-                  setSelectedVehicleName(veh ? `${veh.device_name} (${veh.serial_reference})` : '');
+                  setSelectedVehicleName(veh ? `${veh.device_name} — [${veh.serial_reference}]` : '');
                 }}
                 className="w-full p-2.5 text-xs border border-slate-200 rounded-xl bg-white font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
               >
                 <option value="">-- Sélectionner un Véhicule Filtré --</option>
                 {filteredVehicles.map(v => (
                   <option key={v.id} value={v.id}>
-                    🚗 {v.device_name} ({v.serial_reference}) - Max {v.maxPayloadKg?.toLocaleString()} kg
+                    🚚 {v.device_name} — [{v.serial_reference}] (Max: {v.maxPayloadKg?.toLocaleString()} kg)
                   </option>
                 ))}
               </select>
@@ -1229,7 +1523,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-3">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                         isCloturee ? 'bg-purple-100 text-purple-800 border border-purple-300' :
                         isTerminee ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
@@ -1237,6 +1531,16 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                       }`}>
                         {isCloturee ? '🔐 CLÔTURÉE & RAPPROCHÉE' : isTerminee ? '✅ TERMINÉE (À RAPPROCHER)' : '🚚 EN COURS'}
                       </span>
+
+                      {/* Cash Clearance Print Button */}
+                      <button
+                        onClick={() => handlePrintCashDischarge(tour)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs uppercase flex items-center space-x-1.5 shadow-sm transition cursor-pointer border-0"
+                        title="Imprimer la décharge de caisse avec ventilation Cash, Chèques et RS"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>💰 Imprimer Décharge de Caisse</span>
+                      </button>
 
                       {/* Evening Closure Action Button */}
                       {!isCloturee && (
@@ -1270,11 +1574,46 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
                               </span>
                             </div>
                           </div>
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-black ${
-                            o.delivery_status === 'livre' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {o.delivery_status === 'livre' ? 'LIVRÉ' : 'EN TRANSIT'}
-                          </span>
+                          
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrintBLPOD({
+                                  id: o.order_id,
+                                  invoiceNumber: o.order_id,
+                                  clientName: o.client_name,
+                                  amountTTC: o.amount_ttc,
+                                  issuedDate: new Date().toLocaleDateString('fr-FR'),
+                                  dueDate: new Date().toLocaleDateString('fr-FR'),
+                                  amountHT: o.amount_ttc / 1.19,
+                                  vatRate: 19,
+                                  vatAmount: o.amount_ttc - (o.amount_ttc / 1.19),
+                                  withholdingTaxRate: 1.5,
+                                  amountNetToPay: o.amount_ttc,
+                                  status: 'Paid',
+                                  clientTaxId: '1234567/A',
+                                  clientAddress: 'Radès, Tunis',
+                                  clientPhone: '+216 71 000 000',
+                                  withholdingAmount: 0,
+                                  withholdingCertificateReceived: false,
+                                  recouvrementSteps: [],
+                                  clientId: 'client_0'
+                                });
+                              }}
+                              className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded font-black text-[9px] flex items-center space-x-1 cursor-pointer transition shrink-0"
+                              title="Imprimer Bon de Livraison & POD émargé"
+                            >
+                              <Printer className="w-3 h-3 text-indigo-600" />
+                              <span>📄 BL & POD</span>
+                            </button>
+
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black ${
+                              o.delivery_status === 'livre' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {o.delivery_status === 'livre' ? 'LIVRÉ' : 'EN TRANSIT'}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1409,6 +1748,13 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
           </div>
         </div>
       )}
+
+      {/* UNIFIED PRINT MODAL */}
+      <DocumentPrintModal
+        isOpen={unifiedPrintModalOpen}
+        onClose={() => setUnifiedPrintModalOpen(false)}
+        data={unifiedPrintData}
+      />
 
     </div>
   );

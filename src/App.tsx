@@ -1011,7 +1011,7 @@ const getCompleteDemoPayload = (companyName: string) => {
   const domain = isInter ? 'inter-affaires.tn' : `${cleanDomain || 'entreprise'}.tn`;
   const suffix = companyName ? companyName.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'default';
 
-  const demoEmployees: Employee[] = [
+  let demoEmployees: Employee[] = [
     {
       id: `demo-emp_${suffix}_1`,
       name: 'Khaled Ben Amor',
@@ -1279,78 +1279,7 @@ const getCompleteDemoPayload = (companyName: string) => {
     }
   ];
 
-  const demoContractsList = [
-    {
-      id: `demo-ct_${suffix}_1`,
-      employeeId: `demo-emp_${suffix}_1`,
-      employeeName: 'Khaled Ben Amor',
-      contractType: 'CDI',
-      startDate: '2023-01-15',
-      trialPeriodMonths: 3,
-      baseSalary: 2600.000,
-      status: 'Signed',
-      dutiesDescription: `Superviser l'ensemble des processus financiers, élaboration du budget annuel, pilotage de la trésorerie pour ${companyName}.`,
-      generatedAt: '2023-01-15',
-      signedAt: '2023-01-15'
-    }
-  ];
 
-  const demoAbsencesList = [
-    {
-      id: `demo-abs_${suffix}_1`,
-      employeeId: `demo-emp_${suffix}_2`,
-      employeeName: 'Ines Dridi',
-      type: 'SickLeave',
-      startDate: '2026-06-02',
-      endDate: '2026-06-05',
-      daysCount: 4,
-      isDeductibleFromSalary: true,
-      deductionAmount: 240.000,
-      status: 'Approved',
-      description: 'Grippe saisonnière sévère - Certificat médical transmis'
-    }
-  ];
-
-  const demoPayslipsList = [
-    {
-      id: `demo-ps_${suffix}_1_may`,
-      employeeId: `demo-emp_${suffix}_1`,
-      employeeName: 'Khaled Ben Amor',
-      month: '2026-05',
-      baseSalary: 2600.000,
-      grossSalary: 3160.000,
-      cnssEmployee: 290.088,
-      cnssEmployer: 539.412,
-      professionalExpenses: 166.667,
-      familyDeduction: 41.667,
-      taxableIncome: 2661.578,
-      irpp: 582.345,
-      css: 26.616,
-      netSalary: 2260.951,
-      allowancesPaid: 560.000,
-      status: 'Paid',
-      paymentMethod: 'Virement',
-      bankAccountId: 'ba_1',
-      paidDate: '2026-05-31'
-    }
-  ];
-
-  const demoDocs = [
-    {
-      id: `demo-doc_${suffix}_1`,
-      name: "Contrat_CDI_Khaled_Ben_Amor_Signed",
-      type: "Contract",
-      fileSize: "245 KB",
-      fileType: "application/pdf",
-      uploadDate: "2023-01-15",
-      linkedToType: "Employee",
-      linkedToId: `demo-emp_${suffix}_1`,
-      linkedToName: "Khaled Ben Amor",
-      description: "Contrat de travail permanent en qualité de Directeur Financier & Recouvrement.",
-      version: 1,
-      uploadedBy: `contact@${domain}`
-    }
-  ];
 
   const demoFolders = [
     {
@@ -1435,6 +1364,147 @@ const getCompleteDemoPayload = (companyName: string) => {
   const isSfax = companyName?.toLowerCase().includes('sfax') || companyName?.toLowerCase().includes('distrib');
   const isSahel = companyName?.toLowerCase().includes('sahel') || companyName?.toLowerCase().includes('batiment');
   const isGTS = companyName?.toLowerCase().includes('gts') || companyName?.toLowerCase().includes('transport');
+
+  // Multi-Tenant Differentiated Employees & GED Docs generator according to exact Pack Cabinet specs:
+  // SFE: 18 salariés | Masse brute: 41 200 DT | 14 pièces GED en attente | TEJ: Validée
+  // Sfax Distribution: 8 salariés | Masse brute: 16 850 DT | 32 pièces GED en attente | TVA/G50: En retard
+  // Bâtiment Sahel: 12 salariés | Masse brute: 24 600 DT | 8 pièces GED en attente | TEJ: En attente
+  // GTS: 6 salariés | Masse brute: 12 300 DT | 21 pièces GED en attente | CNSS: À vérifier
+  let targetEmpCount = 10;
+  let targetMasseBrute = 22000;
+  let targetGedCount = 5;
+
+  if (isSFE) {
+    targetEmpCount = 18;
+    targetMasseBrute = 41200;
+    targetGedCount = 14;
+  } else if (isSfax) {
+    targetEmpCount = 8;
+    targetMasseBrute = 16850;
+    targetGedCount = 32;
+  } else if (isSahel) {
+    targetEmpCount = 12;
+    targetMasseBrute = 24600;
+    targetGedCount = 8;
+  } else if (isGTS) {
+    targetEmpCount = 6;
+    targetMasseBrute = 12300;
+    targetGedCount = 21;
+  }
+
+  const generatedEmployees: Employee[] = [];
+  const basePerEmp = Math.floor((targetMasseBrute * 0.75) / targetEmpCount);
+  const allowPerEmp = Math.floor((targetMasseBrute * 0.25) / targetEmpCount);
+  const remainder = targetMasseBrute - (basePerEmp + allowPerEmp) * targetEmpCount;
+
+  const rolesList = [
+    'Directeur Général', 'Responsable Financier', 'Chef Comptable', 'Ingénieur Qualité',
+    'Responsable Transit', 'Chauffeur Poids Lourds', 'Commercial Senior', 'Technicien Maintenance',
+    'Magasinier Principal', 'Assistant RH', 'Opérateur Saisie', 'Contrôleur de Gestion',
+    'Responsable Achats', 'Chef d\'Atelier', 'Superviseur Logistique', 'Auditeur Interne',
+    'Inspecteur Sécurité', 'Chargé Clientèle'
+  ];
+
+  for (let i = 0; i < targetEmpCount; i++) {
+    const isLast = i === targetEmpCount - 1;
+    const baseVal = basePerEmp + (isLast ? remainder : 0);
+    generatedEmployees.push({
+      id: `demo-emp_${suffix}_${i + 1}`,
+      matricule: `EMP-${(100 + i + 1)}`,
+      name: `Collaborateur ${i + 1} (${companyName || 'Cabinet'})`,
+      email: `emp${i + 1}@${domain}`,
+      jobTitle: rolesList[i % rolesList.length],
+      department: i % 2 === 0 ? 'Direction Operations' : 'Administration & Finances',
+      ssn: `148392${10 + i}-92`,
+      cin: `089123${10 + i}`,
+      rib: `030010100159200${3800 + i}`,
+      baseSalary: baseVal,
+      transportAllowance: Math.floor(allowPerEmp * 0.6),
+      presenceAllowance: Math.floor(allowPerEmp * 0.4),
+      otherAllowances: 0,
+      familySituation: i % 2 === 0 ? 'Married_2' : 'Single',
+      isChefDeFamille: i % 2 === 0,
+      status: 'Active',
+      hiringDate: '2023-01-15',
+      company: companyName
+    });
+  }
+
+  const generatedDocs: any[] = [];
+  const docCategories = ['Facture Fournisseur', 'Relevé Bancaire', 'Contrat Commercial', 'Déclaration Fiscale', 'Bon de Livraison'];
+  for (let k = 0; k < targetGedCount; k++) {
+    generatedDocs.push({
+      id: `demo-doc_${suffix}_${k + 1}`,
+      name: `Pièce_Comptable_EnAttente_${k + 1}_${suffix.toUpperCase()}`,
+      type: k % 2 === 0 ? "Invoice" : "Contract",
+      fileSize: `${120 + (k * 15)} KB`,
+      fileType: "application/pdf",
+      uploadDate: `2026-08-${String((k % 12) + 1).padStart(2, '0')}`,
+      linkedToType: "Client",
+      linkedToId: `cli_${suffix}_1`,
+      linkedToName: companyName || "Dossier Client",
+      description: `Document numérisé en attente de validation comptable (${docCategories[k % docCategories.length]}).`,
+      version: 1,
+      status: 'Unprocessed',
+      uploadedBy: `contact@${domain}`
+    });
+  }
+
+  demoEmployees = generatedEmployees;
+
+  const demoContractsList = generatedEmployees.slice(0, 3).map((emp, idx) => ({
+    id: `demo-ct_${suffix}_${idx + 1}`,
+    employeeId: emp.id,
+    employeeName: emp.name,
+    contractType: 'CDI',
+    startDate: '2023-01-15',
+    trialPeriodMonths: 3,
+    baseSalary: emp.baseSalary,
+    status: 'Signed',
+    dutiesDescription: `Poste de ${emp.jobTitle} au sein du dossier client ${companyName}.`,
+    generatedAt: '2023-01-15',
+    signedAt: '2023-01-15'
+  }));
+
+  const demoAbsencesList = [
+    {
+      id: `demo-abs_${suffix}_1`,
+      employeeId: generatedEmployees[0]?.id || `demo-emp_${suffix}_1`,
+      employeeName: generatedEmployees[0]?.name || 'Collaborateur 1',
+      type: 'SickLeave',
+      startDate: '2026-06-02',
+      endDate: '2026-06-05',
+      daysCount: 4,
+      isDeductibleFromSalary: true,
+      deductionAmount: 240.000,
+      status: 'Approved',
+      description: 'Certificat médical transmis et validé'
+    }
+  ];
+
+  const demoPayslipsList = generatedEmployees.map((emp, idx) => ({
+    id: `demo-ps_${suffix}_${idx + 1}_may`,
+    employeeId: emp.id,
+    employeeName: emp.name,
+    month: '2026-07',
+    baseSalary: emp.baseSalary,
+    grossSalary: emp.baseSalary + (emp.transportAllowance || 0) + (emp.presenceAllowance || 0),
+    cnssEmployee: Math.round((emp.baseSalary * 0.0918) * 1000) / 1000,
+    cnssEmployer: Math.round((emp.baseSalary * 0.1707) * 1000) / 1000,
+    professionalExpenses: 166.667,
+    familyDeduction: emp.isChefDeFamille ? 25.000 : 0,
+    taxableIncome: emp.baseSalary * 0.9,
+    irpp: Math.round((emp.baseSalary * 0.15) * 1000) / 1000,
+    css: Math.round((emp.baseSalary * 0.01) * 1000) / 1000,
+    netSalary: Math.round((emp.baseSalary * 0.78) * 1000) / 1000,
+    allowancesPaid: (emp.transportAllowance || 0) + (emp.presenceAllowance || 0),
+    status: 'Paid',
+    paymentMethod: 'Virement',
+    bankAccountId: 'ba_1',
+    paidDate: '2026-07-31'
+  }));
+
+  const demoDocs = generatedDocs;
 
   let customAccounts: any[] = [];
   let customTxs: any[] = [];
@@ -5056,9 +5126,7 @@ export default function App() {
         await runDirectFirestoreFetch(
           async (resData) => {
             if (resData && !resData.empty) {
-              const isDemoCompany = activeCompanyName.toLowerCase() === "elyssa entreprises s.a." || activeCompanyName.toLowerCase() === "inter-affaires";
-              if (isDemoCompany) {
-                if (Array.isArray(resData.clients)) setClients(resData.clients);
+              if (Array.isArray(resData.clients)) setClients(resData.clients);
                 if (Array.isArray(resData.complaints)) setComplaints(resData.complaints);
                 if (Array.isArray(resData.invoices)) setInvoices(resData.invoices);
                 if (Array.isArray(resData.visitReports)) setVisitReports(resData.visitReports);
@@ -5285,157 +5353,6 @@ export default function App() {
                   setIncidents(cleanIncidents);
                 }
               }
-            } else {
-              // First time loading this company's ERP data!
-              const clientRecord = freshClients.find(c => c && (c.id === activeCompanyName || c.companyName?.toLowerCase() === activeCompanyName?.toLowerCase()));
-              const companyLower = activeCompanyName.toLowerCase();
-              const isCabinetDossier = companyLower.includes('sfe') || 
-                                       companyLower.includes('sfax') || 
-                                       companyLower.includes('sahel') || 
-                                       companyLower.includes('gts') || 
-                                       companyLower.includes('dos-') || 
-                                       !!accountantClientContext?.isAccountantMode;
-              const isTrialClient = clientRecord?.status === 'trial' || isCabinetDossier || isSimulationActive;
-
-              if (isTrialClient) {
-                console.log("[Trial Initial Load] Populating all demo data for new trial company:", activeCompanyName);
-                const demoPayload = getCompleteDemoPayload(activeCompanyName);
-                
-                setClients(demoPayload.clients);
-                setComplaints(demoPayload.complaints);
-                setInvoices(demoPayload.invoices);
-                setVisitReports(demoPayload.visitReports);
-                setCompetitors(demoPayload.competitors);
-                setSuppliers(demoPayload.suppliers);
-                setProducts(demoPayload.products);
-                setStockMovements(demoPayload.stockMovements);
-                setSmtpSettings(demoPayload.smtpSettings);
-                setImapSettings(demoPayload.imapSettings);
-                setIncomingEmails(demoPayload.incomingEmails);
-                setEmailTemplates(demoPayload.emailTemplates);
-                setCommunicationLogs(demoPayload.communicationLogs);
-                setBankAccounts((demoPayload.bankAccounts as any));
-                setBankTransactions((demoPayload.bankTransactions as any));
-                setTaxDeclarations(demoPayload.taxDeclarations);
-                setYearEndClosings(demoPayload.yearEndClosings);
-                setDocuments((demoPayload.documents as any));
-                setEmployees(demoPayload.employees);
-                setContracts(demoPayload.contracts);
-                setAbsences(demoPayload.absences);
-                setPayslips(demoPayload.payslips);
-                setAssets(demoPayload.assets);
-                setCessionEntries(demoPayload.cessionEntries);
-                setNomenclatures(demoPayload.nomenclatures);
-                setManufacturingOrders(demoPayload.manufacturingOrders);
-                setPurchaseRequisitions(demoPayload.purchaseRequisitions);
-                setPurchaseOrders(demoPayload.purchaseOrders);
-                setSupplierPerformance(demoPayload.supplierPerformance);
-                setImportFolders((demoPayload.importFolders as any) || []);
-                setLcRequests((demoPayload.lcRequests as any) || []);
-                setVehicles((demoPayload.vehicles as any) || []);
-                setMissions((demoPayload.missions as any) || []);
-                setExpenses((demoPayload.expenses as any) || []);
-                setIncidents((demoPayload.incidents as any) || []);
-
-                await fetch('/api/db/company-data', {
-                  method: 'POST',
-                  headers: getAuthHeaders(),
-                  body: JSON.stringify({
-                    company: activeCompanyName,
-                    data: demoPayload
-                  })
-                });
-              } else {
-                const companyTemplates = INITIAL_EMAIL_TEMPLATES.map(t => ({
-                  ...t,
-                  subject: t.subject.replace(/Elyssa Entreprises S\.A\./g, activeCompanyName),
-                  body: t.body.replace(/Elyssa Entreprises S\.A\./g, activeCompanyName)
-                }));
-
-                const defaultPayload = {
-                  clients: [],
-                  complaints: [],
-                  invoices: [],
-                  visitReports: [],
-                  competitors: [],
-                  suppliers: [],
-                  products: [],
-                  stockMovements: [],
-                  smtpSettings: DEFAULT_SMTP_SETTINGS,
-                  imapSettings: DEFAULT_IMAP_SETTINGS,
-                  incomingEmails: [],
-                  emailTemplates: companyTemplates,
-                  communicationLogs: [],
-                  bankAccounts: [],
-                  bankTransactions: [],
-                  taxDeclarations: [],
-                  yearEndClosings: [],
-                  documents: [],
-                  employees: [],
-                  contracts: [],
-                  absences: [],
-                  payslips: [],
-                  assets: [],
-                  cessionEntries: [],
-                  nomenclatures: [],
-                  manufacturingOrders: [],
-                  purchaseRequisitions: [],
-                  purchaseOrders: [],
-                  supplierPerformance: [],
-                  importFolders: [],
-                  lcRequests: [],
-                  vehicles: [],
-                  missions: [],
-                  expenses: [],
-                  incidents: []
-                };
-
-                setClients(defaultPayload.clients);
-                setComplaints(defaultPayload.complaints);
-                setInvoices(defaultPayload.invoices);
-                setVisitReports(defaultPayload.visitReports);
-                setCompetitors(defaultPayload.competitors);
-                setSuppliers(defaultPayload.suppliers);
-                setProducts(defaultPayload.products);
-                setStockMovements(defaultPayload.stockMovements);
-                setSmtpSettings(defaultPayload.smtpSettings);
-                setImapSettings(defaultPayload.imapSettings);
-                setIncomingEmails(defaultPayload.incomingEmails);
-                setEmailTemplates(defaultPayload.emailTemplates);
-                setCommunicationLogs(defaultPayload.communicationLogs);
-                setBankAccounts(defaultPayload.bankAccounts);
-                setBankTransactions(defaultPayload.bankTransactions);
-                setTaxDeclarations(defaultPayload.taxDeclarations);
-                setYearEndClosings(defaultPayload.yearEndClosings);
-                setDocuments(defaultPayload.documents);
-                setEmployees(defaultPayload.employees);
-                setContracts(defaultPayload.contracts);
-                setAbsences(defaultPayload.absences);
-                setPayslips(defaultPayload.payslips);
-                setAssets(defaultPayload.assets);
-                setCessionEntries(defaultPayload.cessionEntries);
-                setNomenclatures(defaultPayload.nomenclatures);
-                setManufacturingOrders(defaultPayload.manufacturingOrders);
-                setPurchaseRequisitions(defaultPayload.purchaseRequisitions);
-                setPurchaseOrders(defaultPayload.purchaseOrders);
-                setSupplierPerformance(defaultPayload.supplierPerformance);
-                setImportFolders([]);
-                setLcRequests([]);
-                setVehicles([]);
-                setMissions([]);
-                setExpenses([]);
-                setIncidents([]);
-
-                await fetch('/api/db/company-data', {
-                  method: 'POST',
-                  headers: getAuthHeaders(),
-                  body: JSON.stringify({
-                    company: activeCompanyName,
-                    data: { ...defaultPayload, lastUpdated: Date.now() }
-                  })
-                });
-              }
-            }
           },
           (collabsData) => {
             if (Array.isArray(collabsData)) {

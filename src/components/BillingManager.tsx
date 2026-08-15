@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Invoice, Client, InvoiceStatus, RecouvrementStep, AdminSettings, SmtpSettings, EmailTemplate, CommunicationLog } from '../types';
 import { calculateInvoiceAmounts, formatTND, getCompanyLegalHeader } from '../utils/calculations';
 import IframePrintHelper from './IframePrintHelper';
+import DocumentPrintModal, { PrintModalData } from './DocumentPrintModal';
 import { ElyssaLogo } from './ElyssaLogo';
 import { INITIAL_EMAIL_TEMPLATES } from '../data/mockData';
 import { 
@@ -147,6 +148,64 @@ export default function BillingManager({
     const idFromUri = params.get('id');
     return idFromUri || invoices[0]?.id || null;
   });
+
+  // Unified Print Modal State
+  const [unifiedPrintModalOpen, setUnifiedPrintModalOpen] = useState(false);
+  const [unifiedPrintData, setUnifiedPrintData] = useState<PrintModalData | null>(null);
+
+  const handleOpenPrintInvoice = (inv: Invoice) => {
+    const client = clients.find(c => c.id === inv.clientId) || {
+      name: inv.clientName,
+      mf: inv.clientTaxId || '1849203/A/M/000',
+      address: inv.clientAddress || 'Tunis, Tunisie',
+      phone: inv.clientPhone || '+216 71 000 000'
+    };
+
+    const invoiceItems = (inv.items && inv.items.length > 0) ? inv.items.map(item => ({
+      ref: item.productCode || item.sku || 'SKU-001',
+      description: item.description || item.productName || 'Article / Prestation',
+      quantity: item.quantity || 1,
+      unitPrice: item.unitPrice || item.priceHT || 0,
+      tvaRate: item.tvaRate || 19,
+      totalHT: (item.quantity || 1) * (item.unitPrice || item.priceHT || 0),
+      unit: item.unit || 'u.'
+    })) : [
+      {
+        description: `Facture commerciale N° ${inv.invoiceNumber}`,
+        quantity: 1,
+        unitPrice: inv.amountHT || (inv.amountNetToPay ? inv.amountNetToPay / 1.19 : 100),
+        tvaRate: 19,
+        totalHT: inv.amountHT || (inv.amountNetToPay ? inv.amountNetToPay / 1.19 : 100),
+        unit: 'U'
+      }
+    ];
+
+    setUnifiedPrintData({
+      docType: 'FACTURE',
+      docNumber: inv.invoiceNumber,
+      date: inv.issuedDate || new Date().toISOString().split('T')[0],
+      companyInfo: {
+        name: adminSettings?.companyName || 'Elyssa ERP Suite',
+        mf: adminSettings?.matriculeFiscal || '1849203/A/M/000',
+        address: adminSettings?.companyAddress || 'Zone Industrielle Radès, 2040 Tunis, Tunisie',
+        phone: adminSettings?.companyPhone || '+216 71 800 900',
+        email: adminSettings?.companyEmail || 'billing@elyssaerp.tn'
+      },
+      clientInfo: {
+        name: inv.clientName || 'Client Passager',
+        mf: inv.clientTaxId || (client as any).mf || 'MF-1234567/A',
+        address: inv.clientAddress || client.address || 'Tunis, Tunisie',
+        phone: inv.clientPhone || client.phone || ''
+      },
+      items: invoiceItems,
+      taxRate: 19,
+      timbreFiscal: 1.000,
+      includeRS: true,
+      rsRate: 1.5,
+      notes: inv.notes || 'Paiement sous 30 jours. Soumis à la Retenue à la Source RS 1.5% selon la législation fiscale tunisienne.'
+    });
+    setUnifiedPrintModalOpen(true);
+  };
 
   // Bill creation form
   const [isAddingInvoice, setIsAddingInvoice] = useState(false);
@@ -662,13 +721,29 @@ export default function BillingManager({
                   <span className={`px-2 py-0.2 rounded border font-bold ${currentStatus.color}`}>
                     {currentStatus.text}
                   </span>
-                  {inv.withholdingAmount > 0 && (
-                    <span className={`px-1.5 py-0.2 rounded font-bold ${
-                      inv.withholdingCertificateReceived ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800 animate-pulse'
-                    }`}>
-                      RS: {inv.withholdingCertificateReceived ? 'Certificat reçu' : 'RS à collecter'}
-                    </span>
-                  )}
+                  
+                  <div className="flex items-center space-x-1">
+                    {inv.withholdingAmount > 0 && (
+                      <span className={`px-1.5 py-0.2 rounded font-bold ${
+                        inv.withholdingCertificateReceived ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800 animate-pulse'
+                      }`}>
+                        RS: {inv.withholdingCertificateReceived ? 'Certificat reçu' : 'RS à collecter'}
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenPrintInvoice(inv);
+                      }}
+                      className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md font-black text-[9px] flex items-center space-x-1 cursor-pointer transition shrink-0 shadow-2xs"
+                      title="Imprimer Facture A4 avec TVA, Timbre & RS 1.5%"
+                    >
+                      <Printer className="w-3 h-3 text-indigo-600" />
+                      <span>🖨️ Imprimer Facture A4</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -1271,46 +1346,11 @@ export default function BillingManager({
                   <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                     <button
                       type="button"
-                      onClick={() => {
-                        const isIframe = window.self !== window.top;
-                        if (isIframe) {
-                          setPrintDocName(`Facture ${selectedInvoice?.invoiceNumber || ''}`);
-                          setPrintDocTab('billing');
-                          setPrintTarget('printable-invoice');
-                          setPrintTargetId(selectedInvoice?.id || '');
-                          setIsPrintModalOpen(true);
-                          return;
-                        }
-
-                        const printContent = document.getElementById('printable-invoice');
-                        if (printContent) {
-                          const clone = printContent.cloneNode(true) as HTMLElement;
-                          clone.id = 'temp-print-root';
-                          clone.className = 'temp-print-root ' + (printContent.className || '');
-                          document.body.appendChild(clone);
-                          document.body.classList.add('print-mode-active');
-                          
-                          setTimeout(() => {
-                            try {
-                              window.print();
-                            } catch (e) {
-                              console.error('Print error:', e);
-                            } finally {
-                              document.body.classList.remove('print-mode-active');
-                              const tempElement = document.getElementById('temp-print-root');
-                              if (tempElement) {
-                                document.body.removeChild(tempElement);
-                              }
-                            }
-                          }, 150);
-                        } else {
-                          window.print();
-                        }
-                      }}
+                      onClick={() => handleOpenPrintInvoice(selectedInvoice)}
                       className="p-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5 shadow-sm cursor-pointer"
                     >
                       <Printer className="w-4 h-4" />
-                      <span>Imprimer la Facture</span>
+                      <span>🖨️ Imprimer Facture A4 (TVA / Timbre / RS)</span>
                     </button>
                     <button
                       type="button"
@@ -1687,6 +1727,11 @@ export default function BillingManager({
         documentName={printDocName}
         printTarget={printTarget}
         targetId={printTargetId}
+      />
+      <DocumentPrintModal
+        isOpen={unifiedPrintModalOpen}
+        onClose={() => setUnifiedPrintModalOpen(false)}
+        data={unifiedPrintData}
       />
     </div>
   );

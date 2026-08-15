@@ -124,7 +124,7 @@ export async function seedHyperConnectedDemoData(tenantId: string): Promise<Hype
     }
   ];
 
-  // 2. Parc Roulant & Matériel (fleet_inventory)
+  // 2. Parc Roulant & Matériel (fleet_inventory & fleet_vehicles)
   const fleetVehiclesData: FleetInventoryItem[] = [
     {
       id: 'FLEET-ISUZU-01',
@@ -136,7 +136,8 @@ export async function seedHyperConnectedDemoData(tenantId: string): Promise<Hype
       status: 'Available',
       registeredAt: now,
       mileage: 48500,
-      assignedDriver: 'Hamza Ben Salem'
+      assignedDriver: 'Hamza Ben Salem',
+      maxPayloadKg: 1000
     },
     {
       id: 'FLEET-PARTNER-02',
@@ -148,7 +149,21 @@ export async function seedHyperConnectedDemoData(tenantId: string): Promise<Hype
       status: 'Available',
       registeredAt: now,
       mileage: 22100,
-      assignedDriver: 'Sami Cherif'
+      assignedDriver: 'Sami Cherif',
+      maxPayloadKg: 1200
+    },
+    {
+      id: 'FLEET-ISUZU-12T',
+      tenantId: companyId,
+      fleet_park: 'Dépôt Central Radès',
+      device_name: 'Camion Isuzu 12 Tonnes Poids Lourd',
+      serial_reference: 'TN-9021-33',
+      category: 'Camion Poids Lourd',
+      status: 'Available',
+      registeredAt: now,
+      mileage: 89400,
+      assignedDriver: 'Kamel Trad',
+      maxPayloadKg: 12000
     }
   ];
 
@@ -176,34 +191,196 @@ export async function seedHyperConnectedDemoData(tenantId: string): Promise<Hype
 
   const productsData = [
     {
-      id: 'PROD-BTP-001',
-      code: 'PROD-BTP-001',
-      name: 'Ciment Portland CEM I 42.5 (Sac 50kg)',
-      category: 'Matériaux BTP',
-      unitPrice: 18.50,
+      id: "PROD-CIM-50",
+      sku: "CIM-50",
+      name: "Ciment Portland Super CPJ45 (Sac 50kg)",
+      category: "Gros Œuvre",
+      type: "PRODUIT_FINI",
+      unitPrice: 14.500,
+      costPrice: 11.200,
       vatRate: 19,
       stockQuantity: 1200,
-      warehouse_location: 'Dépôt Central Charguia'
+      stockLevel: 1200,
+      minStockLevel: 300,
+      unit: "Sac",
+      supplierName: "Les Ciments de Bizerte",
+      warehouse_location: "Dépôt Central - Radès (Tunis)"
     },
     {
-      id: 'PROD-ALU-002',
-      code: 'PROD-ALU-002',
-      name: 'Profilés Aluminium Anodisé 6m',
-      category: 'Quincaillerie & Menuiserie',
-      unitPrice: 145.00,
+      id: "PROD-BRI-12",
+      sku: "BRI-12",
+      name: "Brique Rouge 12 Alvéoles (Paquet)",
+      category: "Gros Œuvre",
+      type: "PRODUIT_FINI",
+      unitPrice: 0.850,
+      costPrice: 0.620,
       vatRate: 19,
-      stockQuantity: 350,
-      warehouse_location: 'Magasin Principal Tunis'
+      stockQuantity: 5000,
+      stockLevel: 5000,
+      minStockLevel: 1000,
+      unit: "Paquet",
+      supplierName: "Briqueterie El Wafa",
+      warehouse_location: "Dépôt Central - Radès (Tunis)"
     },
     {
-      id: 'PROD-PNT-003',
-      code: 'PROD-PNT-003',
-      name: 'Peinture Industrielle Époxydique (Fût 25L)',
-      category: 'Chimie & Revêtement',
-      unitPrice: 280.00,
+      id: "PROD-PEI-SAT",
+      sku: "PEI-SAT",
+      name: "Peinture Satino-Vinylique Blanche 15L",
+      category: "Finition",
+      type: "PRODUIT_FINI",
+      unitPrice: 85.000,
+      costPrice: 62.000,
       vatRate: 19,
-      stockQuantity: 120,
-      warehouse_location: 'Dépôt Central Charguia'
+      stockQuantity: 180,
+      stockLevel: 180,
+      minStockLevel: 40,
+      unit: "Pot",
+      supplierName: "Astral Tunisie",
+      warehouse_location: "Magasin Principal - Tunis Bourguiba"
+    },
+    {
+      id: "PROD-ROB-LAI",
+      sku: "ROB-LAI",
+      name: "Robinet Mélangeur Évier Laiton Chromé",
+      category: "Sanitaire",
+      type: "PRODUIT_FINI",
+      unitPrice: 65.000,
+      costPrice: 45.000,
+      vatRate: 19,
+      stockQuantity: 95,
+      stockLevel: 95,
+      minStockLevel: 25,
+      unit: "Unité",
+      supplierName: "SOPAL Tunisie",
+      warehouse_location: "Magasin Principal - Tunis Bourguiba"
+    },
+    {
+      id: "PROD-CAB-25",
+      sku: "CAB-25",
+      name: "Câble Électrique Rigide 2.5mm² (Rouleau 100m)",
+      category: "Électricité",
+      type: "PRODUIT_FINI",
+      unitPrice: 110.000,
+      costPrice: 82.000,
+      vatRate: 19,
+      stockQuantity: 320,
+      stockLevel: 320,
+      minStockLevel: 60,
+      unit: "Rouleau",
+      supplierName: "Chakira Câbles",
+      warehouse_location: "Dépôt Central - Radès (Tunis)"
+    },
+    {
+      id: "PROD-FER-12",
+      sku: "FER-12",
+      name: "Barre de Fer à Béton HLE 12mm (12m)",
+      category: "Gros Œuvre",
+      type: "PRODUIT_FINI",
+      unitPrice: 28.000,
+      costPrice: 21.000,
+      vatRate: 19,
+      stockQuantity: 850,
+      stockLevel: 850,
+      minStockLevel: 200,
+      unit: "Barre",
+      supplierName: "EL FOULADH Menzel Bourguiba",
+      warehouse_location: "Dépôt Central - Radès (Tunis)"
+    },
+    {
+      id: "PROD-DIS-CUT",
+      sku: "DIS-CUT",
+      name: "Disque de Découpe Diamanté 230mm Pro",
+      category: "Outillage",
+      type: "PRODUIT_FINI",
+      unitPrice: 42.000,
+      costPrice: 29.000,
+      vatRate: 19,
+      stockQuantity: 410,
+      stockLevel: 410,
+      minStockLevel: 100,
+      unit: "Pièce",
+      supplierName: "Bosch Tunisie Tools",
+      warehouse_location: "Magasin Principal - Tunis Bourguiba"
+    },
+    {
+      id: "PROD-DISJ-16",
+      sku: "DISJ-16",
+      name: "Disjoncteur Divisionnaire 16A",
+      category: "Électricité",
+      type: "PRODUIT_FINI",
+      unitPrice: 7.050,
+      costPrice: 4.550,
+      vatRate: 19,
+      stockQuantity: 1000,
+      stockLevel: 1000,
+      minStockLevel: 250,
+      unit: "Pièce",
+      supplierName: "Schneider Electric Tunisie",
+      warehouse_location: "Usine GPAO & Dépôt Central"
+    },
+    {
+      id: "RAW-CU-CAT",
+      sku: "CU-CAT",
+      name: "Cuivre Cathodique Pur de Haute Pureté",
+      category: "Matières Premières",
+      type: "MATIERE_PREMIERE",
+      unitPrice: 24.500,
+      costPrice: 24.500,
+      vatRate: 19,
+      stockQuantity: 850,
+      stockLevel: 850,
+      minStockLevel: 500,
+      unit: "Kg",
+      supplierName: "Société Tuniso-Africaine du Cuivre",
+      warehouse_location: "Magasin Matières Usine"
+    },
+    {
+      id: "RAW-PVC-GRA",
+      sku: "PVC-GRA",
+      name: "Grains PVC Isolants Auto-extinguibles",
+      category: "Matières Premières",
+      type: "MATIERE_PREMIERE",
+      unitPrice: 4.800,
+      costPrice: 4.800,
+      vatRate: 19,
+      stockQuantity: 1200,
+      stockLevel: 1200,
+      minStockLevel: 800,
+      unit: "Kg",
+      supplierName: "Tunisie Chimie Industrielle (TCI)",
+      warehouse_location: "Magasin Matières Usine"
+    },
+    {
+      id: "RAW-BOB-MAG",
+      sku: "BOB-MAG",
+      name: "Bobine de Déclenchement Magnétique 230V",
+      category: "Matières Premières",
+      type: "MATIERE_PREMIERE",
+      unitPrice: 1.800,
+      costPrice: 1.800,
+      vatRate: 19,
+      stockQuantity: 1500,
+      stockLevel: 1500,
+      minStockLevel: 1000,
+      unit: "Pièce",
+      supplierName: "Composants Électroniques du Cap Bon",
+      warehouse_location: "Magasin Matières Usine"
+    },
+    {
+      id: "RAW-RES-ACI",
+      sku: "RES-ACI",
+      name: "Ressort Acier Allié pour Déclencheur",
+      category: "Matières Premières",
+      type: "MATIERE_PREMIERE",
+      unitPrice: 0.350,
+      costPrice: 0.350,
+      vatRate: 19,
+      stockQuantity: 2200,
+      stockLevel: 2200,
+      minStockLevel: 1200,
+      unit: "Pièce",
+      supplierName: "Ressorts Industriels de Ben Arous",
+      warehouse_location: "Magasin Matières Usine"
     }
   ];
 
@@ -641,6 +818,7 @@ export async function seedHyperConnectedDemoData(tenantId: string): Promise<Hype
       // Fleet
       for (const veh of fleetVehiclesData) {
         await setDoc(doc(db, 'company_erp_data', companyId, 'fleet_inventory', veh.id), veh, { merge: true });
+        await setDoc(doc(db, 'company_erp_data', companyId, 'fleet_vehicles', veh.id), veh, { merge: true });
       }
 
       // Warehouses
@@ -694,6 +872,7 @@ export async function seedHyperConnectedDemoData(tenantId: string): Promise<Hype
     localStorage.setItem('carthage_employees', JSON.stringify(employeesData));
     localStorage.setItem('carthage_invoices', JSON.stringify(invoicesData));
     localStorage.setItem('carthage_fleet_vehicles', JSON.stringify(fleetVehiclesData));
+    localStorage.setItem('carthage_products', JSON.stringify(productsData));
     localStorage.setItem('carthage_incoming_emails', JSON.stringify(incomingEmailsData));
     localStorage.setItem('carthage_performance_contracts', JSON.stringify(DEFAULT_DEMO_PERFORMANCE_CONTRACTS));
     localStorage.setItem('carthage_demo_simulation_active', 'true');

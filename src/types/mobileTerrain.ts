@@ -172,6 +172,9 @@ export interface DeliveryTour {
   vehicle_max_payload_kg?: number;
   payload_ratio_percent?: number;
   evening_closure?: EveningTourClosure;
+  actualCashCounted?: number;
+  actualChequesCounted?: number;
+  actualRSCounted?: number;
 }
 
 export type FleetDeviceStatus = 'Available' | 'Assigned' | 'Maintenance' | 'Decommissioned' | 'Garage' | 'En Panne';
@@ -287,6 +290,10 @@ export interface MobileOrderItem {
   qty: number;
   unitPrice: number;
   total: number;
+  productName?: string;
+  quantity?: number;
+  unitPriceHT?: number;
+  tvaRate?: number;
 }
 
 export interface MobileOrder {
@@ -303,6 +310,11 @@ export interface MobileOrder {
   paymentStatus: 'PAID' | 'PENDING';
   paymentMethod?: 'CASH' | 'CHECK' | 'TRAITE';
   signatureUrl?: string;
+  signatureDataUrl?: string;
+  ticketNumber?: string;
+  timestamp?: Date | string | number;
+  clientTaxId?: string;
+  gpsCoordinates?: string;
   status?: 'PENDING_VALIDATION' | 'VALIDATED' | 'REJECTED';
   createdAt: Date | string;
 }

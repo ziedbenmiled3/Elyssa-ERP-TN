@@ -540,8 +540,86 @@ export default function ProductionManager({
         notes: formNotes
       };
       saveMOsToStorage([newMO, ...manufacturingOrders]);
+      if (newMO.status === 'En cours') {
+        triggerRawMaterialsDeductionAndDA(newMO);
+      }
     }
     setIsMOFormOpen(false);
+  };
+
+  const triggerRawMaterialsDeductionAndDA = (mo: ManufacturingOrder) => {
+    // Find nomenclature matching product
+    const nom = nomenclatures.find(n => 
+      n.productName.toLowerCase().includes(mo.productName.toLowerCase()) || 
+      mo.productName.toLowerCase().includes(n.productName.toLowerCase())
+    ) || DEFAULT_NOMENCLATURES[1];
+
+    if (!nom || !nom.materials) return;
+
+    let storedProducts: any[] = [];
+    try {
+      const raw = localStorage.getItem('carthage_products');
+      if (raw) storedProducts = JSON.parse(raw);
+    } catch (e) {}
+
+    let createdDAs: any[] = [];
+    let alertMessages: string[] = [];
+
+    const updatedProducts = storedProducts.map(p => {
+      const matNeeded = nom.materials.find(m => 
+        (p.sku && m.id && p.sku.toLowerCase() === m.id.toLowerCase()) || 
+        (p.name && m.name && p.name.toLowerCase().includes(m.name.toLowerCase())) || 
+        (p.name && m.name && m.name.toLowerCase().includes(p.name.toLowerCase()))
+      );
+
+      if (matNeeded) {
+        const totalQuantityConsumed = (matNeeded.quantityNeeded || 1) * mo.quantityToProduce;
+        const newStock = Math.max(0, p.stockLevel - totalQuantityConsumed);
+        
+        const minStock = p.minStockLevel || 500;
+        if (newStock <= minStock) {
+          const reorderQty = Math.max(1000, Math.round(minStock * 2.5));
+          const estimatedCost = Math.round(reorderQty * (p.costPrice || p.unitPrice || 10));
+          
+          const daItem = {
+            id: `DA-GPAO-${Date.now()}-${p.sku || p.id}`,
+            itemDescription: `[RÉAPPRO GPAO] ${p.name} (${p.sku || 'Matière Première'}) - Seuil Critique Reint`,
+            quantityRequested: reorderQty,
+            unit: p.unit || 'Unité',
+            estimatedCost,
+            requestedBy: 'GPAO Production Automatique',
+            department: 'Usine & Production',
+            requestDate: new Date().toISOString().split('T')[0],
+            status: 'En attente',
+            decisionNotes: `DA générée automatiquement suite au lancement de l'OF ${mo.id} (${mo.quantityToProduce} u. ${mo.productName}). Stock restant: ${newStock} <= Seuil ${minStock}.`
+          };
+          createdDAs.push(daItem);
+          alertMessages.push(`• ${p.name} (${p.sku}) : Stock restant = ${newStock} ${p.unit} <= Seuil (${minStock} ${p.unit}) -> DA #${daItem.id} auto-créée (${reorderQty} ${p.unit})`);
+        }
+
+        return {
+          ...p,
+          stockLevel: newStock,
+          stockQuantity: newStock
+        };
+      }
+      return p;
+    });
+
+    try {
+      localStorage.setItem('carthage_products', JSON.stringify(updatedProducts));
+    } catch (e) {}
+
+    if (createdDAs.length > 0) {
+      try {
+        const existingRaw = localStorage.getItem('carthage_purchasing_requisitions');
+        const existingDAs = existingRaw ? JSON.parse(existingRaw) : [];
+        localStorage.setItem('carthage_purchasing_requisitions', JSON.stringify([...createdDAs, ...existingDAs]));
+        window.dispatchEvent(new Event('storage'));
+      } catch (e) {}
+
+      alert(`⚙️ GPAO & STOCKS SYNCHRONISÉS :\n\nLancement de l'Ordre de Fabrication ${mo.id} (${mo.quantityToProduce} unités de ${mo.productName}).\n\n- Consommation des Matières Premières déduite du Stock Central.\n- ${createdDAs.length} Demande(s) d'Achat (DA) pré-générée(s) automatiquement dans le module ACHATS :\n\n${alertMessages.join('\n')}`);
+    }
   };
 
   const handleSimulateProgress = (moId: string) => {
@@ -565,7 +643,8 @@ export default function ProductionManager({
     const updated = manufacturingOrders.map(mo => {
       if (mo.id === moId) {
         if (mo.status === 'Planifié' || mo.status === 'En attente Douane/Matières') {
-          return { ...mo, status: 'En cours' as const, advancement: 10, notes: 'Matières dédouanées. Production démarrée.' };
+          triggerRawMaterialsDeductionAndDA(mo);
+          return { ...mo, status: 'En cours' as const, advancement: 10, notes: 'Matières dédouanées. Production démarrée & Stock matières déduit.' };
         } else if (mo.status === 'En cours') {
           const nextAdv = mo.advancement + 30;
           if (nextAdv >= 100) {

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import offlineSyncEngine from '../services/offlineSyncEngine';
 import { MobileOrder, MobileOrderItem } from '../../types/mobileTerrain';
+import DocumentPrintModal, { PrintModalData } from '../../components/DocumentPrintModal';
 
 interface ProductCatalogItem {
   id: string;
@@ -43,7 +44,8 @@ const DEMO_PRODUCTS: ProductCatalogItem[] = [
   { id: 'ART-004', ref: 'ROB-LAI', name: 'Robinet Mélangeur Évier Laiton Chromé', category: 'Sanitaire', priceHT: 65.000, tvaRate: 19, unit: 'Unité' },
   { id: 'ART-005', ref: 'CAB-25', name: 'Câble Électrique Rigide 2.5mm² (Rouleau 100m)', category: 'Électricité', priceHT: 110.000, tvaRate: 19, unit: 'Rouleau' },
   { id: 'ART-006', ref: 'FER-12', name: 'Barre de Fer à Béton HLE 12mm (12m)', category: 'Gros Œuvre', priceHT: 28.000, tvaRate: 19, unit: 'Barre' },
-  { id: 'ART-007', ref: 'DIS-CUT', name: 'Disque de Découpe Diamanté 230mm Pro', category: 'Outillage', priceHT: 42.000, tvaRate: 19, unit: 'Pièce' }
+  { id: 'ART-007', ref: 'DIS-CUT', name: 'Disque de Découpe Diamanté 230mm Pro', category: 'Outillage', priceHT: 42.000, tvaRate: 19, unit: 'Pièce' },
+  { id: 'ART-008', ref: 'DISJ-16', name: 'Disjoncteur Divisionnaire 16A', category: 'Électricité', priceHT: 7.050, tvaRate: 19, unit: 'Pièce' }
 ];
 
 const DEMO_CLIENTS = [
@@ -91,6 +93,51 @@ export const VanSalesScreen: React.FC<VanSalesScreenProps> = ({
   const [btPrinterName, setBtPrinterName] = useState<string>('');
   const [showThermalReceiptModal, setShowThermalReceiptModal] = useState(false);
   const [lastSavedOrder, setLastSavedOrder] = useState<MobileOrder | null>(null);
+
+  // Unified Print Modal State
+  const [unifiedPrintModalOpen, setUnifiedPrintModalOpen] = useState(false);
+  const [unifiedPrintData, setUnifiedPrintData] = useState<PrintModalData | null>(null);
+
+  const handleOpenMobileA4Print = (order: MobileOrder | null) => {
+    if (!order) return;
+    setUnifiedPrintData({
+      docType: 'BON_LIVRAISON',
+      docNumber: `BL-VAN-${order.ticketNumber || order.localUuid || order.id}`,
+      date: order.timestamp ? new Date(order.timestamp).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR'),
+      companyInfo: {
+        name: 'Elyssa ERP — Flotte Nomade & Vente à Emporter',
+        mf: '1849203/A/M/000',
+        address: 'Service Distribution Nomade Tunis',
+        phone: '+216 71 800 900',
+        email: 'vansales@elyssaerp.tn'
+      },
+      clientInfo: {
+        name: order.clientName,
+        mf: order.clientTaxId || 'MF-PASSAGER',
+        address: 'Livraison Vente Directe Camion'
+      },
+      deliveryAddress: 'Vente au Camion Nomade',
+      driverName: 'Agent Commercial Nomade',
+      vehicleRef: 'Camionette Distribution TN-210',
+      gpsCoords: order.gpsCoordinates || '36.8065° N, 10.1815° E',
+      signatureUrl: order.signatureDataUrl || order.signatureUrl || signatureDataUrl,
+      recipientName: order.clientName,
+      deliveryStatus: 'LIVRÉ EN CAISSE NOMADE',
+      items: order.items.map(i => {
+        const q = i.quantity ?? i.qty ?? 1;
+        const p = i.unitPriceHT ?? i.unitPrice ?? 0;
+        return {
+          description: i.productName || i.label || 'Article Nomade',
+          quantity: q,
+          unitPrice: p,
+          tvaRate: i.tvaRate || 19,
+          totalHT: q * p,
+          unit: 'u.'
+        };
+      })
+    });
+    setUnifiedPrintModalOpen(true);
+  };
 
   // Feedback Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -913,7 +960,7 @@ export const VanSalesScreen: React.FC<VanSalesScreenProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 pt-2">
+            <div className="flex flex-wrap items-center gap-2 pt-2">
               <button
                 onClick={() => {
                   window.print();
@@ -921,8 +968,17 @@ export const VanSalesScreen: React.FC<VanSalesScreenProps> = ({
                 className="flex-1 bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-lg cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
-                <span>Imprimer sur Thermique BT</span>
+                <span>Ticket Thermique BT</span>
               </button>
+
+              <button
+                onClick={() => handleOpenMobileA4Print(lastSavedOrder)}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-lg cursor-pointer"
+              >
+                <FileText className="w-4 h-4" />
+                <span>📄 Imprimer Format A4</span>
+              </button>
+
               <button
                 onClick={() => setShowThermalReceiptModal(false)}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-3 rounded-xl font-bold text-xs uppercase cursor-pointer"
@@ -933,6 +989,13 @@ export const VanSalesScreen: React.FC<VanSalesScreenProps> = ({
           </div>
         </div>
       )}
+
+      {/* UNIFIED PRINT MODAL */}
+      <DocumentPrintModal
+        isOpen={unifiedPrintModalOpen}
+        onClose={() => setUnifiedPrintModalOpen(false)}
+        data={unifiedPrintData}
+      />
 
     </div>
   );

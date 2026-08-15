@@ -85,6 +85,10 @@ export interface Invoice {
   commercial_id?: string;
   commercial_name?: string;
   estimatedWeightKg?: number;
+  clientTaxId?: string;
+  clientAddress?: string;
+  clientPhone?: string;
+  notes?: string;
 }
 
 export interface VisitReport {
@@ -124,6 +128,7 @@ export interface AdminSettings {
   companyPhone?: string;         // e.g., +216 71 888 999
   companyEmail?: string;         // corporate mail
   companyMF?: string;            // Matricule Fiscal e.g., 1234567/A/M/000
+  matriculeFiscal?: string;      // Alias for companyMF
   geminiApiKey?: string;         // optional client personal Gemini API Key
   googleAnalyticsId?: string;    // e.g. G-XXXXXXX
   googleAdsId?: string;          // e.g. AW-XXXXXXX
@@ -175,17 +180,19 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
-  category: string; // e.g. "Matières Premières", "Produits Finis", "Emballages", "Pièces"
+  category: string; // e.g. "Matières Premières", "Gros Œuvre", "Sanitaire", "Électricité", etc.
+  type?: 'PRODUIT_FINI' | 'MATIERE_PREMIERE' | 'COMPOSANT';
   stockLevel: number;
   minStockLevel: number; // Alerts when stockLevel <= minStockLevel
-  unitPrice: number; // TND
-  costPrice: number; // TND
-  marginPercentage?: number; // % Profit margin (optional, default to calculated if not set)
+  unitPrice: number; // TND (PV HT)
+  costPrice: number; // TND (PA HT)
+  marginPercentage?: number; // % Profit margin
   supplierId: string; // Linked supplier
   supplierName: string;
-  unit: string; // e.g. "Kg", "Litre", "Pièce", "Tonne"
+  unit: string; // e.g. "Kg", "Sac", "Pièce", "Barre", "Pot", "Rouleau"
   createdDate: string;
   warehouseId?: string;
+  warehouse_location?: string;
   aisle?: string; // Rayon
   shelf?: string; // Étagère
   bin?: string;   // Casier / Emplacement

@@ -1,16 +1,23 @@
-import { initializeApp } from 'firebase/app';
-import { initializeFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, setLogLevel } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeFirestore, getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, setLogLevel } from 'firebase/firestore';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Silence Firestore internal SDK logs (including the benign BloomFilter hash count error warning)
 setLogLevel('silent');
 
-const app = initializeApp(firebaseConfig);
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  }, (firebaseConfig as any).firestoreDatabaseId);
+} catch (e) {
+  firestoreDb = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+}
+
+export const db = firestoreDb;
 export const auth = getAuth(app);
 
 // Explicitly configure Firebase Auth persistence using local storage

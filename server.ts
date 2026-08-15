@@ -15,7 +15,7 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
 import bcrypt from 'bcryptjs';
-import { initializeApp as initializeFirebaseApp } from 'firebase/app';
+import { initializeApp as initializeFirebaseApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, initializeFirestore, collection, doc, getDocs, getDoc, setDoc, deleteDoc, query, where, setLogLevel, writeBatch } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import admin from 'firebase-admin';
@@ -166,12 +166,9 @@ try {
     // Silence Firestore internal connection warning logs (including ECONNRESET)
     setLogLevel('silent');
 
-    const firebaseApp = initializeFirebaseApp({
-      apiKey: config.apiKey,
-      authDomain: config.authDomain,
-      projectId: config.projectId,
-      appId: config.appId,
-    });
+    const firebaseApp = getApps().length > 0 
+      ? getApp() 
+      : initializeFirebaseApp(config);
     
     // Explicitly target the custom firestore database ID with long polling to prevent connection resets on server side
     db = initializeFirestore(firebaseApp, { experimentalForceLongPolling: true }, config.firestoreDatabaseId);
