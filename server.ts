@@ -1158,18 +1158,31 @@ async function getStoredCollaborators(companyNameOrId?: string): Promise<any[]> 
   return processed;
 }
 
-async function saveCollaborators(data: any[]): Promise<boolean> {
-  writeJsonFile(COLLABORATORS_FILE_PATH, data);
+async function saveCollaborators(data: any[], targetCompanyId?: string): Promise<boolean> {
+  // Read existing collaborators from file to handle merge if targetCompanyId is set
+  let fullDataToSave = data;
+  if (targetCompanyId && targetCompanyId !== 'pc-parent-elyssa') {
+    const existingLocal = readJsonFile(COLLABORATORS_FILE_PATH, []);
+    const otherCompanyCollabs = existingLocal.filter((c: any) => 
+      c.company_id !== targetCompanyId && c.companyId !== targetCompanyId
+    );
+    fullDataToSave = [...otherCompanyCollabs, ...data];
+  }
+
+  writeJsonFile(COLLABORATORS_FILE_PATH, fullDataToSave);
   await ensureFirebaseAuth();
   if (isFirestoreActive && db) {
     try {
       const snapshot = await withTimeout(getDocs(collection(db, 'collaborators')), 4000);
-      const existingIds = snapshot.docs.map((d: any) => d.id);
       const incomingIds = new Set(data.map(item => item.id).filter(Boolean));
-      
-      for (const id of existingIds) {
-        if (!incomingIds.has(id)) {
-          console.log(`[AUDIT - PROTECTION DONNÉES] Intention de suppression du collaborateur - ID: ${id}`);
+
+      for (const docSnap of snapshot.docs) {
+        const id = docSnap.id;
+        const docData = docSnap.data();
+        const matchesCompany = !targetCompanyId || docData.company_id === targetCompanyId || docData.companyId === targetCompanyId;
+        if (matchesCompany && !incomingIds.has(id)) {
+          console.log(`[PERSISTENT DELETE FIRESTORE] Deleting collaborator document from Firestore - ID: ${id}`);
+          await withTimeout(deleteDoc(doc(db, 'collaborators', id)), 4000).catch(err => console.warn("Error deleting collaborator doc from Firestore:", err));
         }
       }
 
@@ -2420,18 +2433,19 @@ let realActiveSessions: Record<string, ActiveSession> = {};
 
 const TUNISIAN_LOCATIONS = [
   { city: "Tunis (Berges du Lac 2)", lat: 36.8329, lng: 10.3013 },
+  { city: "Ariana (Dépôt Central GEP)", lat: 36.8625, lng: 10.1956 },
   { city: "Sousse (Port El Kantaoui)", lat: 35.8942, lng: 10.5983 },
   { city: "Sfax (Sfax El Jadida)", lat: 34.7406, lng: 10.7603 },
   { city: "Bizerte (Vieux Port)", lat: 37.2744, lng: 9.8739 },
   { city: "Nabeul (Hammamet)", lat: 36.4042, lng: 10.6167 },
   { city: "Gabès (Centre-ville)", lat: 33.8814, lng: 10.0983 },
-  { city: "Kairouan (Medina)", lat: 35.6781, lng: 10.0963 },
-  { city: "Ariana (Ennasr)", lat: 36.8625, lng: 10.1956 }
+  { city: "Kairouan (Medina)", lat: 35.6781, lng: 10.0963 }
 ];
 
 const SIMULATED_ACTIONS = [
   "Création de Facture de Vente",
   "Suivi de Solvabilité Client",
+  "Pointage Biométrique & RH GEP",
   "Recouvrement Amiable de Créance",
   "Visualisation de Trésorerie",
   "Calcul de Retenue à la source",
@@ -2441,12 +2455,10 @@ const SIMULATED_ACTIONS = [
 ];
 
 const SIMULATED_USERS = [
-  { name: "Bochra Belkadhi", email: "bochra.b@elyssa.pro", role: "Manager", company: "Inter-Affaires", locationIndex: 0 },
-  { name: "Yassine Drira", email: "yassine.d@carthage.tn", role: "Agent", company: "Carthage Solutions", locationIndex: 2 },
-  { name: "Amel Marzouki", email: "amel.m@elyssa.pro", role: "Viewer", company: "Inter-Affaires", locationIndex: 3 },
-  { name: "Mohamed Ben Ali", email: "mohamed.a@elyssa.pro", role: "Agent", company: "Inter-Affaires", locationIndex: 1 },
-  { name: "Kamel Feki", email: "kamel@feki-distribution.tn", role: "Manager", company: "Feki Distribution S.A.", locationIndex: 4 },
-  { name: "Rim Oueslati", email: "rim.o@elyssa.pro", role: "Agent", company: "Inter-Affaires", locationIndex: 5 }
+  { name: "Sami Ben Hassine", email: "sami.b@gep-tn.com", role: "SuperAdmin", company: "GEP", locationIndex: 1, activePath: "Console Administration GEP" },
+  { name: "Houda Hamdi", email: "houda.h@gep-tn.com", role: "Manager", company: "GEP", locationIndex: 0, activePath: "Pointage Biométrique & RH" },
+  { name: "Bochra Belkadhi", email: "bochra.b@elyssa.pro", role: "Manager", company: "Inter-Affaires", locationIndex: 0, activePath: "Tableau de bord Trésorerie" },
+  { name: "Amel Marzouki", email: "amel.m@elyssa.pro", role: "Viewer", company: "Inter-Affaires", locationIndex: 4, activePath: "Portefeuille Clients" }
 ];
 
 function pruneRealSessions() {
@@ -2471,7 +2483,11 @@ app.post('/api/db/active-sessions', (req, res) => {
     for (let i = 0; i < strToHash.length; i++) {
       companyHash += strToHash.charCodeAt(i);
     }
-    const loc = TUNISIAN_LOCATIONS[companyHash % TUNISIAN_LOCATIONS.length];
+
+    let loc = TUNISIAN_LOCATIONS[companyHash % TUNISIAN_LOCATIONS.length];
+    if (company && (company.toUpperCase().includes('GEP'))) {
+      loc = TUNISIAN_LOCATIONS[1]; // Ariana GEP
+    }
     
     // Add stable jitter
     const emailHash = email.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
@@ -2507,8 +2523,49 @@ app.post('/api/db/active-sessions', (req, res) => {
 app.get('/api/db/active-sessions', (req, res) => {
   try {
     pruneRealSessions();
-    const sessionsList = Object.values(realActiveSessions);
-    res.json(sessionsList);
+
+    const targetCompany = (req.query.company as string || '').trim();
+
+    // Map simulated background sessions for Multi-Tenant active view
+    const simulatedSessionsList = SIMULATED_USERS.map((user, idx) => {
+      const loc = TUNISIAN_LOCATIONS[user.locationIndex % TUNISIAN_LOCATIONS.length];
+      return {
+        id: `sim-${user.email}`,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        company: user.company,
+        activePath: user.activePath || SIMULATED_ACTIONS[idx % SIMULATED_ACTIONS.length],
+        ip: `197.14.${120 + idx}.${10 + idx * 3}`,
+        city: loc.city,
+        country: "Tunisie",
+        lat: loc.lat + ((idx % 3) - 1) * 0.004,
+        lng: loc.lng + ((idx % 2) - 0.5) * 0.004,
+        ping: Math.floor(Math.random() * 20) + 10,
+        connectedAt: new Date(Date.now() - (idx * 180000 + 60000)).toISOString(),
+        lastSeen: new Date().toISOString()
+      };
+    });
+
+    // Merge real live active sessions with simulated sessions, prioritizing real live sessions
+    const realSessions = Object.values(realActiveSessions);
+    const realEmails = new Set(realSessions.map(s => s.email.toLowerCase()));
+
+    let merged = [
+      ...realSessions,
+      ...simulatedSessionsList.filter(s => !realEmails.has(s.email.toLowerCase()))
+    ];
+
+    if (targetCompany && targetCompany.toLowerCase() !== 'superadmin' && targetCompany.toLowerCase() !== 'all') {
+      const targetLower = targetCompany.toLowerCase();
+      merged = merged.filter(s => {
+        if (!s || !s.company) return false;
+        const cLower = s.company.toLowerCase();
+        return cLower === targetLower || cLower.includes(targetLower) || targetLower.includes(cLower);
+      });
+    }
+
+    res.json(merged);
   } catch (err) {
     console.error('Error in active-sessions get:', err);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -2804,7 +2861,7 @@ app.post('/api/db/collaborators', enforceCompanyId, async (req, res) => {
       return c;
     }));
 
-    await saveCollaborators(updatedData);
+    await saveCollaborators(updatedData, companyId);
     res.json({ success: true });
   } else {
     console.warn(`[SIGNUP LOG] /api/db/collaborators received invalid non-array data:`, typeof incomingData);
@@ -3080,6 +3137,15 @@ app.post('/api/db/admin/delete-collaborator', async (req, res) => {
     const filteredCollabs = collaborators.filter((c: any) => c.id !== id);
     if (filteredCollabs.length === collaborators.length) {
       return res.status(404).json({ error: "Collaborateur introuvable." });
+    }
+
+    if (isFirestoreActive && db) {
+      try {
+        await withTimeout(deleteDoc(doc(db, 'collaborators', id)), 4000);
+        console.log(`[FIRESTORE EXPLICIT DELETE] Deleted collaborator doc ${id} from Firestore`);
+      } catch (e) {
+        console.warn(`[FIRESTORE EXPLICIT DELETE ERR] Failed to delete doc ${id}:`, e);
+      }
     }
 
     await saveCollaborators(filteredCollabs);

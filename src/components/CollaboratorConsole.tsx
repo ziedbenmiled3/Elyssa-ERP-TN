@@ -431,8 +431,20 @@ L'administration Elyssa ERP`;
     }));
   };
 
-  const confirmDeleteCollaborator = (collabId: string) => {
+  const confirmDeleteCollaborator = async (collabId: string) => {
     const filtered = collaborators.filter(c => c.id !== collabId);
+    
+    // Explicit server-side deletion from Firestore & database
+    try {
+      await fetch('/api/db/admin/delete-collaborator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: collabId })
+      });
+    } catch (err) {
+      console.warn("API delete-collaborator error:", err);
+    }
+
     onUpdateCollaborators(filtered);
     if (selectedCollabId === collabId && filtered.length > 0) {
       setSelectedCollabId(filtered[0].id);

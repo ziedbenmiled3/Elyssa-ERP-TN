@@ -1505,7 +1505,7 @@ export default function AdminConsole({
           </div>
         </form>
       ) : mode === 'admin' && activeSubTab === 'radar' ? (
-        <RadarDashboard />
+        <RadarDashboard companyName={settings.companyName || 'Inter-Affaires'} companySettings={settings} />
       ) : mode === 'admin' && activeSubTab === 'companies' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs animate-fadeIn">
           {/* List of Companies */}
@@ -1664,7 +1664,7 @@ export default function AdminConsole({
                         required
                         value={companyForm.companyName}
                         onChange={(e) => setCompanyForm({ ...companyForm, companyName: e.target.value })}
-                        placeholder="Ex: Carthage Solutions S.A."
+                        placeholder="Ex: Entreprise S.A."
                         className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-indigo-600 font-medium"
                       />
                     </div>

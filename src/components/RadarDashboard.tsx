@@ -3,23 +3,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Radar, 
   MapPin, 
   Activity, 
   Clock, 
-  Laptop, 
   Wifi, 
-  ChevronRight, 
   Compass, 
-  User, 
   Zap, 
   Globe2,
-  AlertCircle
+  Building2,
+  Users,
+  Layers,
+  MousePointer,
+  Maximize2,
+  ShieldCheck,
+  Radio,
+  Server
 } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
-interface ActiveSession {
+// Fix Leaflet default marker assets in Vite/React
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+export interface ActiveSession {
   id: string;
   email: string;
   name: string;
@@ -36,39 +50,325 @@ interface ActiveSession {
   lastSeen: string;
 }
 
-export default function RadarDashboard() {
-  const [sessions, setSessions] = useState<ActiveSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<ActiveSession | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [radarAngle, setRadarAngle] = useState(0);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+export interface CompanySummary {
+  id: string;
+  companyName: string;
+  city: string;
+  country: string;
+  lat: number;
+  lng: number;
+  activeUsersCount: number;
+  avgPing: number;
+  lastActivePath: string;
+  packStatus: string;
+  primaryIp: string;
+  status: 'active' | 'warning' | 'idle';
+  connectedAt: string;
+  users: ActiveSession[];
+}
+
+// Tunisian city coordinate lookup for dynamic map beacon positioning
+const CITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  ariana: { lat: 36.8625, lng: 10.1956 },
+  tunis: { lat: 36.8329, lng: 10.3013 },
+  lac: { lat: 36.8329, lng: 10.3013 },
+  sousse: { lat: 35.8256, lng: 10.6369 },
+  sfax: { lat: 34.7406, lng: 10.7603 },
+  nabeul: { lat: 36.4561, lng: 10.7376 },
+  hammamet: { lat: 36.4561, lng: 10.7376 },
+  bizerte: { lat: 37.2744, lng: 9.8739 },
+  monastir: { lat: 35.7833, lng: 10.8333 },
+  gabes: { lat: 33.8815, lng: 10.0982 },
+  gabès: { lat: 33.8815, lng: 10.0982 },
+  kairouan: { lat: 35.6781, lng: 10.0963 },
+  gafsa: { lat: 34.4250, lng: 8.7842 },
+};
+
+function resolveDynamicGeo(
+  groupName: string,
+  normKey: string,
+  companySettingsProp: any,
+  fetchedSettingsState: any,
+  firstSession?: ActiveSession
+) {
+  const isInterAffaires = normKey.includes('INTER') || normKey.includes('AFFAIRE');
+  const isGep = normKey.includes('GEP');
+
+  let settings = companySettingsProp || fetchedSettingsState;
+  if (!settings && typeof localStorage !== 'undefined') {
+    try {
+      const storedKey = isInterAffaires ? 'carthage_admin_settings' : `carthage_admin_settings_${groupName}`;
+      const saved = localStorage.getItem(storedKey) || localStorage.getItem('carthage_admin_settings');
+      if (saved) settings = JSON.parse(saved);
+    } catch (_e) {}
+  }
+
+  const configuredCityZip = settings?.cityZipCode || settings?.city || '';
+  const configuredAddress = settings?.companyAddress || settings?.address || '';
+
+  let displayCity = '';
+  if (configuredCityZip) {
+    displayCity = configuredCityZip;
+  } else if (configuredAddress) {
+    displayCity = configuredAddress;
+  } else if (firstSession?.city) {
+    displayCity = firstSession.city;
+  } else {
+    displayCity = isGep ? 'Ariana (Dépôt Central GEP)' : 'Tunis';
+  }
+
+  const searchStr = `${displayCity} ${configuredAddress} ${configuredCityZip}`.toLowerCase();
+  let lat = firstSession?.lat || (isGep ? 36.8625 : 36.8329);
+  let lng = firstSession?.lng || (isGep ? 10.1956 : 10.3013);
+
+  for (const [cityName, coords] of Object.entries(CITY_COORDINATES)) {
+    if (searchStr.includes(cityName)) {
+      lat = coords.lat;
+      lng = coords.lng;
+      break;
+    }
+  }
+
+  const packStatus = isInterAffaires 
+    ? 'Pack Full ERP (Siège)' 
+    : isGep 
+      ? 'Pack Sur-Mesure / Custom' 
+      : 'Pack Enterprise SaaS';
+
+  const defaultIp = firstSession?.ip || (isInterAffaires ? '197.14.120.10' : (isGep ? '197.14.120.45' : '197.14.120.88'));
+
+  return {
+    city: displayCity,
+    address: configuredAddress,
+    lat,
+    lng,
+    packStatus,
+    defaultIp
+  };
+}
+
+// Leaflet Map Controller to fly to selected company & toggle scroll wheel zoom
+const LeafletMapController: React.FC<{ 
+  selectedCompany: CompanySummary | null; 
+  directScrollZoom: boolean;
+}> = ({ selectedCompany, directScrollZoom }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (directScrollZoom) {
+      map.scrollWheelZoom.enable();
+    } else {
+      map.scrollWheelZoom.disable();
+    }
+  }, [directScrollZoom, map]);
+
+  useEffect(() => {
+    if (selectedCompany && typeof selectedCompany.lat === 'number' && typeof selectedCompany.lng === 'number') {
+      map.flyTo([selectedCompany.lat, selectedCompany.lng], 12, {
+        animate: true,
+        duration: 1.2
+      });
+    }
+  }, [selectedCompany, map]);
+
+  return null;
+};
+
+// Custom Company Badge Marker Icon Generator
+const createCompanyMarkerIcon = (companyName: string, isSelected: boolean, activeUsers: number) => {
+  const isGep = companyName.toUpperCase().includes('GEP');
+  const primaryColor = isGep ? '#2563eb' : '#4f46e5'; // Blue-600 vs Indigo-600
+  const borderColor = isSelected ? '#fbbf24' : primaryColor; // Amber-400 if selected
   
+  return L.divIcon({
+    className: 'custom-company-radar-marker',
+    html: `
+      <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <!-- Pulsing Ring -->
+        <div style="
+          position: absolute;
+          width: 48px;
+          height: 48px;
+          border-radius: 9999px;
+          background-color: ${borderColor};
+          opacity: 0.35;
+          animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+        "></div>
+        
+        <!-- Badge Box -->
+        <div style="
+          position: relative;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background-color: #0f172a;
+          border: 2px solid ${borderColor};
+          color: #ffffff;
+          padding: 5px 12px;
+          border-radius: 9999px;
+          font-family: ui-sans-serif, system-ui, sans-serif;
+          font-weight: 800;
+          font-size: 11px;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+          white-space: nowrap;
+          transform: ${isSelected ? 'scale(1.15)' : 'scale(1)'};
+          transition: all 0.2s ease-in-out;
+          z-index: ${isSelected ? 100 : 10};
+        ">
+          <span style="
+            width: 8px;
+            height: 8px;
+            border-radius: 9999px;
+            background-color: #10b981;
+            box-shadow: 0 0 8px #10b981;
+          "></span>
+          <span style="color: #f8fafc; letter-spacing: 0.025em;">${companyName}</span>
+          <span style="
+            background-color: rgba(255,255,255,0.15);
+            color: #fbbf24;
+            padding: 1px 6px;
+            border-radius: 9999px;
+            font-size: 9px;
+            font-family: monospace;
+          ">${activeUsers} util.</span>
+        </div>
+      </div>
+    `,
+    iconSize: [120, 40],
+    iconAnchor: [60, 20],
+    popupAnchor: [0, -22]
+  });
+};
+
+interface RadarDashboardProps {
+  companyName?: string;
+  tenantId?: string;
+  companySettings?: any;
+}
+
+export default function RadarDashboard({ companyName, tenantId, companySettings }: RadarDashboardProps = {}) {
+  const [rawSessions, setRawSessions] = useState<ActiveSession[]>([]);
+  const [fetchedSettings, setFetchedSettings] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [directScrollZoom, setDirectScrollZoom] = useState(false);
+  const [logs, setLogs] = useState<string[]>([
+    `[${new Date().toLocaleTimeString('fr-FR')}] PROTOCOLE ACCES : Initialisation Radar Leaflet Multi-Entreprises...`,
+    `[${new Date().toLocaleTimeString('fr-FR')}] PROTOCOLE ACCES : Connexion au flux temps réel des sessions actives...`
+  ]);
+
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch active sessions from the server
+  // Load admin settings from backend API as fallback
+  useEffect(() => {
+    const loadAdminSettings = async () => {
+      try {
+        const res = await fetch('/api/db/admin-settings');
+        if (res.ok) {
+          const data = await res.json();
+          setFetchedSettings(data);
+        }
+      } catch (_e) {}
+    };
+    loadAdminSettings();
+  }, []);
+
+  // Aggregation logic: group real raw sessions strictly by Enterprise/Company
+  const companySummaries = useMemo<CompanySummary[]>(() => {
+    const map = new Map<string, {
+      name: string;
+      sessions: ActiveSession[];
+      key: string;
+    }>();
+
+    // Grouping strictly by normalized company name from active real sessions
+    rawSessions.forEach(s => {
+      if (!s || !s.company) return;
+      const cName = s.company.trim();
+      let normKey = cName.toUpperCase();
+      if (normKey.includes('GEP')) normKey = 'GEP';
+      else if (normKey.includes('INTER') || normKey.includes('AFFAIRE')) normKey = 'INTER-AFFAIRES';
+
+      if (!map.has(normKey)) {
+        map.set(normKey, {
+          name: normKey === 'GEP' ? 'GEP' : (normKey === 'INTER-AFFAIRES' ? 'Inter-Affaires' : cName),
+          sessions: [],
+          key: normKey
+        });
+      }
+      map.get(normKey)!.sessions.push(s);
+    });
+
+    const result: CompanySummary[] = [];
+
+    // Construct summaries dynamically for each active company group
+    map.forEach((group, normKey) => {
+      const geo = resolveDynamicGeo(
+        group.name,
+        normKey,
+        companySettings,
+        fetchedSettings,
+        group.sessions[0]
+      );
+
+      const userCount = group.sessions.length;
+      const avgP = userCount > 0 
+        ? Math.round(group.sessions.reduce((acc, sess) => acc + (sess.ping || 14), 0) / userCount)
+        : 12;
+
+      result.push({
+        id: `comp-${normKey.toLowerCase()}`,
+        companyName: group.name,
+        city: geo.city,
+        country: group.sessions[0]?.country || 'Tunisie',
+        lat: geo.lat,
+        lng: geo.lng,
+        activeUsersCount: userCount,
+        avgPing: avgP,
+        lastActivePath: group.sessions[0]?.activePath || 'Portail Elyssa ERP',
+        packStatus: geo.packStatus,
+        primaryIp: group.sessions[0]?.ip || geo.defaultIp,
+        status: 'active',
+        connectedAt: group.sessions[0]?.connectedAt || new Date().toISOString(),
+        users: group.sessions
+      });
+    });
+
+    return result;
+  }, [rawSessions, companySettings, fetchedSettings]);
+
+  const [selectedCompany, setSelectedCompany] = useState<CompanySummary | null>(null);
+
+  // Sync selection to first available company if null or out of sync
+  useEffect(() => {
+    if (companySummaries.length > 0) {
+      if (!selectedCompany || !companySummaries.some(c => c.id === selectedCompany.id || c.companyName === selectedCompany.companyName)) {
+        setSelectedCompany(companySummaries[0]);
+      }
+    } else {
+      setSelectedCompany(null);
+    }
+  }, [companySummaries]);
+
+  // Fetch real active sessions from backend / Firestore endpoint
   const fetchSessions = async () => {
     try {
-      const res = await fetch('/api/db/active-sessions');
+      setLoading(true);
+      const res = await fetch(`/api/db/active-sessions?company=all`);
       if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
-        
-        // Pick first user if none selected
-        if (data.length > 0 && !selectedUser) {
-          setSelectedUser(data[0]);
-        }
-        
-        // Log action to terminal stream
-        const randomSession = data[Math.floor(Math.random() * data.length)];
-        if (randomSession) {
-          const timeStr = new Date().toLocaleTimeString('fr-FR');
-          const newLog = `[${timeStr}] PROTOCOLE ACCES : ${randomSession.name} (${randomSession.city}) effectue la tâche : "${randomSession.activePath}" [Ping: ${randomSession.ping}ms]`;
+        const data: ActiveSession[] = await res.json();
+        setRawSessions(data);
+
+        // Append log entry to stream
+        const timeStr = new Date().toLocaleTimeString('fr-FR');
+        if (data.length > 0) {
+          const randomSess = data[Math.floor(Math.random() * data.length)];
+          const newLog = `[${timeStr}] FLUX REEL : Session active [${randomSess.email}] @ ${randomSess.company} (${randomSess.city || 'Tunis'}) : "${randomSess.activePath}" [Ping: ${randomSess.ping || 12}ms]`;
           setLogs(prev => [...prev.slice(-30), newLog]);
         }
       }
-    } catch (err) {
-      console.error('Error fetching radar sessions:', err);
+    } catch (_err) {
+      // Keep state intact on network error
     } finally {
       setLoading(false);
     }
@@ -80,387 +380,356 @@ export default function RadarDashboard() {
     
     const interval = setInterval(() => {
       fetchSessions();
-    }, 5000); // Poll every 5s for snappy live feeling
+    }, 5000);
     
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  // Keep terminal scrolled to bottom
+  // Scroll terminal
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  // Sweep the radar angle
-  useEffect(() => {
-    let frameId: number;
-    const animate = () => {
-      setRadarAngle(prev => (prev + 1.5) % 360);
-      frameId = requestAnimationFrame(animate);
-    };
-    frameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameId);
-  }, []);
+  const totalConnectedUsers = useMemo(() => {
+    return companySummaries.reduce((acc, c) => acc + c.activeUsersCount, 0);
+  }, [companySummaries]);
 
-  // Coordinates Mapping for Tunisia (Lat: 33.5 to 37.5, Lng: 8.5 to 11.5)
-  // Let's map this beautifully within a bounding box of 300x400
-  const mapCoordinates = (lat: number, lng: number) => {
-    const latMin = 33.2;
-    const latMax = 37.6;
-    const lngMin = 8.3;
-    const lngMax = 11.7;
-
-    // Normalizing
-    const xPct = (lng - lngMin) / (lngMax - lngMin);
-    const yPct = 1.0 - (lat - latMin) / (latMax - latMin); // Y is inverted in screen space
-
-    return {
-      x: xPct * 100, // percentage for responsive container
-      y: yPct * 100
-    };
-  };
-
-  // Helper for badges
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'SuperAdmin':
-        return <span className="bg-red-50 text-red-700 border border-red-200 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">Super Admin</span>;
-      case 'Manager':
-        return <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full">Manager</span>;
-      case 'Agent':
-        return <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full">Agent</span>;
-      default:
-        return <span className="bg-slate-50 text-slate-600 border border-slate-200 text-[9px] font-bold px-2 py-0.5 rounded-full">Invité</span>;
-    }
-  };
-
-  const activeLocationsCount = new Set(sessions.map(s => s.city)).size;
-  const avgPing = sessions.length > 0 
-    ? Math.round(sessions.reduce((acc, s) => acc + s.ping, 0) / sessions.length) 
-    : 15;
+  const avgGlobalPing = useMemo(() => {
+    if (companySummaries.length === 0) return 12;
+    return Math.round(companySummaries.reduce((acc, c) => acc + c.avgPing, 0) / companySummaries.length);
+  }, [companySummaries]);
 
   return (
-    <div id="radar-monitoring-root" className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs animate-fadeIn">
-      {/* 1. Header diagnostics strip */}
-      <div className="col-span-12 bg-white rounded-xl border border-slate-150 p-4 shadow-sm flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+    <div className="space-y-6 font-sans animate-fadeIn">
+      {/* Upper Navigation / Status Header Bar */}
+      <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+            <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+              <Radio className="w-5 h-5 text-indigo-400 animate-pulse" />
+              Radar Entreprises & Sessions
+            </h1>
+            <span className="bg-indigo-950 text-indigo-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-indigo-800">
+              LEAFLET CARTO ENGINE
+            </span>
           </div>
-          <div>
-            <h3 className="font-extrabold text-slate-800 text-sm flex items-center space-x-1.5">
-              <span>Radar d'Activité Live</span>
-              <span className="text-[10px] text-indigo-600 font-mono font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">SAAS PRESENCE</span>
-            </h3>
-            <p className="text-[10px] text-slate-500 mt-0.5">Surveillance en temps réel des accès entreprises et agents sur la plateforme Elyssa.</p>
-          </div>
+          <p className="text-xs text-slate-400 font-medium">
+            Surveillance géographique et réseau des locataires actifs sur la plateforme Elyssa ERP.
+          </p>
         </div>
 
-        <div className="flex items-center space-x-4">
-          {/* Quick Stats Grid */}
-          <div className="flex space-x-3 border-r pr-4 border-slate-150">
-            <div className="text-center">
-              <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Connectés</span>
-              <span className="text-sm font-black text-slate-800 font-mono">{sessions.length}</span>
-            </div>
-            <div className="text-center">
-              <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Villes</span>
-              <span className="text-sm font-black text-indigo-600 font-mono">{activeLocationsCount}</span>
-            </div>
-            <div className="text-center">
-              <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Moy. Ping</span>
-              <span className="text-sm font-black text-emerald-600 font-mono">{avgPing}ms</span>
-            </div>
+        <div className="flex items-center space-x-3 self-end md:self-auto">
+          <div className="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center space-x-2 text-xs">
+            <Building2 className="w-4 h-4 text-emerald-400" />
+            <span className="text-slate-300 font-medium">Entreprises :</span>
+            <span className="font-extrabold text-white font-mono">{companySummaries.length}</span>
+          </div>
+
+          <div className="bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center space-x-2 text-xs">
+            <Users className="w-4 h-4 text-indigo-400" />
+            <span className="text-slate-300 font-medium">Collaborateurs :</span>
+            <span className="font-extrabold text-amber-400 font-mono">{totalConnectedUsers}</span>
           </div>
 
           <button
             onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`px-3 py-1.5 rounded-lg border font-bold text-[10px] transition flex items-center space-x-1 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 border ${
               autoRefresh 
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
-                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20' 
+                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
             }`}
           >
-            <Activity className={`w-3 h-3 ${autoRefresh ? 'animate-pulse' : ''}`} />
-            <span>{autoRefresh ? "Mise à jour Auto (Active)" : "Mise à jour Suspendue"}</span>
+            <Activity className={`w-3.5 h-3.5 ${autoRefresh ? 'animate-spin' : ''}`} />
+            <span>{autoRefresh ? 'FLUX 5s' : 'PAUSE'}</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Interactive SVG Map & Radar grid */}
-      <div className="lg:col-span-5 bg-slate-900 rounded-2xl border border-slate-800 p-5 shadow-lg relative overflow-hidden flex flex-col justify-between h-[520px]">
-        {/* Futuristic Grid Lines */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:24px_24px] opacity-15"></div>
-
-        {/* Radar Sweep Line */}
-        <div 
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            top: '50%',
-            left: '50%',
-            width: '180%',
-            height: '180%',
-            transform: `translate(-50%, -50%) rotate(${radarAngle}deg)`,
-            background: 'conic-gradient(from 0deg, rgba(16, 185, 129, 0.15) 0deg, rgba(16, 185, 129, 0) 90deg)',
-            transformOrigin: 'center center',
-          }}
-        ></div>
-
-        {/* Radar concentric target indicators */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="border border-emerald-500/10 rounded-full w-1/4 aspect-square animate-pulse"></div>
-          <div className="border border-emerald-500/10 rounded-full w-1/2 aspect-square"></div>
-          <div className="border border-emerald-500/10 rounded-full w-3/4 aspect-square"></div>
-          <div className="border border-emerald-500/5 rounded-full w-[95%] aspect-square"></div>
-          
-          {/* Crosshairs */}
-          <div className="absolute left-0 right-0 h-[1px] bg-emerald-500/10"></div>
-          <div className="absolute top-0 bottom-0 w-[1px] bg-emerald-500/10"></div>
-        </div>
-
-        {/* Coordinates compass indices */}
-        <div className="absolute top-3 left-3 text-[9px] font-mono text-emerald-500/40 flex items-center space-x-1">
-          <Compass className="w-3.5 h-3.5 animate-spin-slow text-emerald-500/30" />
-          <span>SCANNING... MODE: SAAS ACTIVE_GEO</span>
-        </div>
-        <div className="absolute bottom-3 right-3 text-[8px] font-mono text-emerald-500/30">
-          GRID REF: TN.02-26 // TUNISIA FOCUS
-        </div>
-
-        {/* Actual Plotting Container (Tunisia map overlay styled with high-tech elements) */}
-        <div className="relative w-full h-full my-auto mx-auto flex items-center justify-center">
-          <div className="relative w-[85%] h-[85%] border border-slate-800/60 rounded-xl bg-slate-950/60 backdrop-blur-xs p-2">
-            
-            {/* Outline representation of Tunisian coastline and key markers */}
-            <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-10 pointer-events-none text-emerald-500">
-              {/* Very basic vector points outlining Tunisia for professional geo look */}
-              <polygon points="35,10 45,5 55,8 65,12 58,22 62,35 68,40 58,55 54,75 50,90 44,90 40,78 32,50 34,35 25,25 35,10" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="0.8" />
-              {/* Regional grid lines */}
-              <line x1="10" y1="50" x2="90" y2="50" stroke="currentColor" strokeWidth="0.2" strokeDasharray="1,2" />
-              <line x1="50" y1="10" x2="50" y2="90" stroke="currentColor" strokeWidth="0.2" strokeDasharray="1,2" />
-            </svg>
-
-            {/* Plotted Connections */}
-            {sessions.map((user) => {
-              const { x, y } = mapCoordinates(user.lat, user.lng);
-              const isSelected = selectedUser?.id === user.id;
-              
-              return (
-                <button
-                  key={user.id}
-                  onClick={() => setSelectedUser(user)}
-                  className="absolute group transition-transform duration-300 hover:scale-125 focus:outline-none"
-                  style={{ 
-                    left: `${x}%`, 
-                    top: `${y}%`,
-                    transform: 'translate(-50%, -50%)'
-                  }}
-                >
-                  {/* Pulse aura */}
-                  <span className="absolute -inset-2.5 rounded-full opacity-60 bg-emerald-400/40 animate-ping [animation-duration:1.5s]"></span>
-                  
-                  {/* Solid beacon node */}
-                  <span className={`relative block w-3.5 h-3.5 rounded-full shadow-lg border-2 flex items-center justify-center ${
-                    isSelected 
-                      ? 'bg-indigo-500 border-white scale-110 z-30' 
-                      : 'bg-emerald-500 border-slate-900'
-                  }`}>
-                    {/* Tiny pulsing core */}
-                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
-                  </span>
-
-                  {/* Popover label on hover */}
-                  <div className="absolute bottom-5 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 group-hover:opacity-100 bg-slate-950 text-white border border-slate-800 rounded px-2 py-1 text-[8.5px] font-mono whitespace-nowrap transition-all duration-200 shadow-xl z-50">
-                    <p className="font-extrabold text-emerald-400">{user.name}</p>
-                    <p className="text-[7.5px] text-slate-400">{user.city} · {user.ping}ms</p>
-                  </div>
-                </button>
-              );
-            })}
-
-            {/* Geographical Markers (Tunis, Sousse, Sfax, Bizerte) to anchor the map visually */}
-            <div className="absolute top-[18%] left-[54%] flex items-center space-x-1 text-slate-500/60 font-mono text-[7px] pointer-events-none">
-              <MapPin className="w-2 h-2" />
-              <span>Tunis (Lac 2)</span>
-            </div>
-            <div className="absolute top-[48%] left-[64%] flex items-center space-x-1 text-slate-500/60 font-mono text-[7px] pointer-events-none">
-              <MapPin className="w-2 h-2" />
-              <span>Sousse</span>
-            </div>
-            <div className="absolute top-[68%] left-[70%] flex items-center space-x-1 text-slate-500/60 font-mono text-[7px] pointer-events-none">
-              <MapPin className="w-2 h-2" />
-              <span>Sfax</span>
-            </div>
-            <div className="absolute top-[6%] left-[43%] flex items-center space-x-1 text-slate-500/60 font-mono text-[7px] pointer-events-none">
-              <MapPin className="w-2 h-2" />
-              <span>Bizerte</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Right side: Selected user dossier & connections list */}
-      <div className="lg:col-span-7 flex flex-col space-y-6">
+      {/* Main Grid Layout: Left Control Panel (Zone Gauche) + Right Leaflet Map (Zone Droite) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Dynamic Connected Dossier Panel */}
-        <div className="bg-white rounded-xl border border-slate-150 p-5 shadow-sm space-y-4">
-          <h3 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider flex items-center space-x-2">
-            <User className="w-4 h-4 text-indigo-600" />
-            <span>Fiche du Collaborateur Connecté</span>
-          </h3>
-
-          {selectedUser ? (
-            <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
-              {/* Bio & Access details */}
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center font-black text-sm text-white bg-emerald-600">
-                    {selectedUser.name.split(' ').map(n => n[0]).join('')}
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-slate-800 text-sm leading-tight flex items-center gap-1.5">
-                      <span>{selectedUser.name}</span>
-                    </h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{selectedUser.email}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 pt-1.5 border-t border-slate-200/60">
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-slate-400">Rôle d'Accès :</span>
-                    {getRoleBadge(selectedUser.role)}
-                  </div>
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-slate-400">Entreprise / Locataire :</span>
-                    <span className="font-bold text-slate-800 truncate max-w-[150px]">{selectedUser.company}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-slate-400">Adresse IP publique :</span>
-                    <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-150 text-[9.5px] text-slate-600">{selectedUser.ip}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Geographic, telemetry & diagnostics */}
-              <div className="space-y-3 md:border-l md:pl-4 border-slate-150">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-1.5 text-slate-700">
-                    <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
-                    <span className="font-extrabold">{selectedUser.city}, {selectedUser.country}</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-mono">
-                    Coordonnées GPS : {selectedUser.lat.toFixed(4)}°N, {selectedUser.lng.toFixed(4)}°E
-                  </div>
-                </div>
-
-                <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500 text-[10px] flex items-center space-x-1">
-                      <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Action en cours :</span>
-                    </span>
-                    <span className="bg-indigo-50 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase">{selectedUser.activePath}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500 text-[10px] flex items-center space-x-1">
-                      <Wifi className="w-3.5 h-3.5 text-emerald-500" />
-                      <span>Temps de Réponse :</span>
-                    </span>
-                    <span className={`font-mono font-bold text-[10px] ${
-                      selectedUser.ping < 20 ? 'text-emerald-600' : selectedUser.ping < 50 ? 'text-amber-500' : 'text-red-500'
-                    }`}>{selectedUser.ping} ms</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center p-8 bg-slate-50 border rounded-xl">
-              <AlertCircle className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <p className="text-slate-500 font-medium">Aucun utilisateur connecté sélectionné.</p>
-              <p className="text-slate-400 text-[10px] mt-1">Veuillez cliquer sur un nœud du radar ou sur un membre de la liste ci-dessous.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Connections List Feed */}
-        <div className="bg-white rounded-xl border border-slate-150 p-5 shadow-sm space-y-3 flex-1 flex flex-col">
-          <h3 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider flex items-center justify-between">
-            <span className="flex items-center space-x-2">
-              <Globe2 className="w-4 h-4 text-indigo-600" />
-              <span>Liste des Sessions Actives sur le Portail</span>
-            </span>
-            <span className="bg-slate-100 text-slate-700 font-mono text-[10px] px-2.5 py-0.5 rounded-full font-black">
-              {sessions.length} Actif{sessions.length > 1 ? 's' : ''}
-            </span>
-          </h3>
-
-          <div className="overflow-y-auto max-h-[220px] space-y-2 pr-1">
-            {sessions.map((user) => {
-              const isSelected = selectedUser?.id === user.id;
-              return (
-                <div
-                  key={user.id}
-                  onClick={() => setSelectedUser(user)}
-                  className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${
-                    isSelected 
-                      ? 'bg-indigo-50/60 border-indigo-250 shadow-xs' 
-                      : 'bg-white border-slate-150 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3 min-w-0">
-                    <div className="relative shrink-0">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white bg-emerald-600">
-                        {user.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white bg-emerald-400" />
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="font-extrabold text-slate-700 text-xs truncate max-w-[120px]">{user.name}</span>
-                        {getRoleBadge(user.role)}
-                      </div>
-                      <p className="text-[9.5px] text-slate-400 truncate max-w-[160px]">{user.company}</p>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded block max-w-[140px] truncate">
-                      {user.activePath}
-                    </span>
-                    <span className="text-[9px] text-slate-400 mt-1 block font-mono">
-                      {user.city} · Ping: <span className="font-bold text-emerald-600">{user.ping}ms</span>
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Real-time micro terminal diagnostic logs */}
-        <div className="bg-slate-950 rounded-xl border border-slate-850 p-4 shadow-lg font-mono text-[9px] text-slate-300 flex-1 flex flex-col h-[130px]">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2 text-[8px] text-slate-400">
-            <span className="flex items-center space-x-1 text-emerald-500 font-bold">
-              <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>TERMINAL DE DIAGNOSTIC DES PROTOCOLES IP (ELYSSA-SEC)</span>
-            </span>
-            <span>SYSTEME: NOMINAL</span>
-          </div>
+        {/* VOLET LATÉRAL DE CONTRÔLE (ZONE GAUCHE - 5 Colonnes) */}
+        <div className="lg:col-span-5 space-y-5 flex flex-col justify-between">
           
-          <div className="overflow-y-auto flex-1 space-y-1.5 scrollbar-thin text-[8.5px] text-slate-400">
-            {logs.length === 0 ? (
-              <p className="text-slate-500 italic">En attente de protocoles de connexion...</p>
-            ) : (
-              logs.map((log, index) => (
-                <div key={index} className="leading-relaxed hover:text-white transition-colors duration-150">
-                  <span className="text-slate-500">&gt;</span> {log}
+          {/* Bloc Focus: Diagnostic Entreprise Sélectionnée */}
+          <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-lg space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <Building2 className="w-4 h-4 text-indigo-400" />
+                <h2 className="text-xs font-extrabold text-slate-200 uppercase tracking-wider">
+                  Diagnostic Entreprise Sélectionnée
+                </h2>
+              </div>
+              <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                EN LIGNE
+              </span>
+            </div>
+
+            {selectedCompany ? (
+              <div className="space-y-3.5 text-xs">
+                {/* Header Title & Pack */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-black text-white tracking-tight">
+                      {selectedCompany.companyName}
+                    </h3>
+                    <p className="text-[11px] text-indigo-400 font-semibold flex items-center gap-1 mt-0.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                      {selectedCompany.packStatus}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 block font-mono">Dernier Ping</span>
+                    <span className="text-sm font-extrabold text-emerald-400 font-mono">
+                      {selectedCompany.avgPing} ms
+                    </span>
+                  </div>
                 </div>
-              ))
+
+                {/* Info Specs Grid */}
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 space-y-0.5">
+                    <span className="text-[10px] text-slate-400 block flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-rose-400" /> Siège / Ville
+                    </span>
+                    <p className="font-bold text-slate-200 truncate" title={selectedCompany.city}>
+                      {selectedCompany.city || 'Tunis'}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 space-y-0.5">
+                    <span className="text-[10px] text-slate-400 block flex items-center gap-1">
+                      <Server className="w-3 h-3 text-amber-400" /> Passerelle IP
+                    </span>
+                    <p className="font-bold text-slate-200 font-mono truncate">
+                      {selectedCompany.primaryIp}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 space-y-0.5">
+                    <span className="text-[10px] text-slate-400 block flex items-center gap-1">
+                      <Users className="w-3 h-3 text-indigo-400" /> Sessions Actives
+                    </span>
+                    <p className="font-bold text-slate-200 font-mono">
+                      {selectedCompany.activeUsersCount} Collaborateur(s)
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 space-y-0.5">
+                    <span className="text-[10px] text-slate-400 block flex items-center gap-1">
+                      <Globe2 className="w-3 h-3 text-sky-400" /> Coordonnées GPS
+                    </span>
+                    <p className="font-bold text-slate-200 font-mono text-[11px]">
+                      {selectedCompany.lat.toFixed(4)}°N, {selectedCompany.lng.toFixed(4)}°E
+                    </p>
+                  </div>
+                </div>
+
+                {/* Main Activity Path */}
+                <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400 font-medium">Activité Principale :</span>
+                  <span className="font-bold text-indigo-300 font-mono truncate max-w-[200px]">
+                    {selectedCompany.lastActivePath}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="py-6 text-center text-slate-500 text-xs font-medium">
+                Aucune entreprise sélectionnée ou connectée.
+              </div>
             )}
-            <div ref={terminalEndRef} />
           </div>
+
+          {/* Liste Interactive: Entreprises Actives */}
+          <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-lg space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <h2 className="text-xs font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-emerald-400" />
+                Entreprises Actives ({companySummaries.length})
+              </h2>
+              <span className="text-[10px] text-slate-400 font-mono">Cliquer pour centrer</span>
+            </div>
+
+            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+              {companySummaries.length > 0 ? (
+                companySummaries.map((comp) => {
+                  const isSelected = selectedCompany?.id === comp.id || selectedCompany?.companyName === comp.companyName;
+                  return (
+                    <button
+                      key={comp.id}
+                      onClick={() => setSelectedCompany(comp)}
+                      className={`w-full text-left p-3 rounded-xl border transition-all duration-200 flex items-center justify-between ${
+                        isSelected
+                          ? 'bg-indigo-950/60 border-indigo-500/80 shadow-md ring-1 ring-indigo-500/50'
+                          : 'bg-slate-950/50 border-slate-800 hover:bg-slate-800/60 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="space-y-1 max-w-[70%]">
+                        <div className="flex items-center space-x-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span className={`font-black text-xs ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                            {comp.companyName}
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-400 flex items-center gap-1 truncate">
+                          <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
+                          {comp.city}
+                        </p>
+                      </div>
+
+                      <div className="text-right space-y-1">
+                        <span className="inline-block bg-indigo-500/10 text-indigo-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-indigo-500/20 font-mono">
+                          {comp.activeUsersCount} sess.
+                        </span>
+                        <span className="block text-[10px] text-emerald-400 font-mono font-bold">
+                          {comp.avgPing}ms
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="py-6 text-center text-slate-500 text-xs">
+                  Aucune session entreprise active enregistrée.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Légende & Stream Terminal */}
+          <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800 space-y-3">
+            {/* Légende officielle */}
+            <div className="flex items-center justify-between text-[11px] pb-2 border-b border-slate-800/80">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></span>
+                <span className="text-slate-300 font-medium">Pastille Verte = Entreprise connectée / Pack Actif</span>
+              </div>
+            </div>
+
+            {/* Terminal activity logs */}
+            <div className="font-mono text-[10px] text-slate-400 max-h-[80px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+              {logs.slice(-4).map((l, idx) => (
+                <div key={idx} className="truncate">
+                  <span className="text-indigo-400 font-bold">&gt; </span>
+                  <span>{l}</span>
+                </div>
+              ))}
+              <div ref={terminalEndRef} />
+            </div>
+          </div>
+
+        </div>
+
+        {/* MOTEUR DE CARTE INTERACTIF LEAFLET (ZONE DROITE - 7 Colonnes) */}
+        <div className="lg:col-span-7 bg-slate-900/90 rounded-2xl border border-slate-800 p-2 shadow-xl flex flex-col justify-between relative overflow-hidden min-h-[580px]">
+          
+          {/* Map Overlay Controls Header */}
+          <div className="z-20 bg-slate-950/90 backdrop-blur-md px-4 py-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs mb-2 shadow-md">
+            <div className="flex items-center space-x-2">
+              <Layers className="w-4 h-4 text-indigo-400" />
+              <span className="font-black text-slate-200 tracking-wide">
+                MOTEUR CARTO LEAFLET // TUILES CARTO POSITRON (LIGHT)
+              </span>
+            </div>
+
+            {/* Scroll Wheel Zoom Mode Toggle Control */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setDirectScrollZoom(!directScrollZoom)}
+                className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold font-mono transition-all flex items-center space-x-1.5 border ${
+                  directScrollZoom
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
+                }`}
+                title="Basculer le mode de zoom molette souris"
+              >
+                <MousePointer className="w-3 h-3" />
+                <span>Molette : {directScrollZoom ? 'Direct' : 'Standard'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Leaflet Map Canvas */}
+          <div className="w-full flex-1 rounded-xl overflow-hidden border border-slate-800 relative z-10 min-h-[500px]">
+            <MapContainer
+              center={[35.8, 10.2]}
+              zoom={7.5}
+              scrollWheelZoom={directScrollZoom}
+              style={{ height: '100%', width: '100%', minHeight: '500px' }}
+              zoomControl={true}
+            >
+              {/* CARTO Positron Light Tile Layer */}
+              <TileLayer
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                subdomains={['a', 'b', 'c', 'd']}
+                maxZoom={19}
+              />
+
+              {/* Dynamic Leaflet Map Controller */}
+              <LeafletMapController 
+                selectedCompany={selectedCompany} 
+                directScrollZoom={directScrollZoom} 
+              />
+
+              {/* Interactive Company Markers */}
+              {companySummaries.map((comp) => {
+                const isSelected = selectedCompany?.id === comp.id || selectedCompany?.companyName === comp.companyName;
+                const customIcon = createCompanyMarkerIcon(comp.companyName, isSelected, comp.activeUsersCount);
+
+                return (
+                  <Marker
+                    key={comp.id}
+                    position={[comp.lat, comp.lng]}
+                    icon={customIcon}
+                    eventHandlers={{
+                      click: () => {
+                        setSelectedCompany(comp);
+                      }
+                    }}
+                  >
+                    {/* Interactive Leaflet Popup */}
+                    <Popup className="custom-radar-popup" autoPan={true}>
+                      <div className="p-1 space-y-2 font-sans min-w-[210px]">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                          <span className="font-extrabold text-slate-900 text-xs flex items-center gap-1">
+                            <Building2 className="w-3.5 h-3.5 text-indigo-600 inline" />
+                            {comp.companyName}
+                          </span>
+                          <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-300">
+                            ● EN LIGNE
+                          </span>
+                        </div>
+
+                        <div className="space-y-1 text-[10.5px] text-slate-700">
+                          <p className="font-extrabold text-indigo-700">{comp.packStatus}</p>
+                          <p className="flex items-center gap-1 text-slate-600 font-medium">
+                            <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                            {comp.city}
+                          </p>
+                          <p className="flex items-center gap-1 text-slate-600 font-mono">
+                            <Server className="w-3 h-3 text-slate-500 shrink-0" />
+                            IP: {comp.primaryIp}
+                          </p>
+                        </div>
+
+                        <div className="pt-1.5 border-t border-slate-200 flex items-center justify-between text-[10px] font-mono">
+                          <span className="text-slate-600">Sessions : <strong className="text-slate-900 font-extrabold">{comp.activeUsersCount}</strong></span>
+                          <span className="text-emerald-700 font-bold">Ping : {comp.avgPing}ms</span>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
+            </MapContainer>
+          </div>
+
         </div>
 
       </div>

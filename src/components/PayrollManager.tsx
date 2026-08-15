@@ -871,6 +871,12 @@ export default function PayrollManager({
     if (window.confirm(`Voulez-vous vraiment supprimer la fiche de ${name} ?`)) {
       setEmployees(employees.filter(e => e.id !== id));
       setPayslips(payslips.filter(p => p.employeeId !== id));
+
+      fetch('/api/db/admin/delete-collaborator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      }).catch(err => console.warn('Error deleting collaborator via API:', err));
     }
   };
 

@@ -4336,91 +4336,8 @@ export default function App() {
     localStorage.setItem('elyssa_company_locations', JSON.stringify(companyLocations));
   }, [companyLocations]);
 
-  // Bi-directional synchronization: Ensure RH Employees exist in Collaborators list & vice versa
-  useEffect(() => {
-    if (!employees || employees.length === 0) return;
-    setCollaborators(prevCollabs => {
-      let updated = false;
-      const nextCollabs = [...(prevCollabs || [])];
-
-      employees.forEach(emp => {
-        if (!emp || !emp.name) return;
-        const empEmail = emp.email?.toLowerCase().trim();
-        const empName = emp.name.toLowerCase().trim();
-
-        const exists = nextCollabs.some(c => 
-          (empEmail && c.email?.toLowerCase().trim() === empEmail) ||
-          (c.id === emp.id || c.id === `collab_${emp.id}` || emp.id === `emp_${c.id}`) ||
-          (c.name.toLowerCase().trim() === empName)
-        );
-
-        if (!exists) {
-          updated = true;
-          nextCollabs.push({
-            id: emp.id.startsWith('collab_') ? emp.id : `collab_${emp.id}`,
-            name: emp.name,
-            email: emp.email || `${emp.matricule?.toLowerCase() || 'emp'}_${Date.now()}@elyssa.pro`,
-            password: 'Password123!',
-            plainPassword: 'Password123!',
-            role: (emp.role as any) || 'Agent',
-            status: emp.status === 'Active' ? 'Active' : 'Suspended',
-            company: activeCompanyName || 'Inter-Affaires',
-            jobTitle: emp.jobTitle || emp.role || 'Collaborateur RH',
-            matricule: emp.matricule,
-            createdDate: emp.hiringDate || emp.hireDate || new Date().toISOString().split('T')[0],
-            assignedTasks: []
-          });
-        }
-      });
-
-      return updated ? nextCollabs : prevCollabs;
-    });
-  }, [employees, activeCompanyName]);
-
-  useEffect(() => {
-    if (!collaborators || collaborators.length === 0) return;
-    setEmployees(prevEmps => {
-      let updated = false;
-      const nextEmps = [...(prevEmps || [])];
-
-      collaborators.forEach(c => {
-        if (!c || !c.name) return;
-        const cEmail = c.email?.toLowerCase().trim();
-        const cName = c.name.toLowerCase().trim();
-
-        const exists = nextEmps.some(e =>
-          (cEmail && e.email?.toLowerCase().trim() === cEmail) ||
-          (e.id === c.id || e.id === `emp_${c.id}` || c.id === `collab_${e.id}`) ||
-          (e.name.toLowerCase().trim() === cName)
-        );
-
-        if (!exists) {
-          updated = true;
-          nextEmps.push(ensureValidEmployee({
-            id: c.id.startsWith('emp_') ? c.id : `emp_${c.id}`,
-            matricule: c.matricule || `EMP-${c.id.slice(-4).toUpperCase()}`,
-            name: c.name,
-            email: c.email || '',
-            phone: c.phone || '',
-            role: c.role,
-            jobTitle: c.jobTitle || c.role || 'Collaborateur',
-            department: 'Direction & Exploitation',
-            hiringDate: c.createdDate || new Date().toISOString().split('T')[0],
-            hireDate: c.createdDate || new Date().toISOString().split('T')[0],
-            baseSalary: 1800.000,
-            transportAllowance: 150.000,
-            presenceAllowance: 80.000,
-            otherAllowances: 100.000,
-            familySituation: 'Single',
-            isChefDeFamille: false,
-            status: c.status === 'Active' ? 'Active' : 'Terminated'
-          }, nextEmps.length));
-        }
-      });
-
-      return updated ? nextEmps : prevEmps;
-    });
-  }, [collaborators]);
+  // Bi-directional synchronization disabled to prevent resurrecting deleted collaborators/employees
+  // Clean additions or deletions are handled directly by their respective UI action handlers.
 
   // Utility function to check if a specific module is empty
   const isModuleEmpty = (moduleKey: string): boolean => {
@@ -5177,7 +5094,8 @@ export default function App() {
                                               companyLower.includes('gts') ||
                                               companyLower.includes('dos-') ||
                                               !!accountantClientContext?.isAccountantMode;
-                const isTrialClient = (clientRecord?.status === 'trial') || isSimulationActive || isDemoCompany || isDemoOrTrialPattern;
+                const isCustomPackActive = clientRecord?.pack === 'CUSTOM' || clientRecord?.pack === 'full' || clientRecord?.status === 'active' || companyLower === 'gep';
+                const isTrialClient = !isCustomPackActive && ((clientRecord?.status === 'trial') || isSimulationActive || isDemoCompany || isDemoOrTrialPattern);
                 const hasDemoLoaded = !!resData.hasLoadedTrialDemo;
 
                 if (isTrialClient || hasDemoLoaded) {

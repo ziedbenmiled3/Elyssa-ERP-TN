@@ -133,13 +133,13 @@ export default function Dashboard({
   
   const purchaseOrders = getLocalStorageData('carthage_purchasing_orders', [
     { id: 'BC-2026-001', supplierName: 'SOTUMETAL S.A. (Tunis)', itemDescription: 'Cuivre Cathodique Pur de Haute Pureté', amountHT: 49000, amountTTC: 58839, status: 'Approuvé' },
-    { id: 'BC-2026-002', supplierName: 'SOTUCHIM S.A. (Sfax)', itemDescription: 'Granulés de PVC Premium', amountHT: 12500, amountTTC: 14875, status: 'Approuvé' },
+    { id: 'BC-2026-002', supplierName: 'CHIMIE INDUSTRIE S.A. (Sfax)', itemDescription: 'Granulés de PVC Premium', amountHT: 12500, amountTTC: 14875, status: 'Approuvé' },
     { id: 'BC-2026-003', supplierName: 'TUNIFRET (Tunis)', itemDescription: 'Prestation Transit maritime', amountHT: 4200, amountTTC: 4998, status: 'En attente' }
   ]);
 
   const supplierPerformance = getLocalStorageData('carthage_purchasing_suppliers_performance', [
     { id: 'sup_1', name: 'SOTUMETAL S.A. (Tunis)', score: 92, delayRate: 0, totalVolume: 120000, category: 'Métaux' },
-    { id: 'sup_2', name: 'SOTUCHIM S.A. (Sfax)', score: 78, delayRate: 5, totalVolume: 85000, category: 'Chimie' },
+    { id: 'sup_2', name: 'CHIMIE INDUSTRIE S.A. (Sfax)', score: 78, delayRate: 5, totalVolume: 85000, category: 'Chimie' },
     { id: 'sup_3', name: 'PLASTIPACK (Nabeul)', score: 45, delayRate: 22, totalVolume: 35000, category: 'Emballage' }
   ]);
 
