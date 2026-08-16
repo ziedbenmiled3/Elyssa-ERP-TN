@@ -391,12 +391,19 @@ export default function LoginPage({ collaborators, onLoginSuccess, onBackToLandi
     setStep('collaborator_password');
   };
 
-  // Stage 3: Validate individual employee password
+  const [isEmployeeSubmitting, setIsEmployeeSubmitting] = useState(false);
+
+  // Stage 3: Validate individual employee password or master company password
   const handleEmployeePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmployeeError('');
+    setIsEmployeeSubmitting(true);
 
-    if (!selectedProfile) return;
+    if (!selectedProfile || !employeePassword.trim()) {
+      setEmployeeError("Veuillez saisir votre code PIN ou mot de passe.");
+      setIsEmployeeSubmitting(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/auth/verify-employee', {
@@ -404,21 +411,34 @@ export default function LoginPage({ collaborators, onLoginSuccess, onBackToLandi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employeeId: selectedProfile.id,
-          password: employeePassword
+          password: employeePassword.trim()
         })
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        setEmployeeError(errorData.error || "Mot de passe individuel invalide.");
+        const errorData = await response.json().catch(() => ({}));
+        setEmployeeError(errorData.error || "Code PIN ou mot de passe incorrect.");
+        setIsEmployeeSubmitting(false);
         return;
       }
 
       const resData = await response.json();
+
+      // Immediately write session to localStorage to ensure immediate dashboard access
+      try {
+        localStorage.setItem('carthage_session', JSON.stringify(resData.session));
+        localStorage.setItem('elyssa_active_session', JSON.stringify(resData.session));
+        if (resData.session.companyName) {
+          localStorage.setItem('carthage_active_tenant', resData.session.companyName);
+        }
+      } catch (e) {}
+
       onLoginSuccess(resData.session);
     } catch (err) {
       console.error('Erreur lors de la vérification employé:', err);
-      setEmployeeError("Une erreur est survenue lors de la vérification de sécurité.");
+      setEmployeeError("Code PIN ou mot de passe incorrect.");
+    } finally {
+      setIsEmployeeSubmitting(false);
     }
   };
 
@@ -1096,7 +1116,7 @@ export default function LoginPage({ collaborators, onLoginSuccess, onBackToLandi
               <form onSubmit={handleEmployeePasswordSubmit} className="space-y-4 font-semibold">
                 <div>
                   <label className="block text-[10px] font-black uppercase text-slate-400 mb-1.5 font-sans tracking-wider text-center">
-                    {['Manager', 'Director'].includes(selectedProfile.role) ? "Saisissez votre mot de passe d'entreprise ou individuel" : "Saisissez votre code PIN individuel (6 chiffres)"}
+                    Saisissez votre code PIN (6 chiffres) ou mot de passe d'entreprise
                   </label>
                   <div className="relative rounded-lg shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 border-0">
@@ -1105,17 +1125,14 @@ export default function LoginPage({ collaborators, onLoginSuccess, onBackToLandi
                     <input
                       type={showEmployeePassword ? "text" : "password"}
                       required
-                      maxLength={['Manager', 'Director'].includes(selectedProfile.role) ? undefined : 6}
-                      pattern={['Manager', 'Director'].includes(selectedProfile.role) ? undefined : "[0-9]{6}"}
                       value={employeePassword}
                       onChange={(e) => {
-                        const val = ['Manager', 'Director'].includes(selectedProfile.role) ? e.target.value : e.target.value.replace(/[^0-9]/g, '');
-                        setEmployeePassword(val);
+                        setEmployeePassword(e.target.value);
                         setEmployeeError('');
                       }}
                       autoFocus
-                      placeholder={['Manager', 'Director'].includes(selectedProfile.role) ? "Mot de passe d'entreprise ou individuel" : "••••••"}
-                      className={`w-full bg-slate-800 text-white rounded-xl border border-slate-700 p-2.5 text-sm font-black focus:outline-none focus:border-indigo-500 font-mono text-center pl-10 pr-10 ${['Manager', 'Director'].includes(selectedProfile.role) ? '' : 'tracking-[0.5em]'}`}
+                      placeholder="Code PIN ou Mot de Passe"
+                      className="w-full bg-slate-800 text-white rounded-xl border border-slate-700 p-2.5 text-sm font-black focus:outline-none focus:border-indigo-500 font-mono text-center pl-10 pr-10 tracking-widest"
                     />
                     <button
                       type="button"
@@ -1141,20 +1158,29 @@ export default function LoginPage({ collaborators, onLoginSuccess, onBackToLandi
                 <div className="flex gap-2">
                   <button
                     type="button"
+                    disabled={isEmployeeSubmitting}
                     onClick={() => {
                       setStep('collaborator_selection');
                       setEmployeePassword('');
                       setEmployeeError('');
                     }}
-                    className="w-1/2 bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-white rounded-xl text-[10.5px] font-black uppercase py-2.5 transition cursor-pointer font-sans border-0"
+                    className="w-1/2 bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-white rounded-xl text-[10.5px] font-black uppercase py-2.5 transition cursor-pointer font-sans border-0 disabled:opacity-50"
                   >
                     ← Changer profil
                   </button>
                   <button
                     type="submit"
-                    className="w-1/2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-[10.5px] font-black uppercase py-2.5 transition cursor-pointer border-0 shadow-sm font-sans"
+                    disabled={isEmployeeSubmitting}
+                    className="w-1/2 bg-indigo-650 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl text-[10.5px] font-black uppercase py-2.5 transition cursor-pointer border-0 shadow-sm font-sans flex items-center justify-center gap-2"
                   >
-                    Valider la Session
+                    {isEmployeeSubmitting ? (
+                      <>
+                        <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Validation...</span>
+                      </>
+                    ) : (
+                      <span>Valider la Session</span>
+                    )}
                   </button>
                 </div>
               </form>
