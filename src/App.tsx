@@ -1820,8 +1820,7 @@ export default function App() {
       console.error(e);
     }
     return [
-      { id: 'pc-1784366783440', companyName: 'GEP', location: '12 Avenue 2 Mars, Borj Baccouche Ariana', packId: 'custom', paymentGateway: 'Versement', status: 'active', joinedDate: '2026-07-18' },
-      { id: 'pc-interaffaires', companyName: 'Inter-Affaires', location: 'Tunis', packId: 'standard', paymentGateway: 'Virement', status: 'active', joinedDate: '2026-07-26' }
+      { id: 'pc-parent-elyssa', companyName: 'Inter-Affaires', location: 'Tunis', packId: 'standard', paymentGateway: 'Virement', status: 'active', joinedDate: '2026-07-26' }
     ];
   });
 
@@ -2046,26 +2045,6 @@ export default function App() {
     }
     
     setPurchasedModules(merged);
-
-    // 6. Auto-register active company in publisherClients if missing so it appears in publisher console and retains settings
-    if (!clientRecord && activeCompanyName && activeCompanyName.toLowerCase() !== 'elyssa entreprises s.a.') {
-      const autoClient = {
-        id: `pc-${activeCompanyName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'new'}`,
-        companyName: activeCompanyName,
-        location: 'Tunis',
-        packId: merged.length > 0 ? 'custom' : 'standard',
-        paymentGateway: 'Virement',
-        status: 'active',
-        license_status: 'paid',
-        joinedDate: new Date().toISOString().split('T')[0],
-        modules: merged
-      };
-      setPublisherClients((prev: any[]) => {
-        if (!prev) return [autoClient];
-        const exists = prev.some(c => c && (c.id === autoClient.id || c.companyName?.toLowerCase() === autoClient.companyName.toLowerCase()));
-        return exists ? prev : [...prev, autoClient];
-      });
-    }
   }, [activeCompanyName, publisherClients, setPublisherClients]);
 
   const [hideLockedModules, setHideLockedModules] = useState<boolean>(() => {
@@ -2322,16 +2301,8 @@ export default function App() {
         if (clientsRes.ok) {
           const clientsData = await clientsRes.json();
           if (Array.isArray(clientsData)) {
-            setPublisherClients((prev: any[]) => {
-              const mergedMap = new Map<string, any>();
-              if (Array.isArray(prev)) {
-                prev.forEach((c: any) => c && c.companyName && mergedMap.set(c.companyName.toLowerCase(), c));
-              }
-              clientsData.forEach((c: any) => c && c.companyName && mergedMap.set(c.companyName.toLowerCase(), c));
-              const merged = Array.from(mergedMap.values());
-              localStorage.setItem('carthage_publisher_clients', JSON.stringify(merged));
-              return merged;
-            });
+            setPublisherClients(clientsData);
+            localStorage.setItem('carthage_publisher_clients', JSON.stringify(clientsData));
           }
         }
       } catch (err) {

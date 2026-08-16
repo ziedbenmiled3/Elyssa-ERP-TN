@@ -231,7 +231,6 @@ export interface PublisherClient {
 
 const PRESET_PUBLISHER_CLIENTS: PublisherClient[] = [
   { id: 'pc-ws', companyName: 'WS', location: 'Tunis', packId: 'standard', paymentGateway: 'Virement', status: 'active', joinedDate: '2026-07-20', interval: 'monthly' },
-  { id: 'pc-gep', companyName: 'GEP', location: 'Ariana', packId: 'standard', paymentGateway: 'Virement', status: 'active', joinedDate: '2026-07-18', interval: 'monthly' },
   { id: 'pc-bb', companyName: 'BB', location: 'Ariana', packId: 'standard', paymentGateway: 'Virement', status: 'active', joinedDate: '2026-07-22', interval: 'monthly' },
   { id: 'pc-diag', companyName: 'Diagnostic Test Corp', location: 'Tunis', packId: 'standard', paymentGateway: 'Virement', status: 'active', joinedDate: '2026-07-24', interval: 'monthly' },
   { id: 'pc-2', companyName: 'Sousse Logistique S.A.', location: 'Sousse', packId: 'logistics', paymentGateway: 'Virement', status: 'active', joinedDate: '2026-06-18', interval: 'quarterly' },

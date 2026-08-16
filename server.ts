@@ -803,9 +803,16 @@ async function ensureBaseCollectionsExistAndSeedParent(): Promise<void> {
           if (fs.existsSync(CLIENTS_FILE_PATH)) {
             const fileClients = JSON.parse(fs.readFileSync(CLIENTS_FILE_PATH, 'utf-8'));
             if (Array.isArray(fileClients)) {
-              console.log(`[INITIALIZATION-SYNC] Synchronizing ${fileClients.length} local clients from data_publisher_clients.json to Firestore...`);
+              const deletedKeys = getDeletedCompanyKeys();
+              console.log(`[INITIALIZATION-SYNC] Synchronizing local clients from data_publisher_clients.json to Firestore...`);
               for (const client of fileClients) {
                 if (!client.id) continue;
+                const cId = String(client.id || '').toLowerCase().trim();
+                const cName = String(client.companyName || '').toLowerCase().trim();
+                if (deletedKeys.has(cId) || deletedKeys.has(cName)) {
+                  continue; // Skip deleted companies
+                }
+
                 // Sync 'publisher_clients' collection
                 const pRef = doc(db, 'publisher_clients', client.id);
                 const pSnap = await getDoc(pRef);
@@ -891,113 +898,12 @@ async function ensureBaseCollectionsExistAndSeedParent(): Promise<void> {
   return baseCollectionsSeedingPromise;
 }
 
-// Dedicated helper to clean up test companies from root, retaining ONLY GEP and Inter-Affaires
+// Dedicated helper to clean up test companies (Disabled: no auto-purge or auto-seeding of companies)
 async function purgeNonGepTestCompanies() {
-  if (!isFirestoreActive || !db) return;
-  try {
-    console.log("🧹 [PURGE ROOT] Purging test companies from Firestore except GEP and Inter-Affaires...");
-    
-    // 1. Purge publisher_clients
-    const pubSnap = await withTimeout(getDocs(collection(db, 'publisher_clients')), 8000).catch(() => null);
-    if (pubSnap && !pubSnap.empty) {
-      for (const docSnap of pubSnap.docs) {
-        const id = docSnap.id;
-        const data = docSnap.data();
-        const cName = String(data.companyName || data.name || '').trim().toUpperCase();
-        const idLower = id.toLowerCase();
-        
-        const isGep = cName === 'GEP' || idLower.includes('gep') || id === 'pc-1784366783440';
-        const isParent = cName === 'INTER-AFFAIRES' || cName === 'ELYSSA ENTREPRISES S.A.' || id === 'pc-parent-elyssa' || id === 'pc-interaffaires';
-
-        if (!isGep && !isParent) {
-          console.log(`[PURGE ROOT] Deleting test client from publisher_clients: ${id} (${cName})`);
-          await withTimeout(deleteDoc(doc(db, 'publisher_clients', id)), 4000).catch(() => {});
-        }
-      }
-    }
-
-    // 2. Purge companies
-    const compSnap = await withTimeout(getDocs(collection(db, 'companies')), 8000).catch(() => null);
-    if (compSnap && !compSnap.empty) {
-      for (const docSnap of compSnap.docs) {
-        const id = docSnap.id;
-        const data = docSnap.data();
-        const cName = String(data.companyName || data.name || '').trim().toUpperCase();
-        const idLower = id.toLowerCase();
-        
-        const isGep = cName === 'GEP' || idLower.includes('gep') || id === 'pc-1784366783440';
-        const isParent = cName === 'INTER-AFFAIRES' || cName === 'ELYSSA ENTREPRISES S.A.' || id === 'pc-parent-elyssa' || id === 'pc-interaffaires';
-
-        if (!isGep && !isParent) {
-          console.log(`[PURGE ROOT] Deleting test company from companies: ${id} (${cName})`);
-          await withTimeout(deleteDoc(doc(db, 'companies', id)), 4000).catch(() => {});
-        }
-      }
-    }
-
-    // 3. Keep only GEP and Inter-Affaires in data_publisher_clients.json (unless deleted)
-    const cleanLocal = [
-      {
-        "location": "12 Avenue 2 Mars, Borj Baccouche Ariana",
-        "password": "mondhali",
-        "companyName": "GEP",
-        "email": "mondhali@gmail.com",
-        "packId": "custom",
-        "modules": [
-          "caisse", "billing", "stock", "company_settings", "steering", "cession",
-          "juridique", "clients", "communication", "portail_client", "finance",
-          "attendance", "ged", "market", "transit_logistique", "lc_manager",
-          "purchasing", "asset", "treasury"
-        ],
-        "joinedDate": "2026-07-18",
-        "license_status": "paid",
-        "paymentGateway": "Versement",
-        "status": "active",
-        "pin": "123456",
-        "interval": "yearly",
-        "id": "pc-1784366783440"
-      },
-      {
-        "status": "active",
-        "paymentGateway": "Virement",
-        "license_status": "paid",
-        "joinedDate": "2026-07-26",
-        "packId": "standard",
-        "companyName": "Inter-Affaires",
-        "modules": [],
-        "location": "Tunis",
-        "id": "pc-interaffaires"
-      },
-      {
-        "id": "pc-parent-elyssa",
-        "company_id": "pc-parent-elyssa",
-        "companyName": "Elyssa Entreprises S.A.",
-        "email": "contact@elyssa.pro",
-        "location": "Tunis",
-        "packId": "full",
-        "paymentGateway": "Flouci",
-        "status": "paid",
-        "joinedDate": "2026-06-22"
-      }
-    ];
-
-    const deletedKeys = getDeletedCompanyKeys();
-    const cleanLocalFiltered = cleanLocal.filter(c => {
-      const cId = String(c.id || '').toLowerCase().trim();
-      const cName = String(c.companyName || '').toLowerCase().trim();
-      return !deletedKeys.has(cId) && !deletedKeys.has(cName);
-    });
-    fs.writeFileSync(CLIENTS_FILE_PATH, JSON.stringify(cleanLocalFiltered, null, 2), 'utf-8');
-
-  } catch (err) {
-    console.error("Error in purgeNonGepTestCompanies:", err);
-  }
+  return;
 }
 
-const DEFAULT_PRESET_CLIENTS = [
-  { id: 'pc-1784366783440', companyName: 'GEP', location: '12 Avenue 2 Mars, Borj Baccouche Ariana', packId: 'custom', paymentGateway: 'Versement', status: 'active', joinedDate: '2026-07-18' },
-  { id: 'pc-interaffaires', companyName: 'Inter-Affaires', location: 'Tunis', packId: 'standard', paymentGateway: 'Virement', status: 'active', joinedDate: '2026-07-26' }
-];
+const DEFAULT_PRESET_CLIENTS: any[] = [];
 
 async function getPublisherClients(): Promise<any[]> {
   const list: any[] = [];
@@ -2670,23 +2576,6 @@ app.post('/api/db/publisher-clients', enforceCompanyId, async (req: any, res) =>
       const otherClients = currentFullList.filter(item => item.id !== companyId && item.company_id !== companyId);
       const merged = [...otherClients, ...filteredIncoming];
       await savePublisherClients(merged);
-    }
-
-    // Auto-create admin alerts for any new registrations detected!
-    if (newItems.length > 0) {
-      try {
-        const currentAlerts = await getAdminAlerts();
-        const newAlerts = newItems.map(item => ({
-          id: `al_auto_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-          type: 'registration',
-          message: `Nouvelle entreprise enregistrée (SaaS Elyssa ERP) : "${item.companyName}" (${item.location || 'Tunisie'}). Mode : ${item.status === 'trial' ? 'Essai gratuit 7j' : 'Payant'}.`,
-          date: new Date().toISOString().replace('T', ' ').slice(0, 16)
-        }));
-        await saveAdminAlerts([...newAlerts, ...currentAlerts]);
-        console.log(`[ALERTS] Auto-created ${newAlerts.length} admin alerts for new registrations.`);
-      } catch (e) {
-        console.warn("Failed to auto-create admin alerts for new clients:", e);
-      }
     }
 
     res.json({ success: true });
