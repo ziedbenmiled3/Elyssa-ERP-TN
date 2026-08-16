@@ -285,10 +285,15 @@ export default function LoginPage({ collaborators, onLoginSuccess, onBackToLandi
           id: resData.session.id,
           name: resData.session.name,
           email: resData.session.email,
-          role: resData.session.role,
+          role: resData.session.role || 'SUPER_ADMIN',
           companyName: resData.companyName,
           companyId: resData.companyId
         };
+        try {
+          localStorage.setItem('carthage_session', JSON.stringify(finalSession));
+          localStorage.setItem('elyssa_active_session', JSON.stringify(finalSession));
+          localStorage.setItem('carthage_active_tenant', resData.companyName);
+        } catch (e) {}
         onLoginSuccess(finalSession);
       } else {
         if (Array.isArray(resData.collaborators)) {
@@ -1142,17 +1147,6 @@ export default function LoginPage({ collaborators, onLoginSuccess, onBackToLandi
                       {showEmployeePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-
-                  {trialProspect && (
-                    <div className="mt-3 bg-indigo-950/45 border border-indigo-900/60 rounded-xl p-3 text-[10.5px] text-indigo-300 font-sans leading-normal text-left">
-                      <span className="font-bold uppercase tracking-wider block mb-1 text-indigo-400">💡 Codes PIN de démonstration :</span>
-                      <ul className="space-y-1 list-disc list-inside">
-                        <li><strong>{trialProspect.firstName} (Dirigeant)</strong> : <span className="font-mono bg-indigo-900/60 p-0.5 px-1.5 rounded text-white font-extrabold">{trialProspect.pin || '123456'}</span></li>
-                        <li><strong>Hédi (Logistique)</strong> : <span className="font-mono bg-indigo-900/60 p-0.5 px-1.5 rounded text-white font-extrabold">112233</span></li>
-                        <li><strong>Leila (Finance)</strong> : <span className="font-mono bg-indigo-900/60 p-0.5 px-1.5 rounded text-white font-extrabold">445566</span></li>
-                      </ul>
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex gap-2">

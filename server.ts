@@ -4468,11 +4468,8 @@ app.post('/api/auth/trial-signup', async (req, res) => {
       }
     }
 
-    // 3. Create the 3 collaborators
-    const domain = trimmedEmail.split('@')[1] || 'entreprise.tn';
+    // 3. Create the owner collaborator
     const hashedPin = bcrypt.hashSync(pin, 10);
-    const hashedC1 = bcrypt.hashSync('112233', 10);
-    const hashedC2 = bcrypt.hashSync('445566', 10);
 
     const newCollabs = [
       {
@@ -4488,38 +4485,10 @@ app.post('/api/auth/trial-signup', async (req, res) => {
         companyId: newTrialClientId,
         assignedTasks: [],
         createdDate: new Date().toISOString().split('T')[0]
-      },
-      {
-        id: `collab_trial_c1_${Date.now()}`,
-        name: 'Hédi (Audit Logistique)',
-        email: `h.dridi@${domain}`,
-        password: hashedC1,
-        plainPassword: '112233',
-        role: 'Collaborateur',
-        status: 'Active',
-        company: cleanCompanyName,
-        company_id: newTrialClientId,
-        companyId: newTrialClientId,
-        assignedTasks: [],
-        createdDate: new Date().toISOString().split('T')[0]
-      },
-      {
-        id: `collab_trial_c2_${Date.now()}`,
-        name: 'Leila (Audit Financier)',
-        email: `l.benaissa@${domain}`,
-        password: hashedC2,
-        plainPassword: '445566',
-        role: 'Collaborateur',
-        status: 'Active',
-        company: cleanCompanyName,
-        company_id: newTrialClientId,
-        companyId: newTrialClientId,
-        assignedTasks: [],
-        createdDate: new Date().toISOString().split('T')[0]
       }
     ];
 
-    // Save collaborators to database
+    // Save collaborator to database
     await saveCollaborators(newCollabs);
 
     // 4. Pre-load ALL demo data immediately on server so it is active right away!
@@ -4735,22 +4704,24 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
     (compId === 'pc-parent-elyssa' && (!c.company || c.company === 'Inter-Affaires' || c.company === 'Elyssa Entreprises S.A.'))
   );
 
-  // If 0 collaborators found for this company, generate a default Manager / Dirigeant account profile
+  // If 0 collaborators found for this company: Open direct admin session and short-circuit steps 2 & 3!
   if (companyCollabs.length === 0) {
-    const defaultManager = {
-      id: `collab_owner_${compId}_${Date.now()}`,
-      name: `${compName} (Gérant / Dirigeant)`,
-      email: targetCompany.email || trimmedEmail,
-      role: 'Manager',
-      status: 'Active',
-      company: compName,
-      company_id: compId,
+    const adminRole = (trimmedEmail === 'admin@elyssa.pro' || trimmedEmail === 'contact@elyssa.pro' || trimmedEmail === 'ziedbenmiled3@gmail.com') ? 'SuperAdmin' : 'SUPER_ADMIN';
+    return res.json({
+      success: true,
+      type: 'company_direct',
+      companyName: compName,
       companyId: compId,
-      assignedTasks: [],
-      createdDate: new Date().toISOString().split('T')[0]
-    };
-    await saveCollaborators([...allCollabs, defaultManager]);
-    companyCollabs = [defaultManager];
+      session: {
+        id: targetCompany.id || `admin_${compId}`,
+        email: targetCompany.email || trimmedEmail,
+        name: `${compName} (Gérant / Dirigeant)`,
+        role: adminRole,
+        companyId: compId,
+        company_id: compId,
+        companyName: compName
+      }
+    });
   }
 
   const maskedCollabs = companyCollabs.map((c: any) => ({
@@ -4758,7 +4729,7 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
     password: '********'
   }));
 
-  // Always return step 2 (collaborator_selection) so user can pick profile and enter 6-digit PIN
+  // If company has real collaborators configured, return collaborator_selection step
   return res.json({
     success: true,
     type: 'collaborator_selection',
