@@ -24,6 +24,8 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { db } from '../utils/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 // Fix Leaflet default marker assets in Vite/React
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -67,8 +69,12 @@ export interface CompanySummary {
   users: ActiveSession[];
 }
 
-// Tunisian city coordinate lookup for dynamic map beacon positioning
+// Tunisian city coordinate lookup for dynamic map beacon positioning fallback
 const CITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  ezzahra: { lat: 36.74865, lng: 10.31030 },
+  'ez-zahra': { lat: 36.74865, lng: 10.31030 },
+  zahra: { lat: 36.74865, lng: 10.31030 },
+  'ben arous': { lat: 36.7531, lng: 10.2189 },
   ariana: { lat: 36.8625, lng: 10.1956 },
   tunis: { lat: 36.8329, lng: 10.3013 },
   lac: { lat: 36.8329, lng: 10.3013 },
@@ -89,6 +95,7 @@ function resolveDynamicGeo(
   normKey: string,
   companySettingsProp: any,
   fetchedSettingsState: any,
+  fetchedAttendanceSettingsState: any,
   firstSession?: ActiveSession
 ) {
   const isInterAffaires = normKey.includes('INTER') || normKey.includes('AFFAIRE');
@@ -103,30 +110,77 @@ function resolveDynamicGeo(
     } catch (_e) {}
   }
 
-  const configuredCityZip = settings?.cityZipCode || settings?.city || '';
-  const configuredAddress = settings?.companyAddress || settings?.address || '';
+  // Retrieve locations list from attendance_settings or localStorage
+  let locations: any[] = [];
+  if (fetchedAttendanceSettingsState?.companyLocations && Array.isArray(fetchedAttendanceSettingsState.companyLocations)) {
+    locations = fetchedAttendanceSettingsState.companyLocations;
+  }
+  if (locations.length === 0 && typeof localStorage !== 'undefined') {
+    try {
+      const savedLocs = localStorage.getItem('elyssa_company_locations');
+      if (savedLocs) {
+        const parsed = JSON.parse(savedLocs);
+        if (Array.isArray(parsed) && parsed.length > 0) locations = parsed;
+      }
+    } catch (_e) {}
+  }
+
+  // Find maman location (site mère / GPS de pointage principal)
+  const mamanLoc = locations.find((l: any) => l.isMaman || l.id === 'loc-maman') || locations[0];
+
+  // 1. Explicit GPS numbers from pointage/geofencing or company settings
+  let explicitLat: number | null = null;
+  let explicitLng: number | null = null;
+
+  if (mamanLoc && typeof mamanLoc.lat === 'number' && typeof mamanLoc.lng === 'number' && mamanLoc.lat !== 0) {
+    explicitLat = mamanLoc.lat;
+    explicitLng = mamanLoc.lng;
+  } else if (settings?.lat && settings?.lng && typeof settings.lat === 'number' && typeof settings.lng === 'number') {
+    explicitLat = settings.lat;
+    explicitLng = settings.lng;
+  } else if (settings?.mamanGps?.lat && settings?.mamanGps?.lng) {
+    explicitLat = Number(settings.mamanGps.lat);
+    explicitLng = Number(settings.mamanGps.lng);
+  } else if (firstSession?.lat && firstSession?.lng && typeof firstSession.lat === 'number') {
+    explicitLat = firstSession.lat;
+    explicitLng = firstSession.lng;
+  }
+
+  // Extract address and city labels dynamically
+  const configuredCityZip = mamanLoc?.city || mamanLoc?.name || settings?.cityZipCode || settings?.city || '';
+  const configuredAddress = mamanLoc?.address || settings?.companyAddress || settings?.address || '';
 
   let displayCity = '';
-  if (configuredCityZip) {
+  if (mamanLoc?.city || mamanLoc?.name) {
+    displayCity = mamanLoc.city ? `${mamanLoc.city} (${mamanLoc.name || 'Siège'})` : mamanLoc.name;
+  } else if (configuredCityZip) {
     displayCity = configuredCityZip;
   } else if (configuredAddress) {
     displayCity = configuredAddress;
   } else if (firstSession?.city) {
     displayCity = firstSession.city;
   } else {
-    displayCity = isGep ? 'Ariana (Dépôt Central GEP)' : 'Tunis';
+    displayCity = isGep ? 'Ariana (Dépôt Central GEP)' : 'Ezzahra (Siège Inter-Affaires)';
   }
 
-  const searchStr = `${displayCity} ${configuredAddress} ${configuredCityZip}`.toLowerCase();
-  let lat = firstSession?.lat || (isGep ? 36.8625 : 36.8329);
-  let lng = firstSession?.lng || (isGep ? 10.1956 : 10.3013);
+  // Determine final GPS coordinates (explicit or city lookup fallback)
+  let finalLat = explicitLat;
+  let finalLng = explicitLng;
 
-  for (const [cityName, coords] of Object.entries(CITY_COORDINATES)) {
-    if (searchStr.includes(cityName)) {
-      lat = coords.lat;
-      lng = coords.lng;
-      break;
+  if (finalLat === null || finalLng === null) {
+    const searchStr = `${displayCity} ${configuredAddress} ${configuredCityZip}`.toLowerCase();
+    for (const [cityName, coords] of Object.entries(CITY_COORDINATES)) {
+      if (searchStr.includes(cityName)) {
+        finalLat = coords.lat;
+        finalLng = coords.lng;
+        break;
+      }
     }
+  }
+
+  if (finalLat === null || finalLng === null) {
+    finalLat = isGep ? 36.8625 : 36.74865;
+    finalLng = isGep ? 10.1956 : 10.31030;
   }
 
   const packStatus = isInterAffaires 
@@ -140,8 +194,8 @@ function resolveDynamicGeo(
   return {
     city: displayCity,
     address: configuredAddress,
-    lat,
-    lng,
+    lat: finalLat,
+    lng: finalLng,
     packStatus,
     defaultIp
   };
@@ -249,17 +303,56 @@ interface RadarDashboardProps {
 export default function RadarDashboard({ companyName, tenantId, companySettings }: RadarDashboardProps = {}) {
   const [rawSessions, setRawSessions] = useState<ActiveSession[]>([]);
   const [fetchedSettings, setFetchedSettings] = useState<any>(null);
+  const [attendanceSettings, setAttendanceSettings] = useState<any>(null);
+  const [localLocationsTrigger, setLocalLocationsTrigger] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [directScrollZoom, setDirectScrollZoom] = useState(false);
   const [logs, setLogs] = useState<string[]>([
     `[${new Date().toLocaleTimeString('fr-FR')}] PROTOCOLE ACCES : Initialisation Radar Leaflet Multi-Entreprises...`,
-    `[${new Date().toLocaleTimeString('fr-FR')}] PROTOCOLE ACCES : Connexion au flux temps réel des sessions actives...`
+    `[${new Date().toLocaleTimeString('fr-FR')}] PROTOCOLE ACCES : Synchronisation GPS Mère (Pointage & Géofencing)...`
   ]);
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  // Load admin settings from backend API as fallback
+  // 1. Subscribe in real time to Firestore 'attendance_settings' for dynamic GPS updates
+  useEffect(() => {
+    const activeDocId = (tenantId || companyName || 'inter-affaires').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const docRef = doc(db, 'attendance_settings', activeDocId);
+
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setAttendanceSettings(data);
+        if (data.companyLocations && Array.isArray(data.companyLocations)) {
+          const maman = data.companyLocations.find((l: any) => l.isMaman || l.id === 'loc-maman') || data.companyLocations[0];
+          if (maman) {
+            const timeStr = new Date().toLocaleTimeString('fr-FR');
+            setLogs(prev => [...prev.slice(-30), `[${timeStr}] SYNC GPS FIRESTORE : Position Mère [${maman.name || 'Siège'}] = ${maman.lat}°N, ${maman.lng}°E (${maman.city || maman.address || 'Pointage'})`]);
+          }
+        }
+      }
+    }, (err) => {
+      console.warn("Firestore attendance_settings listener warning:", err);
+    });
+
+    return () => unsubscribe();
+  }, [tenantId, companyName]);
+
+  // 2. Listen to local storage & custom window events for immediate location updates
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setLocalLocationsTrigger(prev => prev + 1);
+    };
+    window.addEventListener('elyssa_locations_updated', handleLocationChange);
+    window.addEventListener('storage', handleLocationChange);
+    return () => {
+      window.removeEventListener('elyssa_locations_updated', handleLocationChange);
+      window.removeEventListener('storage', handleLocationChange);
+    };
+  }, []);
+
+  // 3. Load admin settings from backend API as fallback
   useEffect(() => {
     const loadAdminSettings = async () => {
       try {
@@ -308,6 +401,7 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
         normKey,
         companySettings,
         fetchedSettings,
+        attendanceSettings,
         group.sessions[0]
       );
 
@@ -335,15 +429,22 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
     });
 
     return result;
-  }, [rawSessions, companySettings, fetchedSettings]);
+  }, [rawSessions, companySettings, fetchedSettings, attendanceSettings, localLocationsTrigger]);
 
   const [selectedCompany, setSelectedCompany] = useState<CompanySummary | null>(null);
 
-  // Sync selection to first available company if null or out of sync
+  // Sync selection to first available company or update coordinates of currently selected company
   useEffect(() => {
     if (companySummaries.length > 0) {
-      if (!selectedCompany || !companySummaries.some(c => c.id === selectedCompany.id || c.companyName === selectedCompany.companyName)) {
+      if (!selectedCompany) {
         setSelectedCompany(companySummaries[0]);
+      } else {
+        const updated = companySummaries.find(c => c.id === selectedCompany.id || c.companyName === selectedCompany.companyName);
+        if (updated) {
+          setSelectedCompany(updated);
+        } else {
+          setSelectedCompany(companySummaries[0]);
+        }
       }
     } else {
       setSelectedCompany(null);
@@ -394,11 +495,6 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
     return companySummaries.reduce((acc, c) => acc + c.activeUsersCount, 0);
   }, [companySummaries]);
 
-  const avgGlobalPing = useMemo(() => {
-    if (companySummaries.length === 0) return 12;
-    return Math.round(companySummaries.reduce((acc, c) => acc + c.avgPing, 0) / companySummaries.length);
-  }, [companySummaries]);
-
   return (
     <div className="space-y-6 font-sans animate-fadeIn">
       {/* Upper Navigation / Status Header Bar */}
@@ -418,7 +514,7 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
             </span>
           </div>
           <p className="text-xs text-slate-400 font-medium">
-            Surveillance géographique et réseau des locataires actifs sur la plateforme Elyssa ERP.
+            Surveillance géographique, réseau et géofencing GPS des locataires actifs sur Elyssa ERP.
           </p>
         </div>
 
@@ -520,12 +616,12 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
                     </p>
                   </div>
 
-                  <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 space-y-0.5">
-                    <span className="text-[10px] text-slate-400 block flex items-center gap-1">
-                      <Globe2 className="w-3 h-3 text-sky-400" /> Coordonnées GPS
+                  <div className="bg-slate-950/80 p-2.5 rounded-xl border border-indigo-500/40 bg-indigo-950/20 space-y-0.5">
+                    <span className="text-[10px] text-indigo-300 block flex items-center gap-1 font-bold">
+                      <Globe2 className="w-3 h-3 text-emerald-400" /> Coordonnées GPS
                     </span>
-                    <p className="font-bold text-slate-200 font-mono text-[11px]">
-                      {selectedCompany.lat.toFixed(4)}°N, {selectedCompany.lng.toFixed(4)}°E
+                    <p className="font-extrabold text-emerald-400 font-mono text-[11px]">
+                      {selectedCompany.lat.toFixed(5)}°N, {selectedCompany.lng.toFixed(5)}°E
                     </p>
                   </div>
                 </div>
@@ -587,7 +683,7 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
                           {comp.activeUsersCount} sess.
                         </span>
                         <span className="block text-[10px] text-emerald-400 font-mono font-bold">
-                          {comp.avgPing}ms
+                          {comp.lat.toFixed(3)}°, {comp.lng.toFixed(3)}°
                         </span>
                       </div>
                     </button>
@@ -607,7 +703,7 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
             <div className="flex items-center justify-between text-[11px] pb-2 border-b border-slate-800/80">
               <div className="flex items-center space-x-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></span>
-                <span className="text-slate-300 font-medium">Pastille Verte = Entreprise connectée / Pack Actif</span>
+                <span className="text-slate-300 font-medium">Pastille Verte = GPS Calibré & En ligne</span>
               </div>
             </div>
 
@@ -633,7 +729,7 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
             <div className="flex items-center space-x-2">
               <Layers className="w-4 h-4 text-indigo-400" />
               <span className="font-black text-slate-200 tracking-wide">
-                MOTEUR CARTO LEAFLET // TUILES CARTO POSITRON (LIGHT)
+                MOTEUR CARTO LEAFLET // SUIVI GPS MULTI-SITES EN TEMPS RÉEL
               </span>
             </div>
 
@@ -657,8 +753,8 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
           {/* Leaflet Map Canvas */}
           <div className="w-full flex-1 rounded-xl overflow-hidden border border-slate-800 relative z-10 min-h-[500px]">
             <MapContainer
-              center={[35.8, 10.2]}
-              zoom={7.5}
+              center={[selectedCompany?.lat || 36.74865, selectedCompany?.lng || 10.31030]}
+              zoom={10}
               scrollWheelZoom={directScrollZoom}
               style={{ height: '100%', width: '100%', minHeight: '500px' }}
               zoomControl={true}
@@ -702,7 +798,7 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
                             {comp.companyName}
                           </span>
                           <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-300">
-                            ● EN LIGNE
+                            ● GPS ACTIF
                           </span>
                         </div>
 
@@ -711,6 +807,10 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
                           <p className="flex items-center gap-1 text-slate-600 font-medium">
                             <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
                             {comp.city}
+                          </p>
+                          <p className="flex items-center gap-1 text-slate-900 font-mono font-bold">
+                            <Globe2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                            GPS: {comp.lat.toFixed(5)}°N, {comp.lng.toFixed(5)}°E
                           </p>
                           <p className="flex items-center gap-1 text-slate-600 font-mono">
                             <Server className="w-3 h-3 text-slate-500 shrink-0" />
