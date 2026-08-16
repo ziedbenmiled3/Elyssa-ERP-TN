@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeFirestore, getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, setLogLevel } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, setLogLevel } from 'firebase/firestore';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -151,6 +151,90 @@ export const getPointages = async (currentCompanyId: string): Promise<any[]> => 
   } catch (error) {
     console.error("Erreur lors de la récupération sécurisée des pointages :", error);
     throw error;
+  }
+};
+
+/**
+ * Persistent and effective company deletion in Firestore and server DB.
+ * Deletes company document from 'companies', 'publisher_clients',
+ * and all related orphaned collections (collaborators, attendance_settings, etc.)
+ */
+export const deleteCompanyFromDb = async (targetCompanyId: string, companyName?: string) => {
+  if (!targetCompanyId) return;
+
+  console.log(`[deleteCompanyFromDb] Starting persistent deletion for ID: ${targetCompanyId}, Name: ${companyName}`);
+
+  // 1. Direct Firestore SDK Deletion
+  if (db) {
+    try {
+      // Delete document from 'companies'
+      await deleteDoc(doc(db, 'companies', targetCompanyId)).catch(e => console.warn('Firestore companies delete warning:', e));
+      if (companyName) {
+        await deleteDoc(doc(db, 'companies', companyName)).catch(() => {});
+        await deleteDoc(doc(db, 'companies', companyName.toLowerCase())).catch(() => {});
+      }
+
+      // Delete document from 'publisher_clients'
+      await deleteDoc(doc(db, 'publisher_clients', targetCompanyId)).catch(e => console.warn('Firestore publisher_clients delete warning:', e));
+
+      // Set tombstone in 'deleted_companies'
+      await setDoc(doc(db, 'deleted_companies', targetCompanyId), {
+        id: targetCompanyId,
+        companyName: companyName || targetCompanyId,
+        deletedAt: new Date().toISOString()
+      }).catch(e => console.warn('deleted_companies record warning:', e));
+
+      // Clean up orphaned records in linked collections
+      const relatedCols = ['collaborators', 'attendance_settings', 'active_sessions', 'licence_requests', 'company_settings'];
+      for (const colName of relatedCols) {
+        try {
+          const colRef = collection(db, colName);
+          const qId = query(colRef, where('companyId', '==', targetCompanyId));
+          const snapId = await getDocs(qId).catch(() => null);
+          if (snapId && !snapId.empty) {
+            for (const d of snapId.docs) {
+              await deleteDoc(doc(db, colName, d.id)).catch(() => {});
+            }
+          }
+
+          const qCompId = query(colRef, where('company_id', '==', targetCompanyId));
+          const snapCompId = await getDocs(qCompId).catch(() => null);
+          if (snapCompId && !snapCompId.empty) {
+            for (const d of snapCompId.docs) {
+              await deleteDoc(doc(db, colName, d.id)).catch(() => {});
+            }
+          }
+
+          if (companyName) {
+            const qComp = query(colRef, where('company', '==', companyName));
+            const snapComp = await getDocs(qComp).catch(() => null);
+            if (snapComp && !snapComp.empty) {
+              for (const d of snapComp.docs) {
+                await deleteDoc(doc(db, colName, d.id)).catch(() => {});
+              }
+            }
+          }
+        } catch (colErr) {
+          console.warn(`Clean up warning for collection ${colName}:`, colErr);
+        }
+      }
+    } catch (fsErr) {
+      console.error("Firestore SDK company deletion error:", fsErr);
+    }
+  }
+
+  // 2. Server API Deletion call
+  try {
+    const res = await fetch('/api/db/delete-company', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: targetCompanyId, companyName })
+    });
+    if (!res.ok) {
+      console.warn("Server delete-company returned status:", res.status);
+    }
+  } catch (apiErr) {
+    console.warn("API delete-company call warning:", apiErr);
   }
 };
 

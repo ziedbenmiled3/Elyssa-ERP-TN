@@ -101,6 +101,16 @@ service cloud.firestore {
     match /publisher_keys/{keyId} {
       allow read, write: if true;
     }
+
+    // Deleted Companies Tombstones
+    match /deleted_companies/{companyId} {
+      allow read, write: if true;
+    }
+
+    // Active Sessions
+    match /active_sessions/{sessionId} {
+      allow read, write: if true;
+    }
   }
 }
 

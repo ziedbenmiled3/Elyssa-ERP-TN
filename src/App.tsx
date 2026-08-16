@@ -1812,29 +1812,7 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Permanently prune pc-inter-affaires and ABK (the test client that user wants to delete)
-          let filtered = parsed.filter((c: any) => {
-            if (!c) return false;
-            
-            const sessionStr = localStorage.getItem('carthage_session');
-            if (sessionStr) {
-              try {
-                const session = JSON.parse(sessionStr);
-                if (session && (session.companyId === c.id || session.companyName === c.companyName)) {
-                  return true;
-                }
-              } catch (e) {}
-            }
-
-            const nameUpper = String(c.companyName || '').trim().toUpperCase();
-            const idLower = String(c.id || '').toLowerCase();
-            const isGep = nameUpper === 'GEP' || idLower.includes('gep') || c.id === 'pc-1784366783440';
-            const isParent = nameUpper === 'INTER-AFFAIRES' || nameUpper === 'ELYSSA ENTREPRISES S.A.' || idLower.includes('interaffaires') || c.id === 'pc-parent-elyssa';
-
-            return isGep || isParent;
-          });
-          
-          localStorage.setItem('carthage_publisher_clients', JSON.stringify(filtered));
+          let filtered = parsed.filter((c: any) => c && (c.id || c.companyName));
           return filtered;
         }
       }

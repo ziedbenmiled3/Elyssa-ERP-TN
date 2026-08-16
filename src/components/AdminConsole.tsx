@@ -8,7 +8,7 @@ import corporateLogo from '../assets/images/elyssa_corporate_logo_1782209702209.
 import faviconLogo from '../assets/images/elyssa_favicon_icon_1782209720262.jpg';
 import { AdminSettings, Client, Complaint, Invoice, VisitReport, CompetitorReport, CollaboratorAccount, UserSession } from '../types';
 import CollaboratorConsole from './CollaboratorConsole';
-import { saveCompanyERPState, loadCompanyERPState, db } from '../utils/firebase';
+import { saveCompanyERPState, loadCompanyERPState, deleteCompanyFromDb, db } from '../utils/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import SecurityDashboard from './SecurityDashboard';
 import RadarDashboard from './RadarDashboard';
@@ -48,7 +48,8 @@ import {
   RefreshCw,
   Sparkles,
   Smartphone,
-  Layers
+  Layers,
+  Loader2
 } from 'lucide-react';
 
 interface AdminConsoleProps {
@@ -130,6 +131,7 @@ export default function AdminConsole({
 
   // Company management states
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [isDeletingCompany, setIsDeletingCompany] = useState<boolean>(false);
   const [editingCompanyPassword, setEditingCompanyPassword] = useState<string>('');
   const [editingCollaboratorId, setEditingCollaboratorId] = useState<string>('');
   const [editingCollaboratorPassword, setEditingCollaboratorPassword] = useState<string>('');
@@ -795,20 +797,24 @@ export default function AdminConsole({
 
   const handleDeleteCompanySubmit = async () => {
     if (!selectedCompanyId) return;
-    if (window.confirm("⚠️ Êtes-vous sûr de vouloir supprimer définitivement cette entreprise ? Cette action supprimera sa fiche d'identité ainsi que ses droits d'accès.")) {
-      const updatedList = publisherClientsList.filter(c => 
-        c.id !== selectedCompanyId && c.company_id !== selectedCompanyId
-      );
+    const targetComp = publisherClientsList.find(c => 
+      c.id === selectedCompanyId || c.company_id === selectedCompanyId || c.companyName === selectedCompanyId
+    );
+    const companyName = targetComp?.companyName || '';
 
-      try {
-        await fetch('/api/db/delete-company', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: selectedCompanyId })
-        });
-      } catch (err) {
-        console.warn("API delete-company warning:", err);
-      }
+    if (!window.confirm(`⚠️ Êtes-vous sûr de vouloir supprimer définitivement cette entreprise ${companyName ? `(${companyName})` : ''} ? Cette action supprimera sa fiche d'identité ainsi que tous ses droits d'accès.`)) {
+      return;
+    }
+
+    try {
+      setIsDeletingCompany(true);
+      await deleteCompanyFromDb(selectedCompanyId, companyName);
+
+      const updatedList = publisherClientsList.filter(c => 
+        c.id !== selectedCompanyId && 
+        c.company_id !== selectedCompanyId &&
+        (companyName ? c.companyName?.toLowerCase() !== companyName.toLowerCase() : true)
+      );
 
       setPublisherClientsList(updatedList);
       localStorage.setItem('carthage_publisher_clients', JSON.stringify(updatedList));
@@ -817,7 +823,12 @@ export default function AdminConsole({
         onUpdatePublisherClients(updatedList);
       }
       setSelectedCompanyId('');
-      alert("Entreprise supprimée avec succès !");
+      alert("Entreprise supprimée définitivement avec succès !");
+    } catch (error) {
+      console.error("Erreur lors de la suppression de l'entreprise:", error);
+      alert("Erreur lors de la suppression en base de données.");
+    } finally {
+      setIsDeletingCompany(false);
     }
   };
 
@@ -1782,11 +1793,21 @@ export default function AdminConsole({
                     {!isCreatingNew ? (
                       <button
                         type="button"
+                        disabled={isDeletingCompany}
                         onClick={handleDeleteCompanySubmit}
-                        className="flex items-center space-x-1.5 p-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-xs rounded-lg transition cursor-pointer"
+                        className="flex items-center space-x-1.5 p-2 px-3 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 font-extrabold text-xs rounded-lg transition cursor-pointer"
                       >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Supprimer l'Entreprise</span>
+                        {isDeletingCompany ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+                            <span>Suppression en cours...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="w-4 h-4" />
+                            <span>Supprimer l'Entreprise</span>
+                          </>
+                        )}
                       </button>
                     ) : (
                       <div />

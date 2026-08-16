@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { loadSaaSBankConfig, saveSaaSBankConfig } from '../utils/firebase';
+import { loadSaaSBankConfig, saveSaaSBankConfig, deleteCompanyFromDb } from '../utils/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import SaaSInvoiceModal from './SaaSInvoiceModal';
 import EvaluationGuideComponent from './EvaluationGuideComponent';
@@ -2155,10 +2155,16 @@ export default function SaaSConfig({
     }
   };
 
-  const confirmDeletePublisherClient = () => {
+  const confirmDeletePublisherClient = async () => {
     if (clientToDelete) {
       const targetName = clientToDelete.companyName?.toLowerCase();
       const targetId = clientToDelete.id;
+
+      try {
+        await deleteCompanyFromDb(targetId, clientToDelete.companyName);
+      } catch (err) {
+        console.warn("deleteCompanyFromDb error in SaaSConfig:", err);
+      }
 
       const updated = publisherClients.filter(c => 
         c.id !== targetId && 
@@ -2193,8 +2199,8 @@ export default function SaaSConfig({
         if (targetName) localStorage.removeItem(`carthage_purchased_modules_${targetName}`);
       }
 
-      setClientToDelete(null);
       setSimulationAlert(`Le compte entreprise "${clientToDelete.companyName}", ses collaborateurs associés et toutes ses commandes en attente ont été définitivement purgés.`);
+      setClientToDelete(null);
       setTimeout(() => setSimulationAlert(null), 4500);
     }
   };

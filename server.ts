@@ -136,11 +136,50 @@ setInterval(() => {
 
 // Persistent Storage File Paths
 const CLIENTS_FILE_PATH = path.join(process.cwd(), 'data_publisher_clients.json');
+const DELETED_COMPANIES_FILE_PATH = path.join(process.cwd(), 'data_deleted_companies.json');
 const COLLABORATORS_FILE_PATH = path.join(process.cwd(), 'data_collaborators.json');
 const LICENCE_REQUESTS_FILE_PATH = path.join(process.cwd(), 'data_licence_requests.json');
 const PUBLISHER_KEYS_FILE_PATH = path.join(process.cwd(), 'data_publisher_keys.json');
 const ADMIN_ALERTS_FILE_PATH = path.join(process.cwd(), 'data_admin_alerts.json');
 const ADMIN_SETTINGS_FILE_PATH = path.join(process.cwd(), 'data_admin_settings.json');
+
+function getDeletedCompanyKeys(): Set<string> {
+  const deletedSet = new Set<string>();
+  try {
+    if (fs.existsSync(DELETED_COMPANIES_FILE_PATH)) {
+      const data = JSON.parse(fs.readFileSync(DELETED_COMPANIES_FILE_PATH, 'utf-8'));
+      if (Array.isArray(data)) {
+        data.forEach((item: any) => {
+          if (item) {
+            if (item.id) deletedSet.add(String(item.id).toLowerCase().trim());
+            if (item.companyName) deletedSet.add(String(item.companyName).toLowerCase().trim());
+          }
+        });
+      }
+    }
+  } catch (e) {}
+  return deletedSet;
+}
+
+function recordCompanyDeletionInServer(id: string, companyName?: string) {
+  try {
+    let current: any[] = [];
+    if (fs.existsSync(DELETED_COMPANIES_FILE_PATH)) {
+      try {
+        current = JSON.parse(fs.readFileSync(DELETED_COMPANIES_FILE_PATH, 'utf-8')) || [];
+      } catch (e) {}
+    }
+    const targetIdLower = String(id).toLowerCase().trim();
+    const targetNameLower = companyName ? String(companyName).toLowerCase().trim() : '';
+
+    if (!current.some((c: any) => String(c.id).toLowerCase().trim() === targetIdLower)) {
+      current.push({ id, companyName: companyName || id, deletedAt: new Date().toISOString() });
+      fs.writeFileSync(DELETED_COMPANIES_FILE_PATH, JSON.stringify(current, null, 2), 'utf-8');
+    }
+  } catch (e) {
+    console.warn("recordCompanyDeletionInServer error:", e);
+  }
+}
 
 // Initialize Firebase SDK for Cloud Firestore (Client SDK used on server to avoid GCP IAM credential restrictions)
 let db: any = null;
@@ -896,7 +935,7 @@ async function purgeNonGepTestCompanies() {
       }
     }
 
-    // 3. Keep only GEP and Inter-Affaires in data_publisher_clients.json
+    // 3. Keep only GEP and Inter-Affaires in data_publisher_clients.json (unless deleted)
     const cleanLocal = [
       {
         "location": "12 Avenue 2 Mars, Borj Baccouche Ariana",
@@ -941,7 +980,14 @@ async function purgeNonGepTestCompanies() {
         "joinedDate": "2026-06-22"
       }
     ];
-    fs.writeFileSync(CLIENTS_FILE_PATH, JSON.stringify(cleanLocal, null, 2), 'utf-8');
+
+    const deletedKeys = getDeletedCompanyKeys();
+    const cleanLocalFiltered = cleanLocal.filter(c => {
+      const cId = String(c.id || '').toLowerCase().trim();
+      const cName = String(c.companyName || '').toLowerCase().trim();
+      return !deletedKeys.has(cId) && !deletedKeys.has(cName);
+    });
+    fs.writeFileSync(CLIENTS_FILE_PATH, JSON.stringify(cleanLocalFiltered, null, 2), 'utf-8');
 
   } catch (err) {
     console.error("Error in purgeNonGepTestCompanies:", err);
@@ -956,6 +1002,7 @@ const DEFAULT_PRESET_CLIENTS = [
 async function getPublisherClients(): Promise<any[]> {
   const list: any[] = [];
   const seenNames = new Set<string>();
+  const deletedKeys = getDeletedCompanyKeys();
 
   await ensureFirebaseAuth();
   if (isFirestoreActive && db) {
@@ -1015,15 +1062,22 @@ async function getPublisherClients(): Promise<any[]> {
     }
   }
 
-  // Merge default preset clients if missing
+  // Merge default preset clients if missing and NOT deleted
   for (const preset of DEFAULT_PRESET_CLIENTS) {
-    if (!seenNames.has(preset.companyName.toLowerCase())) {
-      seenNames.add(preset.companyName.toLowerCase());
+    const pId = preset.id.toLowerCase().trim();
+    const pName = preset.companyName.toLowerCase().trim();
+    if (!deletedKeys.has(pId) && !deletedKeys.has(pName) && !seenNames.has(pName)) {
+      seenNames.add(pName);
       list.push(preset);
     }
   }
 
-  return list;
+  // Filter out any deleted companies
+  return list.filter((c: any) => {
+    const cId = String(c.id || c.company_id || '').toLowerCase().trim();
+    const cName = String(c.companyName || c.name || '').toLowerCase().trim();
+    return !deletedKeys.has(cId) && !deletedKeys.has(cName);
+  });
 }
 
 async function savePublisherClients(data: any[]): Promise<boolean> {
@@ -3157,22 +3211,82 @@ app.post('/api/db/admin/delete-collaborator', async (req, res) => {
 });
 
 app.post('/api/db/delete-company', async (req, res) => {
-  const { id } = req.body;
+  const { id, companyName } = req.body;
   if (!id) {
     return res.status(400).json({ error: "L'identifiant de l'entreprise est requis." });
   }
 
   try {
-    const clients = await getPublisherClients();
-    const filteredClients = clients.filter((c: any) => c.id !== id);
-    if (filteredClients.length === clients.length) {
-      return res.status(404).json({ error: "Entreprise introuvable." });
+    const targetIdLower = String(id).toLowerCase().trim();
+    const targetNameLower = companyName ? String(companyName).toLowerCase().trim() : '';
+
+    // 1. Record in server deleted tracker
+    recordCompanyDeletionInServer(id, companyName);
+
+    // 2. Filter local JSON storage
+    const localClients = readJsonFile(CLIENTS_FILE_PATH, []);
+    if (Array.isArray(localClients)) {
+      const filtered = localClients.filter((c: any) => {
+        const cId = String(c.id || c.company_id || '').toLowerCase().trim();
+        const cName = String(c.companyName || c.name || '').toLowerCase().trim();
+        if (cId === targetIdLower) return false;
+        if (targetNameLower && cName === targetNameLower) return false;
+        return true;
+      });
+      writeJsonFile(CLIENTS_FILE_PATH, filtered);
     }
 
-    await savePublisherClients(filteredClients);
-    res.json({ success: true, message: "L'entreprise a été supprimée avec succès !" });
+    // 3. Delete from Firestore SDK across all collections
+    await ensureFirebaseAuth();
+    if (isFirestoreActive && db) {
+      const deletions: Promise<any>[] = [];
+
+      // Delete from publisher_clients
+      deletions.push(withTimeout(deleteDoc(doc(db, 'publisher_clients', id)), 5000).catch(() => {}));
+      if (companyName) {
+        deletions.push(withTimeout(deleteDoc(doc(db, 'publisher_clients', companyName)), 5000).catch(() => {}));
+      }
+
+      // Delete from companies
+      deletions.push(withTimeout(deleteDoc(doc(db, 'companies', id)), 5000).catch(() => {}));
+      if (companyName) {
+        deletions.push(withTimeout(deleteDoc(doc(db, 'companies', companyName)), 5000).catch(() => {}));
+      }
+
+      // Record tombstone in deleted_companies
+      deletions.push(withTimeout(setDoc(doc(db, 'deleted_companies', id), {
+        id,
+        companyName: companyName || id,
+        deletedAt: new Date().toISOString()
+      }), 5000).catch(() => {}));
+
+      // Delete linked documents in subcollections
+      const subCols = ['collaborators', 'attendance_settings', 'active_sessions', 'licence_requests', 'company_erp_data', 'company_erp_modules', 'company_settings'];
+      for (const colName of subCols) {
+        try {
+          const colSnap = await withTimeout(getDocs(collection(db, colName)), 5000).catch(() => null);
+          if (colSnap && !colSnap.empty) {
+            colSnap.forEach((docSnap: any) => {
+              const data = docSnap.data();
+              const dCompId = String(data.companyId || data.company_id || docSnap.id).toLowerCase().trim();
+              const dCompName = String(data.company || data.companyName || '').toLowerCase().trim();
+
+              if (dCompId === targetIdLower || (targetNameLower && dCompName === targetNameLower)) {
+                deletions.push(withTimeout(deleteDoc(doc(db, colName, docSnap.id)), 4000).catch(() => {}));
+              }
+            });
+          }
+        } catch (errCol) {
+          console.warn(`Subcol purge warning for ${colName}:`, errCol);
+        }
+      }
+
+      await Promise.allSettled(deletions);
+    }
+
+    res.json({ success: true, message: "L'entreprise a été supprimée définitivement avec succès !" });
   } catch (err: any) {
-    console.error(err);
+    console.error("Error in /api/db/delete-company:", err);
     res.status(500).json({ error: "Erreur lors de la suppression de l'entreprise : " + err.message });
   }
 });
