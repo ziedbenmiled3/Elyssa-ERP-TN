@@ -4582,7 +4582,13 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
     });
   }
 
-  // 2. Locate target Company (Fiche Entreprise) strictly in companies collection / publisher_clients / local data
+  // Get set of deleted company keys (IDs and Names)
+  const deletedKeys = getDeletedCompanyKeys();
+  if (deletedKeys.has(trimmedEmail) || (deletedKeys.has('gep') && (trimmedEmail.includes('gep') || trimmedEmail.includes('mondhali')))) {
+    return res.status(401).json({ error: "Entreprise introuvable ou compte résilié." });
+  }
+
+  // 2. Locate target Company (Fiche Entreprise) strictly in companies collection / publisher_clients
   let targetCompany: any = null;
 
   if (isFirestoreActive && db) {
@@ -4592,11 +4598,16 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
         snap.forEach((docSnap: any) => {
           if (targetCompany) return;
           const data = docSnap.data();
-          const cId = docSnap.id;
-          const cName = (data.companyName || data.name || '').toLowerCase();
-          const cEmail = (data.email || data.companyEmail || '').toLowerCase();
-          if (cEmail === trimmedEmail || cName === trimmedEmail || cId.toLowerCase() === trimmedEmail) {
-            targetCompany = { ...data, id: cId, company_id: cId, companyName: data.companyName || data.name || 'Entreprise' };
+          const cId = String(docSnap.id || '').toLowerCase().trim();
+          const cName = String(data.companyName || data.name || '').toLowerCase().trim();
+          const cEmail = String(data.email || data.companyEmail || '').toLowerCase().trim();
+
+          if (deletedKeys.has(cId) || deletedKeys.has(cName) || deletedKeys.has(cEmail)) {
+            return; // Skip deleted companies
+          }
+
+          if (cEmail === trimmedEmail || cName === trimmedEmail || cId === trimmedEmail) {
+            targetCompany = { ...data, id: docSnap.id, company_id: docSnap.id, companyName: data.companyName || data.name || 'Entreprise' };
           }
         });
       }
@@ -4608,12 +4619,14 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
   if (!targetCompany) {
     try {
       const clients = await getPublisherClients();
-      const match = clients.find((c: any) => 
-        c.email?.toLowerCase() === trimmedEmail || 
-        c.companyEmail?.toLowerCase() === trimmedEmail ||
-        c.companyName?.toLowerCase() === trimmedEmail ||
-        c.id?.toLowerCase() === trimmedEmail
-      );
+      const match = clients.find((c: any) => {
+        const cId = String(c.id || '').toLowerCase().trim();
+        const cName = String(c.companyName || c.name || '').toLowerCase().trim();
+        const cEmail = String(c.email || c.companyEmail || '').toLowerCase().trim();
+        if (deletedKeys.has(cId) || deletedKeys.has(cName) || deletedKeys.has(cEmail)) return false;
+
+        return cEmail === trimmedEmail || cName === trimmedEmail || cId === trimmedEmail;
+      });
       if (match) {
         targetCompany = { ...match, company_id: match.id, companyName: match.companyName || match.name || 'Entreprise' };
       }
@@ -4628,20 +4641,14 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
         const targetCompId = matchCollab.company_id || matchCollab.companyId;
         const targetCompName = matchCollab.company;
         const clients = await getPublisherClients();
-        const compMatch = clients.find((c: any) => 
-          (targetCompId && c.id === targetCompId) || 
-          (targetCompName && c.companyName?.toLowerCase() === targetCompName.toLowerCase())
-        );
+        const compMatch = clients.find((c: any) => {
+          const cId = String(c.id || '').toLowerCase().trim();
+          const cName = String(c.companyName || '').toLowerCase().trim();
+          if (deletedKeys.has(cId) || deletedKeys.has(cName)) return false;
+          return (targetCompId && c.id === targetCompId) || (targetCompName && c.companyName?.toLowerCase() === targetCompName.toLowerCase());
+        });
         if (compMatch) {
           targetCompany = { ...compMatch, company_id: compMatch.id, companyName: compMatch.companyName || 'Entreprise' };
-        } else {
-          targetCompany = {
-            id: targetCompId || 'pc-parent-elyssa',
-            company_id: targetCompId || 'pc-parent-elyssa',
-            companyName: targetCompName || 'Inter-Affaires',
-            email: matchCollab.email,
-            password: 'bochra1985'
-          };
         }
       }
     } catch (e) {}
@@ -4657,8 +4664,9 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
     };
   }
 
+  // Strict rejection: If company is not found or deleted, interrupt immediately and block Step 2
   if (!targetCompany) {
-    return res.status(401).json({ error: "Aucune entreprise trouvée avec cette adresse e-mail." });
+    return res.status(401).json({ error: "Entreprise introuvable ou compte résilié." });
   }
 
   if (targetCompany.status === 'suspended' || targetCompany.status === 'Suspended') {
@@ -4666,7 +4674,7 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
   }
 
   // 3. Strict Verification of Enterprise Global Password (Mot de Passe Global d'Entreprise)
-  const masterPasswords = ['bochra1985', 'Carthage2026!', 'Elyssa2026!', 'Carthage2226!', 'mondhali'];
+  const masterPasswords = ['bochra1985', 'Carthage2026!', 'Elyssa2026!', 'Carthage2226!'];
   const possibleCompanyPasswords = [
     targetCompany.password,
     targetCompany.companyPassword,
@@ -4743,25 +4751,33 @@ app.post('/api/auth/verify-employee', rateLimiter(30, 15 * 60 * 1000), async (re
   }
 
   const cleanInputPass = String(password).trim();
+  const deletedKeys = getDeletedCompanyKeys();
+
   const collaborators = await getStoredCollaborators();
-  let selectedProfile = collaborators.find((c: any) => c.id === employeeId || c.email?.toLowerCase() === String(employeeId).toLowerCase());
+  let selectedProfile = collaborators.find((c: any) => {
+    const cCompId = String(c.company_id || c.companyId || '').toLowerCase().trim();
+    const cCompName = String(c.company || '').toLowerCase().trim();
+    if (deletedKeys.has(cCompId) || deletedKeys.has(cCompName)) return false;
+    return c.id === employeeId || c.email?.toLowerCase() === String(employeeId).toLowerCase();
+  });
 
   if (!selectedProfile) {
     const clients = await getPublisherClients();
-    const compMatch = clients.find((c: any) => 
-      c.id === employeeId || 
-      c.companyName?.toLowerCase() === String(employeeId).toLowerCase() || 
-      c.email?.toLowerCase() === String(employeeId).toLowerCase()
-    );
+    const compMatch = clients.find((c: any) => {
+      const cId = String(c.id || '').toLowerCase().trim();
+      const cName = String(c.companyName || '').toLowerCase().trim();
+      if (deletedKeys.has(cId) || deletedKeys.has(cName)) return false;
+      return c.id === employeeId || cName === String(employeeId).toLowerCase() || c.email?.toLowerCase() === String(employeeId).toLowerCase();
+    });
 
-    if (compMatch || String(employeeId).toLowerCase().includes('gep') || String(employeeId).toLowerCase().includes('mondhali') || String(employeeId).startsWith('collab_gerant_')) {
-      const cName = compMatch ? compMatch.companyName : 'GEP';
-      const cId = compMatch ? compMatch.id : 'pc-1784366783440';
-      const cEmail = compMatch ? (compMatch.email || compMatch.companyEmail) : 'mondhali@gmail.com';
+    if (compMatch) {
+      const cName = compMatch.companyName;
+      const cId = compMatch.id;
+      const cEmail = compMatch.email || compMatch.companyEmail;
       selectedProfile = {
-        id: employeeId || 'collab_gep_manager',
+        id: employeeId || `collab_gerant_${cId}`,
         name: `${cName} (Gérant / Dirigeant)`,
-        email: cEmail || 'mondhali@gmail.com',
+        email: cEmail,
         role: 'DIRIGEANT',
         status: 'Active',
         company: cName,
@@ -4772,7 +4788,7 @@ app.post('/api/auth/verify-employee', rateLimiter(30, 15 * 60 * 1000), async (re
   }
 
   if (!selectedProfile) {
-    return res.status(404).json({ error: "Profil introuvable." });
+    return res.status(404).json({ error: "Entreprise introuvable ou compte résilié." });
   }
 
   if (selectedProfile.status === 'Suspended') {
@@ -4783,13 +4799,11 @@ app.post('/api/auth/verify-employee', rateLimiter(30, 15 * 60 * 1000), async (re
   const isManagerOrGEP = (
     selectedProfile.role === 'Manager' || 
     selectedProfile.role === 'Director' || 
-    selectedProfile.role === 'SuperAdmin' || 
-    selectedProfile.email?.toLowerCase() === 'mondhali@gmail.com' || 
-    (compName && compName.toUpperCase().includes('GEP'))
+    selectedProfile.role === 'SuperAdmin'
   );
 
   const defaultValidPins = ['123456', '000000', '112233', '445566'];
-  const masterPasswords = ['mondhali', 'bochra1985', 'Carthage2026!', 'Elyssa2026!', 'Carthage2226!'];
+  const masterPasswords = ['bochra1985', 'Carthage2026!', 'Elyssa2026!', 'Carthage2226!'];
 
   let isMatch = false;
 
