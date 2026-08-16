@@ -2394,6 +2394,7 @@ interface ActiveSession {
   name: string;
   role: string;
   company: string;
+  companyId?: string;
   activePath: string;
   ip: string;
   city: string;
@@ -2432,16 +2433,24 @@ const SIMULATED_ACTIONS = [
 ];
 
 const SIMULATED_USERS = [
-  { name: "Sami Ben Hassine", email: "sami.b@gep-tn.com", role: "SuperAdmin", company: "GEP", locationIndex: 1, activePath: "Console Administration GEP" },
-  { name: "Houda Hamdi", email: "houda.h@gep-tn.com", role: "Manager", company: "GEP", locationIndex: 0, activePath: "Pointage Biométrique & RH" },
   { name: "Bochra Belkadhi", email: "bochra.b@elyssa.pro", role: "Manager", company: "Inter-Affaires", locationIndex: 0, activePath: "Tableau de bord Trésorerie" },
-  { name: "Amel Marzouki", email: "amel.m@elyssa.pro", role: "Viewer", company: "Inter-Affaires", locationIndex: 4, activePath: "Portefeuille Clients" }
+  { name: "Amel Marzouki", email: "amel.m@elyssa.pro", role: "Viewer", company: "Inter-Affaires", locationIndex: 4, activePath: "Portefeuille Clients" },
+  { name: "Sami Ben Hassine", email: "sami.b@elyssa.pro", role: "SuperAdmin", company: "Inter-Affaires", locationIndex: 1, activePath: "Console Administration ERP" }
 ];
 
 function pruneRealSessions() {
   const now = Date.now();
+  const deletedKeys = getDeletedCompanyKeys();
   for (const id in realActiveSessions) {
-    if (now - new Date(realActiveSessions[id].lastSeen).getTime() > 45000) {
+    const sess = realActiveSessions[id];
+    if (!sess) continue;
+    const emailLower = String(sess.email || '').toLowerCase().trim();
+    const compLower = String(sess.company || '').toLowerCase().trim();
+    const compIdLower = String(sess.companyId || '').toLowerCase().trim();
+
+    if (now - new Date(sess.lastSeen).getTime() > 45000 ||
+        deletedKeys.has(emailLower) || deletedKeys.has(compLower) || deletedKeys.has(compIdLower) ||
+        compLower.includes('gep') || compIdLower.includes('gep') || emailLower.includes('gep') || emailLower.includes('mondhali')) {
       delete realActiveSessions[id];
     }
   }
@@ -2449,9 +2458,19 @@ function pruneRealSessions() {
 
 app.post('/api/db/active-sessions', (req, res) => {
   try {
-    const { email, name, role, company, activePath } = req.body;
+    const { email, name, role, company, companyId, activePath } = req.body;
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const emailLower = String(email).toLowerCase().trim();
+    const compLower = String(company || '').toLowerCase().trim();
+    const compIdLower = String(companyId || '').toLowerCase().trim();
+
+    const deletedKeys = getDeletedCompanyKeys();
+    if (deletedKeys.has(emailLower) || deletedKeys.has(compLower) || deletedKeys.has(compIdLower) ||
+        compLower.includes('gep') || compIdLower.includes('gep') || emailLower.includes('gep') || emailLower.includes('mondhali')) {
+      return res.status(403).json({ error: 'Session non autorisée : ce compte entreprise a été résilié.' });
     }
     
     // Hash company or email to map to a semi-permanent Tunisian location
@@ -2461,10 +2480,7 @@ app.post('/api/db/active-sessions', (req, res) => {
       companyHash += strToHash.charCodeAt(i);
     }
 
-    let loc = TUNISIAN_LOCATIONS[companyHash % TUNISIAN_LOCATIONS.length];
-    if (company && (company.toUpperCase().includes('GEP'))) {
-      loc = TUNISIAN_LOCATIONS[1]; // Ariana GEP
-    }
+    const loc = TUNISIAN_LOCATIONS[companyHash % TUNISIAN_LOCATIONS.length];
     
     // Add stable jitter
     const emailHash = email.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
@@ -2479,6 +2495,7 @@ app.post('/api/db/active-sessions', (req, res) => {
       name: name || email.split('@')[0],
       role: role || 'Viewer',
       company: company || 'Inter-Affaires',
+      companyId: companyId || company || 'pc-interaffaires',
       activePath: activePath || 'Tableau de bord',
       ip,
       city: loc.city,
@@ -2497,34 +2514,82 @@ app.post('/api/db/active-sessions', (req, res) => {
   }
 });
 
-app.get('/api/db/active-sessions', (req, res) => {
+app.get('/api/db/active-sessions', async (req, res) => {
   try {
     pruneRealSessions();
 
     const targetCompany = (req.query.company as string || '').trim();
+    const deletedKeys = getDeletedCompanyKeys();
 
-    // Map simulated background sessions for Multi-Tenant active view
-    const simulatedSessionsList = SIMULATED_USERS.map((user, idx) => {
-      const loc = TUNISIAN_LOCATIONS[user.locationIndex % TUNISIAN_LOCATIONS.length];
-      return {
-        id: `sim-${user.email}`,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        company: user.company,
-        activePath: user.activePath || SIMULATED_ACTIONS[idx % SIMULATED_ACTIONS.length],
-        ip: `197.14.${120 + idx}.${10 + idx * 3}`,
-        city: loc.city,
-        country: "Tunisie",
-        lat: loc.lat + ((idx % 3) - 1) * 0.004,
-        lng: loc.lng + ((idx % 2) - 0.5) * 0.004,
-        ping: Math.floor(Math.random() * 20) + 10,
-        connectedAt: new Date(Date.now() - (idx * 180000 + 60000)).toISOString(),
-        lastSeen: new Date().toISOString()
-      };
-    });
+    // 1. Purge Firestore active_sessions for deleted or orphaned company records
+    if (isFirestoreActive && db) {
+      try {
+        const activeSnap = await withTimeout(getDocs(collection(db, 'active_sessions')), 4000).catch(() => null);
+        if (activeSnap && !activeSnap.empty) {
+          activeSnap.forEach((docSnap: any) => {
+            const data = docSnap.data();
+            const cName = String(data.company || data.companyName || '').toLowerCase().trim();
+            const cId = String(data.companyId || data.company_id || docSnap.id).toLowerCase().trim();
+            const sEmail = String(data.email || '').toLowerCase().trim();
 
-    // Merge real live active sessions with simulated sessions, prioritizing real live sessions
+            if (deletedKeys.has(cName) || deletedKeys.has(cId) || deletedKeys.has(sEmail) ||
+                cName.includes('gep') || cId.includes('gep') || sEmail.includes('gep') || sEmail.includes('mondhali')) {
+              deleteDoc(doc(db, 'active_sessions', docSnap.id)).catch(() => {});
+            }
+          });
+        }
+      } catch (e) {}
+    }
+
+    // 2. Fetch list of active, valid companies to filter out non-existent companies
+    const validCompanyNames = new Set<string>(['inter-affaires', 'inter affaires', 'elyssa entreprises s.a.']);
+    const validCompanyIds = new Set<string>(['pc-parent-elyssa', 'pc-interaffaires']);
+
+    try {
+      const clients = await getPublisherClients();
+      clients.forEach((c: any) => {
+        const status = String(c.status || '').toLowerCase();
+        if (status === 'suspended' || status === 'deleted' || status === 'résilié' || status === 'resilie') return;
+        const cId = String(c.id || c.company_id || '').toLowerCase().trim();
+        const cName = String(c.companyName || c.name || '').toLowerCase().trim();
+        const cEmail = String(c.email || '').toLowerCase().trim();
+
+        if (deletedKeys.has(cId) || deletedKeys.has(cName) || deletedKeys.has(cEmail)) return;
+
+        if (cId) validCompanyIds.add(cId);
+        if (cName) validCompanyNames.add(cName);
+      });
+    } catch (e) {}
+
+    // 3. Filter simulated background sessions
+    const simulatedSessionsList: ActiveSession[] = SIMULATED_USERS
+      .filter(user => {
+        const uComp = String(user.company).toLowerCase().trim();
+        const uEmail = String(user.email).toLowerCase().trim();
+        return !deletedKeys.has(uComp) && !deletedKeys.has(uEmail) && !uComp.includes('gep') && !uEmail.includes('gep');
+      })
+      .map((user, idx) => {
+        const loc = TUNISIAN_LOCATIONS[user.locationIndex % TUNISIAN_LOCATIONS.length];
+        return {
+          id: `sim-${user.email}`,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          company: user.company,
+          companyId: "pc-interaffaires",
+          activePath: user.activePath || SIMULATED_ACTIONS[idx % SIMULATED_ACTIONS.length],
+          ip: `197.14.${120 + idx}.${10 + idx * 3}`,
+          city: loc.city,
+          country: "Tunisie",
+          lat: loc.lat + ((idx % 3) - 1) * 0.004,
+          lng: loc.lng + ((idx % 2) - 0.5) * 0.004,
+          ping: Math.floor(Math.random() * 20) + 10,
+          connectedAt: new Date(Date.now() - (idx * 180000 + 60000)).toISOString(),
+          lastSeen: new Date().toISOString()
+        };
+      });
+
+    // Merge real live active sessions with simulated sessions
     const realSessions = Object.values(realActiveSessions);
     const realEmails = new Set(realSessions.map(s => s.email.toLowerCase()));
 
@@ -2532,6 +2597,28 @@ app.get('/api/db/active-sessions', (req, res) => {
       ...realSessions,
       ...simulatedSessionsList.filter(s => !realEmails.has(s.email.toLowerCase()))
     ];
+
+    // Filter strictly to existing & active companies
+    merged = merged.filter(s => {
+      if (!s || !s.company) return false;
+      const cName = String(s.company).toLowerCase().trim();
+      const cId = String(s.companyId || '').toLowerCase().trim();
+      const sEmail = String(s.email || '').toLowerCase().trim();
+
+      if (deletedKeys.has(cName) || deletedKeys.has(cId) || deletedKeys.has(sEmail) ||
+          cName.includes('gep') || cId.includes('gep') || sEmail.includes('gep') || sEmail.includes('mondhali')) {
+        return false;
+      }
+
+      if (s.role === 'SuperAdmin' || sEmail === 'admin@elyssa.pro' || sEmail === 'contact@elyssa.pro' || sEmail === 'ziedbenmiled3@gmail.com') {
+        return true;
+      }
+
+      const isValid = validCompanyNames.has(cName) || validCompanyIds.has(cId) ||
+                      Array.from(validCompanyNames).some(v => cName.includes(v) || v.includes(cName));
+
+      return isValid;
+    });
 
     if (targetCompany && targetCompany.toLowerCase() !== 'superadmin' && targetCompany.toLowerCase() !== 'all') {
       const targetLower = targetCompany.toLowerCase();
@@ -3142,7 +3229,22 @@ app.post('/api/db/delete-company', async (req, res) => {
       writeJsonFile(CLIENTS_FILE_PATH, filtered);
     }
 
-    // 3. Delete from Firestore SDK across all collections
+    // 3. Purge in-memory realActiveSessions
+    for (const email in realActiveSessions) {
+      const sess = realActiveSessions[email];
+      if (!sess) continue;
+      const cId = String(sess.companyId || '').toLowerCase().trim();
+      const cName = String(sess.company || '').toLowerCase().trim();
+      const sEmail = String(sess.email || '').toLowerCase().trim();
+
+      if (cId === targetIdLower || (targetNameLower && cName === targetNameLower) ||
+          cName.includes(targetIdLower) || (targetNameLower && cName.includes(targetNameLower)) ||
+          sEmail.includes(targetIdLower) || (targetNameLower && sEmail.includes(targetNameLower))) {
+        delete realActiveSessions[email];
+      }
+    }
+
+    // 4. Delete from Firestore SDK across all collections
     await ensureFirebaseAuth();
     if (isFirestoreActive && db) {
       const deletions: Promise<any>[] = [];
@@ -3167,7 +3269,7 @@ app.post('/api/db/delete-company', async (req, res) => {
       }), 5000).catch(() => {}));
 
       // Delete linked documents in subcollections
-      const subCols = ['collaborators', 'attendance_settings', 'active_sessions', 'licence_requests', 'company_erp_data', 'company_erp_modules', 'company_settings'];
+      const subCols = ['collaborators', 'attendance_settings', 'active_sessions', 'presence_logs', 'heartbeats', 'licence_requests', 'company_erp_data', 'company_erp_modules', 'company_settings'];
       for (const colName of subCols) {
         try {
           const colSnap = await withTimeout(getDocs(collection(db, colName)), 5000).catch(() => null);
@@ -3176,8 +3278,11 @@ app.post('/api/db/delete-company', async (req, res) => {
               const data = docSnap.data();
               const dCompId = String(data.companyId || data.company_id || docSnap.id).toLowerCase().trim();
               const dCompName = String(data.company || data.companyName || '').toLowerCase().trim();
+              const dEmail = String(data.email || '').toLowerCase().trim();
 
-              if (dCompId === targetIdLower || (targetNameLower && dCompName === targetNameLower)) {
+              if (dCompId === targetIdLower || (targetNameLower && dCompName === targetNameLower) ||
+                  dCompId.includes(targetIdLower) || (targetNameLower && dCompName.includes(targetNameLower)) ||
+                  (targetIdLower === 'gep' && (dCompName.includes('gep') || dCompId.includes('gep') || dEmail.includes('gep') || dEmail.includes('mondhali')))) {
                 deletions.push(withTimeout(deleteDoc(doc(db, colName, docSnap.id)), 4000).catch(() => {}));
               }
             });

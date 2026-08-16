@@ -185,31 +185,24 @@ export const deleteCompanyFromDb = async (targetCompanyId: string, companyName?:
       }).catch(e => console.warn('deleted_companies record warning:', e));
 
       // Clean up orphaned records in linked collections
-      const relatedCols = ['collaborators', 'attendance_settings', 'active_sessions', 'licence_requests', 'company_settings'];
+      const relatedCols = ['collaborators', 'attendance_settings', 'active_sessions', 'presence_logs', 'heartbeats', 'licence_requests', 'company_settings'];
       for (const colName of relatedCols) {
         try {
           const colRef = collection(db, colName);
-          const qId = query(colRef, where('companyId', '==', targetCompanyId));
-          const snapId = await getDocs(qId).catch(() => null);
-          if (snapId && !snapId.empty) {
-            for (const d of snapId.docs) {
-              await deleteDoc(doc(db, colName, d.id)).catch(() => {});
-            }
-          }
+          const snapAll = await getDocs(colRef).catch(() => null);
+          if (snapAll && !snapAll.empty) {
+            const idLower = targetCompanyId.toLowerCase().trim();
+            const nameLower = companyName ? companyName.toLowerCase().trim() : '';
 
-          const qCompId = query(colRef, where('company_id', '==', targetCompanyId));
-          const snapCompId = await getDocs(qCompId).catch(() => null);
-          if (snapCompId && !snapCompId.empty) {
-            for (const d of snapCompId.docs) {
-              await deleteDoc(doc(db, colName, d.id)).catch(() => {});
-            }
-          }
+            for (const d of snapAll.docs) {
+              const data = d.data();
+              const dCompId = String(data.companyId || data.company_id || d.id).toLowerCase().trim();
+              const dCompName = String(data.company || data.companyName || '').toLowerCase().trim();
+              const dEmail = String(data.email || '').toLowerCase().trim();
 
-          if (companyName) {
-            const qComp = query(colRef, where('company', '==', companyName));
-            const snapComp = await getDocs(qComp).catch(() => null);
-            if (snapComp && !snapComp.empty) {
-              for (const d of snapComp.docs) {
+              if (dCompId === idLower || (nameLower && dCompName === nameLower) ||
+                  dCompId.includes(idLower) || (nameLower && dCompName.includes(nameLower)) ||
+                  (idLower === 'gep' && (dCompName.includes('gep') || dCompId.includes('gep') || dEmail.includes('gep') || dEmail.includes('mondhali')))) {
                 await deleteDoc(doc(db, colName, d.id)).catch(() => {});
               }
             }

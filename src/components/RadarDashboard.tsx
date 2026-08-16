@@ -25,7 +25,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { db } from '../utils/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, deleteDoc } from 'firebase/firestore';
 
 // Fix Leaflet default marker assets in Vite/React
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -366,6 +366,28 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
     loadAdminSettings();
   }, []);
 
+  // 4. Real-time background cleanup of Firestore active_sessions for GEP & deleted company docs
+  useEffect(() => {
+    if (!db) return;
+    try {
+      const colRef = collection(db, 'active_sessions');
+      const unsubscribe = onSnapshot(colRef, (snap) => {
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const cName = String(data.company || data.companyName || '').toLowerCase().trim();
+          const cId = String(data.companyId || data.company_id || docSnap.id).toLowerCase().trim();
+          const sEmail = String(data.email || '').toLowerCase().trim();
+
+          if (cName.includes('gep') || cId.includes('gep') || sEmail.includes('gep') || sEmail.includes('mondhali')) {
+            console.log(`[RADAR CLEANUP] Deleting orphaned active_session ${docSnap.id}`);
+            deleteDoc(doc(db, 'active_sessions', docSnap.id)).catch(() => {});
+          }
+        });
+      }, () => {});
+      return () => unsubscribe();
+    } catch (e) {}
+  }, []);
+
   // Aggregation logic: group real raw sessions strictly by Enterprise/Company
   const companySummaries = useMemo<CompanySummary[]>(() => {
     const map = new Map<string, {
@@ -378,13 +400,21 @@ export default function RadarDashboard({ companyName, tenantId, companySettings 
     rawSessions.forEach(s => {
       if (!s || !s.company) return;
       const cName = s.company.trim();
+      const emailLower = (s.email || '').toLowerCase().trim();
       let normKey = cName.toUpperCase();
-      if (normKey.includes('GEP')) normKey = 'GEP';
-      else if (normKey.includes('INTER') || normKey.includes('AFFAIRE')) normKey = 'INTER-AFFAIRES';
+
+      // STRICT FILTERING: Exclude GEP or any deleted company or email
+      if (normKey.includes('GEP') || emailLower.includes('gep-tn.com') || emailLower.includes('mondhali')) {
+        return;
+      }
+
+      if (normKey.includes('INTER') || normKey.includes('AFFAIRE')) {
+        normKey = 'INTER-AFFAIRES';
+      }
 
       if (!map.has(normKey)) {
         map.set(normKey, {
-          name: normKey === 'GEP' ? 'GEP' : (normKey === 'INTER-AFFAIRES' ? 'Inter-Affaires' : cName),
+          name: normKey === 'INTER-AFFAIRES' ? 'Inter-Affaires' : cName,
           sessions: [],
           key: normKey
         });
