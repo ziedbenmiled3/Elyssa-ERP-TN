@@ -360,14 +360,16 @@ export default function LoginPage({ collaborators, onLoginSuccess, onBackToLandi
     let filtered = localCollaborators;
     if (selectedCompany === 'Inter-Affaires' || selectedCompany === 'Elyssa Entreprises S.A.') {
       // Find default collaborators
-      filtered = localCollaborators.filter(c => !c.company || c.company === 'Inter-Affaires' || c.company === 'Elyssa Entreprises S.A.');
-    } else {
-      filtered = localCollaborators.filter(c => 
+      const match = localCollaborators.filter(c => !c.company || c.company === 'Inter-Affaires' || c.company === 'Elyssa Entreprises S.A.');
+      if (match.length > 0) filtered = match;
+    } else if (selectedCompany) {
+      const match = localCollaborators.filter(c => 
         c.company === selectedCompany || 
         c.company_id === selectedCompany || 
         c.companyId === selectedCompany ||
         (c.company && selectedCompany && c.company.toLowerCase() === selectedCompany.toLowerCase())
       );
+      if (match.length > 0) filtered = match;
     }
 
     if (employeeSearch.trim()) {
