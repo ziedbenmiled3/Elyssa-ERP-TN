@@ -100,6 +100,13 @@ export default function LoginPage({ collaborators, onLoginSuccess, onBackToLandi
   // URL search parameter parsing to trigger confirmation or password reset views
   useEffect(() => {
     try {
+      const revocationNotice = window.sessionStorage.getItem('elyssa_revocation_notice') || window.localStorage.getItem('elyssa_revocation_notice');
+      if (revocationNotice) {
+        setEnterpriseError(revocationNotice);
+        window.sessionStorage.removeItem('elyssa_revocation_notice');
+        window.localStorage.removeItem('elyssa_revocation_notice');
+      }
+
       const params = new URLSearchParams(window.location.search);
       const action = params.get('action');
       const token = params.get('token');

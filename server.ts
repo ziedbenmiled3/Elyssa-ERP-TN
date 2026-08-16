@@ -443,12 +443,23 @@ async function isValidCompanyId(companyId: string, req?: express.Request): Promi
   if (!companyId) return false;
   if (companyId === 'pc-parent-elyssa') return true;
 
+  const deletedKeys = getDeletedCompanyKeys();
+  const lowerCompanyId = String(companyId).toLowerCase().trim();
+  if (deletedKeys.has(lowerCompanyId)) {
+    return false;
+  }
+
   // Check in the 'companies' collection in Firestore
   await ensureFirebaseAuth();
   if (isFirestoreActive && db) {
     try {
       const companyDoc = await withTimeout(getDoc(doc(db, 'companies', companyId)), 15000);
       if (companyDoc.exists()) {
+        const data = companyDoc.data();
+        const status = (data?.status || '').toLowerCase();
+        if (status === 'suspended' || status === 'deleted' || status === 'résilié' || status === 'resilie') {
+          return false;
+        }
         return true;
       }
     } catch (e) {
@@ -458,8 +469,14 @@ async function isValidCompanyId(companyId: string, req?: express.Request): Promi
 
   // Fallback check in publisher_clients for backwards compatibility
   const clients = await getPublisherClients();
-  const existsInClients = clients.some(c => c.id === companyId || c.company_id === companyId);
-  if (existsInClients) return true;
+  const matchedClient = clients.find(c => c.id === companyId || c.company_id === companyId);
+  if (matchedClient) {
+    const status = (matchedClient.status || '').toLowerCase();
+    if (status === 'suspended' || status === 'deleted' || status === 'résilié' || status === 'resilie') {
+      return false;
+    }
+    return true;
+  }
 
   // BOOTSTRAP/SIGNUP EXCEPTION: If the user is posting their own new trial client/collaborator registration, 
   // allow it through so the document can be successfully created in the database.
@@ -4875,6 +4892,102 @@ app.post('/api/auth/verify-employee', rateLimiter(30, 15 * 60 * 1000), async (re
   } else {
     return res.status(401).json({ error: "Code PIN ou mot de passe incorrect." });
   }
+});
+
+app.post('/api/auth/validate-session', rateLimiter(60, 15 * 60 * 1000), async (req, res) => {
+  const { session } = req.body;
+  if (!session || typeof session !== 'object') {
+    return res.status(400).json({ valid: false, error: "Session invalide." });
+  }
+
+  const emailLower = String(session.email || '').trim().toLowerCase();
+  const isSuperAdmin = session.role === 'SuperAdmin' || 
+                       emailLower === 'admin@elyssa.pro' || 
+                       emailLower === 'contact@elyssa.pro' || 
+                       emailLower === 'ziedbenmiled3@gmail.com';
+
+  if (isSuperAdmin) {
+    return res.json({ valid: true });
+  }
+
+  const deletedKeys = getDeletedCompanyKeys();
+  if (deletedKeys.has(emailLower) || (deletedKeys.has('gep') && (emailLower.includes('gep') || emailLower.includes('mondhali')))) {
+    return res.status(401).json({ valid: false, error: "Votre session a expiré : ce compte entreprise a été résilié." });
+  }
+
+  const companyId = session.companyId || session.company_id;
+  const companyName = session.companyName || session.company;
+
+  if (companyId) {
+    const compIdLower = String(companyId).trim().toLowerCase();
+    if (deletedKeys.has(compIdLower)) {
+      return res.status(401).json({ valid: false, error: "Votre session a expiré : ce compte entreprise a été résilié." });
+    }
+  }
+
+  if (companyName) {
+    const compNameLower = String(companyName).trim().toLowerCase();
+    if (deletedKeys.has(compNameLower)) {
+      return res.status(401).json({ valid: false, error: "Votre session a expiré : ce compte entreprise a été résilié." });
+    }
+  }
+
+  let companyFound = false;
+  let companyStatus = 'active';
+
+  if (isFirestoreActive && db) {
+    try {
+      if (companyId) {
+        const companyDoc = await withTimeout(getDoc(doc(db, 'companies', companyId)), 6000);
+        if (companyDoc.exists()) {
+          companyFound = true;
+          const data = companyDoc.data();
+          if (data?.status) companyStatus = String(data.status).toLowerCase();
+        }
+      }
+      if (!companyFound && companyName) {
+        const snap = await withTimeout(getDocs(collection(db, 'companies')), 6000);
+        if (!snap.empty) {
+          snap.forEach((docSnap: any) => {
+            const data = docSnap.data();
+            const cName = (data.companyName || data.name || '').toLowerCase().trim();
+            const cEmail = (data.email || data.companyEmail || '').toLowerCase().trim();
+            if (cName === String(companyName).toLowerCase().trim() || cEmail === emailLower) {
+              companyFound = true;
+              if (data?.status) companyStatus = String(data.status).toLowerCase();
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Firestore session validation check warning:", e);
+    }
+  }
+
+  if (!companyFound) {
+    try {
+      const clients = await getPublisherClients();
+      const clientMatch = clients.find((c: any) => {
+        const cId = String(c.id || '').trim().toLowerCase();
+        const cName = String(c.companyName || c.name || '').trim().toLowerCase();
+        const cEmail = String(c.email || c.companyEmail || '').trim().toLowerCase();
+        if (deletedKeys.has(cId) || deletedKeys.has(cName) || deletedKeys.has(cEmail)) return false;
+        return (companyId && cId === String(companyId).trim().toLowerCase()) ||
+               (companyName && cName === String(companyName).trim().toLowerCase()) ||
+               (emailLower && cEmail === emailLower);
+      });
+      if (clientMatch) {
+        companyFound = true;
+        if (clientMatch.status) companyStatus = String(clientMatch.status).toLowerCase();
+      }
+    } catch (e) {}
+  }
+
+  if (!companyFound || companyStatus === 'suspended' || companyStatus === 'deleted' || companyStatus === 'résilié' || companyStatus === 'resilie') {
+    return res.status(401).json({ valid: false, error: "Votre session a expiré : ce compte entreprise a été résilié." });
+  }
+
+  return res.json({ valid: true });
 });
 
 app.post('/api/auth/verify-prompt', rateLimiter(30, 15 * 60 * 1000), async (req, res) => {

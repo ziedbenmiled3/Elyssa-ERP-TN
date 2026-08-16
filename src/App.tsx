@@ -825,7 +825,16 @@ const localStorage = scopedStorage;
 
 export const fetchWithRetry = async (url: string, options?: RequestInit, retries = 6, delay = 1500): Promise<Response> => {
   try {
-    return await fetch(url, options);
+    const res = await fetch(url, options);
+    if ((res.status === 401 || res.status === 403) && 
+        !url.includes('/api/auth/verify-enterprise') && 
+        !url.includes('/api/auth/verify-employee') && 
+        !url.includes('/api/auth/validate-session')) {
+      window.dispatchEvent(new CustomEvent('elyssa:auth-revoked', { 
+        detail: { status: res.status, url } 
+      }));
+    }
+    return res;
   } catch (err) {
     if (retries > 0) {
       await new Promise(resolve => setTimeout(resolve, delay));
@@ -1869,6 +1878,69 @@ export default function App() {
     }
     return 'independent';
   };
+
+  const handleRevokeSession = useCallback((message?: string) => {
+    const errorMsg = message || "Votre session a expiré : ce compte entreprise a été résilié.";
+    console.warn("🔴 [SESSION REVOCATION] Purging storage and redirecting to login:", errorMsg);
+    
+    try {
+      window.sessionStorage.clear();
+      window.localStorage.clear();
+      window.sessionStorage.setItem('elyssa_revocation_notice', errorMsg);
+    } catch (e) {}
+
+    setCurrentUser(null);
+    setShowLogin(true);
+    setActiveTab('dashboard');
+  }, []);
+
+  // Listen for global auth revocation events from HTTP 401/403 or Firestore errors
+  useEffect(() => {
+    const handleAuthRevoked = () => {
+      if (currentUser && !isPlatformAdmin) {
+        handleRevokeSession("Votre session a expiré : ce compte entreprise a été résilié.");
+      }
+    };
+    window.addEventListener('elyssa:auth-revoked', handleAuthRevoked);
+    return () => window.removeEventListener('elyssa:auth-revoked', handleAuthRevoked);
+  }, [currentUser, isPlatformAdmin, handleRevokeSession]);
+
+  // Session Integrity Verification on boot & restored session
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const emailLower = currentUser.email?.toLowerCase();
+    const isPlatform = currentUser.role === 'SuperAdmin' || 
+                       emailLower === 'admin@elyssa.pro' || 
+                       emailLower === 'contact@elyssa.pro' || 
+                       emailLower === 'ziedbenmiled3@gmail.com';
+    if (isPlatform) return;
+
+    const validateSessionOnBoot = async () => {
+      try {
+        const res = await fetch('/api/auth/validate-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session: currentUser })
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          handleRevokeSession(data.error || "Votre session a expiré : ce compte entreprise a été résilié.");
+          return;
+        }
+
+        const data = await res.json();
+        if (!data.valid) {
+          handleRevokeSession(data.error || "Votre session a expiré : ce compte entreprise a été résilié.");
+        }
+      } catch (err) {
+        console.warn("Session validation check failed:", err);
+      }
+    };
+
+    validateSessionOnBoot();
+  }, [currentUser, handleRevokeSession]);
 
   // Cache version control - Reset client cache if local version is outdated compared to server
   useEffect(() => {
