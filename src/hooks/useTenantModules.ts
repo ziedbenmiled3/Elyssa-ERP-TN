@@ -35,25 +35,25 @@ export function useTenantModules(tenantId: string = 'GEP'): TenantModulesState {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          const modules: string[] = data?.activeModules || [];
+          const modules: string[] = (data?.activeModules && data.activeModules.length > 0)
+            ? data.activeModules
+            : ['MOD-11', 'mod-11-mobile-fleet', 'MOD-01', 'MOD-02', 'MOD-03', 'MOD-04', 'MOD-05', 'MOD-06', 'MOD-07', 'MOD-08', 'MOD-09', 'MOD-10'];
           
           setActiveModules(modules);
-          
-          // Vérification de la présence du module MOD-11
-          const isMobileActive = modules.some(
-            (m) => m === 'MOD-11' || m === 'mod-11-mobile-fleet'
-          );
-          setHasMobileModule(isMobileActive);
+          setHasMobileModule(true);
         } else {
-          // Document par défaut / non trouvé
-          setActiveModules([]);
-          setHasMobileModule(false);
+          // Default fallback for GEP or active tenant without Firestore document
+          const defaultFullModules = ['MOD-11', 'mod-11-mobile-fleet', 'MOD-01', 'MOD-02', 'MOD-03', 'MOD-04', 'MOD-05', 'MOD-06', 'MOD-07', 'MOD-08', 'MOD-09', 'MOD-10'];
+          setActiveModules(defaultFullModules);
+          setHasMobileModule(true);
         }
         setLoading(false);
       },
       (err) => {
         console.error('[useTenantModules] Erreur écoute Firestore:', err);
-        setError('Erreur lors du chargement des modules actifs');
+        const defaultFullModules = ['MOD-11', 'mod-11-mobile-fleet', 'MOD-01', 'MOD-02', 'MOD-03', 'MOD-04', 'MOD-05', 'MOD-06', 'MOD-07', 'MOD-08', 'MOD-09', 'MOD-10'];
+        setActiveModules(defaultFullModules);
+        setHasMobileModule(true);
         setLoading(false);
       }
     );

@@ -4704,24 +4704,18 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
     (compId === 'pc-parent-elyssa' && (!c.company || c.company === 'Inter-Affaires' || c.company === 'Elyssa Entreprises S.A.'))
   );
 
-  // If 0 collaborators found for this company: Open direct admin session and short-circuit steps 2 & 3!
+  // Requirement: ALWAYS show Step 2 (Collaborator Selection & PIN entry), even if 0 secondary collaborators exist
   if (companyCollabs.length === 0) {
-    const adminRole = (trimmedEmail === 'admin@elyssa.pro' || trimmedEmail === 'contact@elyssa.pro' || trimmedEmail === 'ziedbenmiled3@gmail.com') ? 'SuperAdmin' : 'SUPER_ADMIN';
-    return res.json({
-      success: true,
-      type: 'company_direct',
-      companyName: compName,
-      companyId: compId,
-      session: {
-        id: targetCompany.id || `admin_${compId}`,
-        email: targetCompany.email || trimmedEmail,
-        name: `${compName} (Gérant / Dirigeant)`,
-        role: adminRole,
-        companyId: compId,
-        company_id: compId,
-        companyName: compName
-      }
-    });
+    companyCollabs = [{
+      id: `collab_gerant_${compId}`,
+      name: `${compName} (Gérant / Dirigeant)`,
+      email: targetCompany.email || trimmedEmail,
+      role: 'DIRIGEANT',
+      status: 'Active',
+      company: compName,
+      company_id: compId,
+      companyId: compId
+    }];
   }
 
   const maskedCollabs = companyCollabs.map((c: any) => ({
@@ -4729,7 +4723,7 @@ app.post('/api/auth/verify-enterprise', rateLimiter(30, 15 * 60 * 1000), async (
     password: '********'
   }));
 
-  // If company has real collaborators configured, return collaborator_selection step
+  // Always return collaborator_selection step so user can pick profile and enter PIN
   return res.json({
     success: true,
     type: 'collaborator_selection',
@@ -4757,15 +4751,15 @@ app.post('/api/auth/verify-employee', rateLimiter(30, 15 * 60 * 1000), async (re
       c.email?.toLowerCase() === String(employeeId).toLowerCase()
     );
 
-    if (compMatch || String(employeeId).toLowerCase().includes('gep') || String(employeeId).toLowerCase().includes('mondhali')) {
+    if (compMatch || String(employeeId).toLowerCase().includes('gep') || String(employeeId).toLowerCase().includes('mondhali') || String(employeeId).startsWith('collab_gerant_')) {
       const cName = compMatch ? compMatch.companyName : 'GEP';
-      const cId = compMatch ? compMatch.id : 'pc-gep-1';
+      const cId = compMatch ? compMatch.id : 'pc-1784366783440';
       const cEmail = compMatch ? (compMatch.email || compMatch.companyEmail) : 'mondhali@gmail.com';
       selectedProfile = {
         id: employeeId || 'collab_gep_manager',
         name: `${cName} (Gérant / Dirigeant)`,
         email: cEmail || 'mondhali@gmail.com',
-        role: 'Manager',
+        role: 'DIRIGEANT',
         status: 'Active',
         company: cName,
         company_id: cId,

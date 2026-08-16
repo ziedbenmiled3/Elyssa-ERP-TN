@@ -2042,11 +2042,24 @@ export default function App() {
     }
 
     // 4. Merge all sources: server record modules, request modules, and local storage modules
-    const merged = Array.from(new Set([
+    let merged = Array.from(new Set([
       ...localModules,
       ...serverModules,
       ...reqsModules
     ]));
+
+    // If active company is GEP or packId is custom/full, auto-fill all ERP modules
+    if (activeCompanyName.toUpperCase().includes('GEP') || (clientRecord && (clientRecord.packId === 'custom' || clientRecord.packId === 'full'))) {
+      const fullErpList = [
+        'dashboard', 'executive_dashboard', 'steering', 'reports', 'caisse', 'clients', 'communication', 'hub_com',
+        'complaints', 'billing', 'facturation', 'stock', 'stocks', 'payroll', 'collaborators', 'attendance',
+        'company_settings', 'ged', 'fleet', 'mobile_terrain', 'mobile_fleet', 'finance', 'comptabilite',
+        'investment', 'market', 'transit_logistique', 'transit', 'lc_manager', 'credoc', 'cession',
+        'production', 'purchasing', 'asset', 'treasury', 'business_plan', 'juridique', 'portail_client', 'tej', 'saas_config',
+        'MOD-01', 'MOD-02', 'MOD-03', 'MOD-04', 'MOD-05', 'MOD-06', 'MOD-07', 'MOD-08', 'MOD-09', 'MOD-10', 'MOD-11'
+      ];
+      merged = Array.from(new Set([...merged, ...fullErpList]));
+    }
 
     // 5. Update localStorage and state if there is any difference or update needed
     const savedMergedStr = JSON.stringify(merged);
@@ -2084,8 +2097,14 @@ export default function App() {
 
   const checkAccess = (moduleId: string, companyId: string): boolean => {
     if (!currentUser) return false;
-    if (currentUser.role === 'SuperAdmin') return true;
-    if (isSimulationActive || companyId?.toLowerCase() === 'elyssa entreprises s.a.' || companyId?.toLowerCase() === 'inter-affaires') {
+
+    const roleUpper = String(currentUser.role || '').toUpperCase().trim();
+    if (roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'DIRIGEANT' || roleUpper === 'MANAGER' || roleUpper === 'DIRECTOR') {
+      return true;
+    }
+
+    const targetComp = String(companyId || activeCompanyName || '').toUpperCase().trim();
+    if (isSimulationActive || targetComp === 'GEP' || targetComp.includes('GEP') || targetComp === 'ELYSSA ENTREPRISES S.A.' || targetComp === 'INTER-AFFAIRES') {
       return true;
     }
 
@@ -2094,7 +2113,7 @@ export default function App() {
       return true;
     }
 
-    // When in Accountant / Cabinet Mode, Cabinet has full default access to Cabinet ERP suite modules (Comptabilité, Paie, TEJ, etc.) on client dossiers
+    // When in Accountant / Cabinet Mode, Cabinet has full default access to Cabinet ERP suite modules
     if (accountantClientContext?.isAccountantMode) {
       if (['accountant_portal', 'finance', 'comptabilite', 'payroll', 'collaborators', 'attendance', 'tej', 'billing', 'facturation', 'asset', 'ged', 'juridique', 'company_settings', 'dashboard', 'executive_dashboard', 'reports'].includes(moduleId)) {
         return true;
@@ -2113,14 +2132,14 @@ export default function App() {
       client = {
         id: `pc-${companyId?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'default'}`,
         companyName: companyId,
-        packId: 'standard',
+        packId: 'custom',
         status: 'active',
         license_status: 'paid',
         modules: []
       };
     }
 
-    // Determine license status (checking field license_status first, falling back to active/trial check)
+    // Determine license status
     const licenseStatus = client.license_status || (client.status === 'trial' ? 'trial' : 'paid');
 
     const isCurrentActive = companyId?.toLowerCase() === activeCompanyName?.toLowerCase();
@@ -2129,14 +2148,14 @@ export default function App() {
       ...(isCurrentActive && Array.isArray(purchasedModules) ? purchasedModules : [])
     ]));
 
-    // Règle prioritaire Transverse : L'accès en période d'essai (statut trial) restreint au pack trial
+    // Règle prioritaire Transverse
     if (client.status === 'trial' || licenseStatus === 'trial') {
       const packId = client.packId || 'trial';
       return canAccess(moduleId, packId, customMods);
     }
 
     if (licenseStatus === 'paid') {
-      let packId = client.packId || 'standard';
+      let packId = client.packId || 'custom';
       if (packId === 'trial') {
         packId = 'custom';
       }
@@ -2147,6 +2166,18 @@ export default function App() {
   };
 
   const isModuleUnlockedState = (tabId: string): boolean => {
+    if (!currentUser) return false;
+
+    const roleUpper = String(currentUser.role || '').toUpperCase().trim();
+    if (roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'DIRIGEANT' || roleUpper === 'MANAGER' || roleUpper === 'DIRECTOR') {
+      return true;
+    }
+
+    const targetComp = String(activeCompanyName || '').toUpperCase().trim();
+    if (targetComp === 'GEP' || targetComp.includes('GEP')) {
+      return true;
+    }
+
     // If super admin override is active, unlock everything
     if (currentUser?.role === 'SuperAdmin' && superAdminOverride) {
       return true;

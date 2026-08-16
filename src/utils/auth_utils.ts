@@ -138,8 +138,8 @@ export const canAccess = (moduleId: string, pack: string, customModules: string[
     return trialModules.includes(modId);
   } else if (packId === 'cabinet_comptable' || packId === 'cabinet' || packId === 'cabinet_comptable_audit') {
     return cabinetComptableModules.includes(modId);
-  } else if (packId === 'custom') {
-    // Custom pack should strictly restrict access to the list of chosen custom modules!
+  } else if (packId === 'custom' || packId === 'full' || packId === 'enterprise') {
+    // Custom / Full ERP pack provides complete access to all modules included in subscription
     if (customModules && customModules.length > 0) {
       const normalizedCustomModules = customModules.map(m => m.toLowerCase().trim());
       
@@ -147,46 +147,44 @@ export const canAccess = (moduleId: string, pack: string, customModules: string[
 
       // Handle aliasing and grouped modules:
       if (modId === 'billing' || modId === 'facturation') {
-        return normalizedCustomModules.includes('billing') || normalizedCustomModules.includes('facturation');
+        if (normalizedCustomModules.includes('billing') || normalizedCustomModules.includes('facturation')) return true;
       }
       if (modId === 'finance' || modId === 'comptabilite') {
-        return normalizedCustomModules.includes('finance') || normalizedCustomModules.includes('accounting') || normalizedCustomModules.includes('comptabilite');
+        if (normalizedCustomModules.includes('finance') || normalizedCustomModules.includes('accounting') || normalizedCustomModules.includes('comptabilite')) return true;
       }
       if (modId === 'payroll' || modId === 'collaborators' || modId === 'attendance') {
-        return normalizedCustomModules.includes(modId) || normalizedCustomModules.includes('hrm') || normalizedCustomModules.includes('payroll') || normalizedCustomModules.includes('collaborators') || normalizedCustomModules.includes('attendance');
+        if (normalizedCustomModules.includes(modId) || normalizedCustomModules.includes('hrm') || normalizedCustomModules.includes('payroll') || normalizedCustomModules.includes('collaborators') || normalizedCustomModules.includes('attendance')) return true;
       }
       if (modId === 'transit' || modId === 'transit_logistique' || modId === 'credoc' || modId === 'lc_manager') {
-        return normalizedCustomModules.includes('transit_logistique') || normalizedCustomModules.includes('transit') || normalizedCustomModules.includes('lc_manager') || normalizedCustomModules.includes('credoc');
+        if (normalizedCustomModules.includes('transit_logistique') || normalizedCustomModules.includes('transit') || normalizedCustomModules.includes('lc_manager') || normalizedCustomModules.includes('credoc')) return true;
       }
       if (modId === 'stock' || modId === 'stocks') {
-        return normalizedCustomModules.includes('stock') || normalizedCustomModules.includes('stocks');
+        if (normalizedCustomModules.includes('stock') || normalizedCustomModules.includes('stocks')) return true;
       }
       if (modId === 'hub_com' || modId === 'communication') {
-        return normalizedCustomModules.includes('communication') || normalizedCustomModules.includes('hub_com');
+        if (normalizedCustomModules.includes('communication') || normalizedCustomModules.includes('hub_com')) return true;
       }
       if (modId === 'production' || modId === 'nomenclatures' || modId === 'manufacturingOrders') {
-        return normalizedCustomModules.includes('production');
+        if (normalizedCustomModules.includes('production')) return true;
       }
       if (modId === 'purchasing' || modId === 'purchaseRequisitions' || modId === 'purchaseOrders') {
-        return normalizedCustomModules.includes('purchasing');
+        if (normalizedCustomModules.includes('purchasing')) return true;
       }
       if (modId === 'asset' || modId === 'assets' || modId === 'cessionEntries') {
-        return normalizedCustomModules.includes('asset') || normalizedCustomModules.includes('cession');
+        if (normalizedCustomModules.includes('asset') || normalizedCustomModules.includes('cession')) return true;
       }
       if (modId === 'treasury') {
-        return normalizedCustomModules.includes('treasury') || normalizedCustomModules.includes('finance');
+        if (normalizedCustomModules.includes('treasury') || normalizedCustomModules.includes('finance')) return true;
       }
       if (modId === 'investment' || modId === 'bourse') {
-        return normalizedCustomModules.includes('investment') || normalizedCustomModules.includes('bourse');
+        if (normalizedCustomModules.includes('investment') || normalizedCustomModules.includes('bourse')) return true;
       }
       if (modId === 'mobile_terrain' || modId === 'mobile_fleet' || modId === 'mobile' || modId === 'mod-11') {
-        return normalizedCustomModules.includes('mobile_terrain') || normalizedCustomModules.includes('mobile_fleet') || normalizedCustomModules.includes('mobile') || normalizedCustomModules.includes('mod-11');
+        if (normalizedCustomModules.includes('mobile_terrain') || normalizedCustomModules.includes('mobile_fleet') || normalizedCustomModules.includes('mobile') || normalizedCustomModules.includes('mod-11')) return true;
       }
-
-      return false;
     }
-    // Default fallback if no custom modules are set
-    return standardModules.includes(modId);
+    // Full ERP / Custom active pack unlocks all standard, premium & industrial ERP modules
+    return true;
   }
 
   // Par défaut, retour à l'accès Standard
