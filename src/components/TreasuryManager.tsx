@@ -191,29 +191,25 @@ export default function TreasuryManager({ currentUser }: { currentUser: any }) {
 
   // --- Load / Save ---
   useEffect(() => {
-    let parsedItems = DEFAULT_ITEMS;
+    let parsedItems: ChequeEffet[] = [];
     try {
       const savedItems = localStorage.getItem(TREASURY_KEY);
       if (savedItems) {
         parsedItems = JSON.parse(savedItems);
-      } else {
-        localStorage.setItem(TREASURY_KEY, JSON.stringify(DEFAULT_ITEMS));
       }
     } catch (e) {
-      console.error("Failed to read/write TREASURY_KEY from localStorage", e);
+      console.error("Failed to read TREASURY_KEY from localStorage", e);
     }
     setItems(parsedItems);
 
-    let parsedAudits = DEFAULT_AUDITS;
+    let parsedAudits: BankCommissionAudit[] = [];
     try {
       const savedAudits = localStorage.getItem(AUDIT_KEY);
       if (savedAudits) {
         parsedAudits = JSON.parse(savedAudits);
-      } else {
-        localStorage.setItem(AUDIT_KEY, JSON.stringify(DEFAULT_AUDITS));
       }
     } catch (e) {
-      console.error("Failed to read/write AUDIT_KEY from localStorage", e);
+      console.error("Failed to read AUDIT_KEY from localStorage", e);
     }
     setAudits(parsedAudits);
 

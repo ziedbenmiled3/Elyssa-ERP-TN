@@ -187,16 +187,12 @@ export default function AssetManager({
   // --- Load / Save ---
   useEffect(() => {
     if (assets.length === 0) {
-      if (isDemoCompany) {
-        onUpdateAssets(DEFAULT_ASSETS);
-      } else {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          onUpdateAssets(JSON.parse(saved));
-        }
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        onUpdateAssets(JSON.parse(saved));
       }
     }
-  }, [isDemoCompany]);
+  }, []);
 
   const saveAssetsToStorage = (updated: Immobilisation[]) => {
     onUpdateAssets(updated);

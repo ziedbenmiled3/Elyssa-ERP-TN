@@ -368,66 +368,8 @@ export default function FleetManager({
   }, [incidents, onUpdateIncidents]);
 
   useEffect(() => {
-    if (!isHydrated) return;
-    if (isSimulationActive) {
-      const safeVehicles = vehicles || [];
-      const safeMissions = missions || [];
-      const safeExpenses = expenses || [];
-      const safeIncidents = incidents || [];
-
-      const hasDemoVehicles = safeVehicles.some(v => (v?.id || '').startsWith('demo-'));
-      if (!hasDemoVehicles) {
-        setVehicles((prev: Vehicle[]) => {
-          const prevList = prev || [];
-          const hasDemo = prevList.some(v => (v?.id || '').startsWith('demo-'));
-          if (!hasDemo) {
-            const filtered = prevList.filter(v => !(v?.id || '').startsWith('demo-'));
-            return [...DEMO_VEHICLES, ...filtered];
-          }
-          return prevList;
-        });
-      }
-
-      const hasDemoMissions = safeMissions.some(m => (m?.id || '').startsWith('demo-'));
-      if (!hasDemoMissions) {
-        setMissions((prev: MissionOrder[]) => {
-          const prevList = prev || [];
-          const hasDemo = prevList.some(m => (m?.id || '').startsWith('demo-'));
-          if (!hasDemo) {
-            const filtered = prevList.filter(m => !(m?.id || '').startsWith('demo-'));
-            return [...DEMO_MISSIONS, ...filtered];
-          }
-          return prevList;
-        });
-      }
-
-      const hasDemoExpenses = safeExpenses.some(e => (e?.id || '').startsWith('demo-'));
-      if (!hasDemoExpenses) {
-        setExpenses((prev: FleetExpense[]) => {
-          const prevList = prev || [];
-          const hasDemo = prevList.some(e => (e?.id || '').startsWith('demo-'));
-          if (!hasDemo) {
-            const filtered = prevList.filter(e => !(e?.id || '').startsWith('demo-'));
-            return [...DEMO_EXPENSES, ...filtered];
-          }
-          return prevList;
-        });
-      }
-
-      const hasDemoIncidents = safeIncidents.some(i => (i?.id || '').startsWith('demo-'));
-      if (!hasDemoIncidents) {
-        setIncidents((prev: IncidentRecord[]) => {
-          const prevList = prev || [];
-          const hasDemo = prevList.some(i => (i?.id || '').startsWith('demo-'));
-          if (!hasDemo) {
-            const filtered = prevList.filter(i => !(i?.id || '').startsWith('demo-'));
-            return [...DEMO_INCIDENTS, ...filtered];
-          }
-          return prevList;
-        });
-      }
-    }
-  }, [isSimulationActive, isHydrated]); // Removed vehicles/missions/expenses/incidents from deps to avoid infinite loops
+    // Auto-seeding on empty disabled per user directive.
+  }, [isSimulationActive, isHydrated]);
 
   // Add Modals states
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);

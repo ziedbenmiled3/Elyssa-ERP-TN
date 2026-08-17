@@ -489,63 +489,51 @@ export default function PurchasingManager({
   // --- Load / Save ---
   useEffect(() => {
     if (requisitions.length === 0) {
-      if (isDemoCompany) {
-        onUpdateRequisitions(DEFAULT_REQUISITIONS);
-      } else {
-        const savedReqs = localStorage.getItem(REQ_STORAGE_KEY);
-        if (savedReqs) {
-          try {
-            const parsed = JSON.parse(savedReqs);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              onUpdateRequisitions(parsed);
-            }
-          } catch (e) {
-            console.error('Error parsing requisitions:', e);
+      const savedReqs = localStorage.getItem(REQ_STORAGE_KEY);
+      if (savedReqs) {
+        try {
+          const parsed = JSON.parse(savedReqs);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            onUpdateRequisitions(parsed);
           }
+        } catch (e) {
+          console.error('Error parsing requisitions:', e);
         }
       }
     }
-  }, [isDemoCompany]);
+  }, []);
 
   useEffect(() => {
     if (purchaseOrders.length === 0) {
-      if (isDemoCompany) {
-        onUpdatePurchaseOrders(DEFAULT_PURCHASE_ORDERS);
-      } else {
-        const savedPOs = localStorage.getItem(PO_STORAGE_KEY);
-        if (savedPOs) {
-          try {
-            const parsed = JSON.parse(savedPOs);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              onUpdatePurchaseOrders(parsed);
-            }
-          } catch (e) {
-            console.error('Error parsing purchase orders:', e);
+      const savedPOs = localStorage.getItem(PO_STORAGE_KEY);
+      if (savedPOs) {
+        try {
+          const parsed = JSON.parse(savedPOs);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            onUpdatePurchaseOrders(parsed);
           }
+        } catch (e) {
+          console.error('Error parsing purchase orders:', e);
         }
       }
     }
-  }, [isDemoCompany]);
+  }, []);
 
   useEffect(() => {
     if (suppliers.length === 0) {
-      if (isDemoCompany) {
-        onUpdateSuppliers(DEFAULT_SUPPLIERS);
-      } else {
-        const savedSuppliers = localStorage.getItem(SUPPLIER_PERF_KEY);
-        if (savedSuppliers) {
-          try {
-            const parsed = JSON.parse(savedSuppliers);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              onUpdateSuppliers(parsed);
-            }
-          } catch (e) {
-            console.error('Error parsing suppliers:', e);
+      const savedSuppliers = localStorage.getItem(SUPPLIER_PERF_KEY);
+      if (savedSuppliers) {
+        try {
+          const parsed = JSON.parse(savedSuppliers);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            onUpdateSuppliers(parsed);
           }
+        } catch (e) {
+          console.error('Error parsing suppliers:', e);
         }
       }
     }
-  }, [isDemoCompany]);
+  }, []);
 
   const saveReqsToStorage = (updated: PurchaseRequisition[]) => {
     onUpdateRequisitions(updated);

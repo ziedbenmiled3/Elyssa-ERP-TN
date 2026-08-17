@@ -5151,99 +5151,50 @@ export default function App() {
                 const hasDemoLoaded = !!resData.hasLoadedTrialDemo;
 
                 if (isTrialClient || hasDemoLoaded) {
-                  if (!resData.hasLoadedTrialDemo && isTrialClient) {
-                    console.log("[Trial Auto-load] Loading all demo data for trial company:", activeCompanyName);
-                    const demoPayload = getCompleteDemoPayload(activeCompanyName);
-                    setClients(demoPayload.clients);
-                    setComplaints(demoPayload.complaints);
-                    setInvoices(demoPayload.invoices);
-                    setVisitReports(demoPayload.visitReports);
-                    setCompetitors(demoPayload.competitors);
-                    setSuppliers(demoPayload.suppliers);
-                    setProducts(demoPayload.products);
-                    setStockMovements(demoPayload.stockMovements);
-                    setSmtpSettings(demoPayload.smtpSettings);
-                    setImapSettings(demoPayload.imapSettings);
-                    setIncomingEmails(demoPayload.incomingEmails);
-                    setEmailTemplates(demoPayload.emailTemplates);
-                    setCommunicationLogs(demoPayload.communicationLogs);
-                    setBankAccounts((demoPayload.bankAccounts as any));
-                    setBankTransactions((demoPayload.bankTransactions as any));
-                    setTaxDeclarations(demoPayload.taxDeclarations);
-                    setYearEndClosings(demoPayload.yearEndClosings);
-                    setDocuments((demoPayload.documents as any));
-                    setEmployees(demoPayload.employees);
-                    setContracts(demoPayload.contracts);
-                    setAbsences(demoPayload.absences);
-                    setPayslips(demoPayload.payslips);
-                    setAssets(demoPayload.assets);
-                    setCessionEntries(demoPayload.cessionEntries);
-                    setNomenclatures(demoPayload.nomenclatures);
-                    setManufacturingOrders(demoPayload.manufacturingOrders);
-                    setPurchaseRequisitions(demoPayload.purchaseRequisitions);
-                    setPurchaseOrders(demoPayload.purchaseOrders);
-                    setSupplierPerformance(demoPayload.supplierPerformance);
-                    setImportFolders((demoPayload.importFolders as any) || []);
-                    setLcRequests((demoPayload.lcRequests as any) || []);
-                    setVehicles((demoPayload.vehicles as any) || []);
-                    setMissions((demoPayload.missions as any) || []);
-                    setExpenses((demoPayload.expenses as any) || []);
-                    setIncidents((demoPayload.incidents as any) || []);
-
-                    await fetch('/api/db/company-data', {
-                      method: 'POST',
-                      headers: getAuthHeaders(),
-                      body: JSON.stringify({
-                        company: activeCompanyName,
-                        data: demoPayload
-                      })
-                    });
+                  setClients(resData.clients || []);
+                  setComplaints(resData.complaints || []);
+                  setInvoices(resData.invoices || []);
+                  setVisitReports(resData.visitReports || []);
+                  setCompetitors(resData.competitors || []);
+                  setSuppliers(resData.suppliers || []);
+                  setProducts(resData.products || []);
+                  setStockMovements(resData.stockMovements || []);
+                  if (resData.smtpSettings) setSmtpSettings(resData.smtpSettings);
+                  if (resData.imapSettings) setImapSettings(resData.imapSettings);
+                  setIncomingEmails(resData.incomingEmails || []);
+                  if (Array.isArray(resData.emailTemplates)) {
+                    const companyTemplates = resData.emailTemplates.map((t: any) => ({
+                      ...t,
+                      subject: t.subject ? t.subject.replace(/Elyssa Entreprises S\.A\./g, activeCompanyName) : "",
+                      body: t.body ? t.body.replace(/Elyssa Entreprises S\.A\./g, activeCompanyName) : ""
+                    }));
+                    setEmailTemplates(companyTemplates);
                   } else {
-                    setClients(resData.clients || []);
-                    setComplaints(resData.complaints || []);
-                    setInvoices(resData.invoices || []);
-                    setVisitReports(resData.visitReports || []);
-                    setCompetitors(resData.competitors || []);
-                    setSuppliers(resData.suppliers || []);
-                    setProducts(resData.products || []);
-                    setStockMovements(resData.stockMovements || []);
-                    if (resData.smtpSettings) setSmtpSettings(resData.smtpSettings);
-                    if (resData.imapSettings) setImapSettings(resData.imapSettings);
-                    setIncomingEmails(resData.incomingEmails || []);
-                    if (Array.isArray(resData.emailTemplates)) {
-                      const companyTemplates = resData.emailTemplates.map((t: any) => ({
-                        ...t,
-                        subject: t.subject ? t.subject.replace(/Elyssa Entreprises S\.A\./g, activeCompanyName) : "",
-                        body: t.body ? t.body.replace(/Elyssa Entreprises S\.A\./g, activeCompanyName) : ""
-                      }));
-                      setEmailTemplates(companyTemplates);
-                    } else {
-                      setEmailTemplates([]);
-                    }
-                    setCommunicationLogs(resData.communicationLogs || []);
-                    setBankAccounts(resData.bankAccounts || []);
-                    setBankTransactions(resData.bankTransactions || []);
-                    setTaxDeclarations(resData.taxDeclarations || []);
-                    setYearEndClosings(resData.yearEndClosings || []);
-                    setDocuments(resData.documents || []);
-                    setEmployees(resData.employees || []);
-                    setContracts(resData.contracts || []);
-                    setAbsences(resData.absences || []);
-                    setPayslips(resData.payslips || []);
-                    setAssets(resData.assets || []);
-                    setCessionEntries(resData.cessionEntries || []);
-                    setNomenclatures(resData.nomenclatures || []);
-                    setManufacturingOrders(resData.manufacturingOrders || []);
-                    setPurchaseRequisitions(resData.purchaseRequisitions || []);
-                    setPurchaseOrders(resData.purchaseOrders || []);
-                    setSupplierPerformance(resData.supplierPerformance || []);
-                    setImportFolders(resData.importFolders || []);
-                    setLcRequests(resData.lcRequests || []);
-                    setVehicles(resData.vehicles || []);
-                    setMissions(resData.missions || []);
-                    setExpenses(resData.expenses || []);
-                    setIncidents(resData.incidents || []);
+                    setEmailTemplates([]);
                   }
+                  setCommunicationLogs(resData.communicationLogs || []);
+                  setBankAccounts(resData.bankAccounts || []);
+                  setBankTransactions(resData.bankTransactions || []);
+                  setTaxDeclarations(resData.taxDeclarations || []);
+                  setYearEndClosings(resData.yearEndClosings || []);
+                  setDocuments(resData.documents || []);
+                  setEmployees(resData.employees || []);
+                  setContracts(resData.contracts || []);
+                  setAbsences(resData.absences || []);
+                  setPayslips(resData.payslips || []);
+                  setAssets(resData.assets || []);
+                  setCessionEntries(resData.cessionEntries || []);
+                  setNomenclatures(resData.nomenclatures || []);
+                  setManufacturingOrders(resData.manufacturingOrders || []);
+                  setPurchaseRequisitions(resData.purchaseRequisitions || []);
+                  setPurchaseOrders(resData.purchaseOrders || []);
+                  setSupplierPerformance(resData.supplierPerformance || []);
+                  setImportFolders(resData.importFolders || []);
+                  setLcRequests(resData.lcRequests || []);
+                  setVehicles(resData.vehicles || []);
+                  setMissions(resData.missions || []);
+                  setExpenses(resData.expenses || []);
+                  setIncidents(resData.incidents || []);
                 } else {
                   // Self-cleaning filter to wipe any leaked demo elements from real tenant records
                   const cleanClients = Array.isArray(resData.clients) ? resData.clients.filter((c: any) => !c.id?.startsWith('demo-') && c.id !== 'cli_1' && c.id !== 'cli_2' && c.id !== 'cli_3' && c.id !== 'cli_4' && c.name !== 'Poulina Group Holding') : [];

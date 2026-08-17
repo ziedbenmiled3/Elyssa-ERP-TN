@@ -297,43 +297,35 @@ export default function ProductionManager({
   // --- Load and Save Data ---
   useEffect(() => {
     if (nomenclatures.length === 0) {
-      if (isDemoCompany) {
-        onUpdateNomenclatures(DEFAULT_NOMENCLATURES);
-      } else {
-        const savedBoms = localStorage.getItem(BOM_STORAGE_KEY);
-        if (savedBoms) {
-          try {
-            const parsed = JSON.parse(savedBoms);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              onUpdateNomenclatures(parsed);
-            }
-          } catch (e) {
-            console.error('Error parsing boms:', e);
+      const savedBoms = localStorage.getItem(BOM_STORAGE_KEY);
+      if (savedBoms) {
+        try {
+          const parsed = JSON.parse(savedBoms);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            onUpdateNomenclatures(parsed);
           }
+        } catch (e) {
+          console.error('Error parsing boms:', e);
         }
       }
     }
-  }, [isDemoCompany]);
+  }, []);
 
   useEffect(() => {
     if (manufacturingOrders.length === 0) {
-      if (isDemoCompany) {
-        onUpdateManufacturingOrders(DEFAULT_MANUFACTURING_ORDERS);
-      } else {
-        const savedMOs = localStorage.getItem(MO_STORAGE_KEY);
-        if (savedMOs) {
-          try {
-            const parsed = JSON.parse(savedMOs);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              onUpdateManufacturingOrders(parsed);
-            }
-          } catch (e) {
-            console.error('Error parsing MOs:', e);
+      const savedMOs = localStorage.getItem(MO_STORAGE_KEY);
+      if (savedMOs) {
+        try {
+          const parsed = JSON.parse(savedMOs);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            onUpdateManufacturingOrders(parsed);
           }
+        } catch (e) {
+          console.error('Error parsing MOs:', e);
         }
       }
     }
-  }, [isDemoCompany]);
+  }, []);
 
   useEffect(() => {
     // Load Settings

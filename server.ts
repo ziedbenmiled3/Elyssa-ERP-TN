@@ -1623,75 +1623,9 @@ app.post('/api/db/admin-settings', async (req, res) => {
   }
 });
 
-// Helper to run checkup and restore missing demo datasets in modules/keys
+// Helper to run checkup (Auto-seeding on empty disabled: demo data injection occurs strictly via manual '+ CHARGER DÉMOS' action)
 async function checkAndRestoreMissingDemos(companyId: string, data: any, client: any) {
-  const companyName = (client?.companyName || '').toLowerCase();
-  const isDemoCompany = companyId.startsWith('pc-demo-') || 
-                        companyId === 'pc-parent-elyssa' ||
-                        companyName.includes('carthage') ||
-                        companyName.includes('kef') ||
-                        companyName.includes('bizerte') ||
-                        companyName.includes('djerba') ||
-                        companyName.includes('demo') ||
-                        companyName.includes('affaires') ||
-                        companyName.includes('elyssa') ||
-                        companyId.toLowerCase().includes('demo');
-
-  if (!isDemoCompany) return data;
-  if (data?.demoPurged === true || data?.isPurged === true || data?.hasLoadedTrialDemo === false) {
-    return data;
-  }
-
-  const demoMasterPath = path.join(process.cwd(), 'demo_master_data.json');
-  if (!fs.existsSync(demoMasterPath)) return data;
-
-  try {
-    const demoMaster = JSON.parse(fs.readFileSync(demoMasterPath, 'utf-8'));
-    const keysToCheck = [
-      'clients', 'complaints', 'invoices', 'visitReports', 'competitors', 'suppliers',
-      'products', 'stockMovements', 'bankAccounts', 'bankTransactions', 'taxDeclarations',
-      'yearEndClosings', 'employees', 'contracts', 'absences', 'payslips', 'documents',
-      'importFolders', 'lcRequests', 'vehicles', 'fuelBons', 'interventions', 'insurances',
-      'assets', 'cessionEntries', 'nomenclatures', 'manufacturingOrders', 'purchaseRequisitions',
-      'purchaseOrders', 'supplierPerformance'
-    ];
-
-    let modified = false;
-
-    keysToCheck.forEach(key => {
-      if (!data[key]) {
-        data[key] = [];
-      }
-      const currentList = data[key];
-      const demoList = demoMaster[key] || [];
-
-      // Check if any demo items are present for this key
-      const hasDemo = currentList.some((item: any) => 
-        item && (item.is_demo === true || String(item.id || '').startsWith('demo-') || String(item.id || '').startsWith('pc-demo-'))
-      );
-
-      // If no demo items are found in this module, restore them
-      if (!hasDemo && demoList.length > 0) {
-        console.log(`[Checkup & Heal] Restoring missing demo items for module/key: "${key}" in company: "${companyId}"`);
-        const currentMap = new Map(currentList.map((item: any) => [item.id, item]));
-        demoList.forEach((demoItem: any) => {
-          currentMap.set(demoItem.id, { ...demoItem, is_demo: true });
-        });
-        data[key] = Array.from(currentMap.values());
-        modified = true;
-      }
-    });
-
-    if (modified) {
-      data.lastUpdated = Date.now();
-      await saveCompanyErpData(companyId, data);
-      console.log(`[Checkup & Heal] Successfully restored missing demo dataset for company: "${companyId}"`);
-    }
-  } catch (err) {
-    console.error("[Checkup & Heal] Error during checkup and restore:", err);
-  }
-
-  return data;
+  return data || {};
 }
 
 // Company ERP data REST endpoints (Firestore persistent with strict multi-tenant enforcement)
@@ -1707,29 +1641,9 @@ app.get('/api/db/company-data', enforceCompanyId, async (req, res) => {
     const isParentCompany = companyId === 'pc-parent-elyssa';
     
     let data = await getCompanyErpData(companyId);
-    
-    // Auto checkup and restore missing demos in modules
-    const companyName = (client?.companyName || '').toLowerCase();
-    const isDemo = companyId.startsWith('pc-demo-') || 
-                   companyId === 'pc-parent-elyssa' ||
-                   companyName.includes('carthage') ||
-                   companyName.includes('kef') ||
-                   companyName.includes('bizerte') ||
-                   companyName.includes('djerba') ||
-                   companyName.includes('demo') ||
-                   companyName.includes('affaires') ||
-                   companyName.includes('elyssa') ||
-                   companyId.toLowerCase().includes('demo');
 
     if (!data) {
-      if (isDemo) {
-        console.log(`[Checkup & Heal] Demo company "${companyId}" has no data document. Auto-initializing with full demo dataset...`);
-        data = await checkAndRestoreMissingDemos(companyId, {}, client);
-      } else {
-        return res.json({ empty: true });
-      }
-    } else {
-      data = await checkAndRestoreMissingDemos(companyId, data, client);
+      return res.json({ empty: true });
     }
 
     if (client && !isParentCompany) {

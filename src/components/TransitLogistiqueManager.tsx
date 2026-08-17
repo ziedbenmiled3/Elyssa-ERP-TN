@@ -234,7 +234,8 @@ export default function TransitLogistiqueManager({
   };
 
   useEffect(() => {
-    if (isSimulationActive) {
+    // Auto-seeding on empty disabled per user directive
+    if (false && isSimulationActive) {
       const hasDemoFolders = folders.some(f => f.id.startsWith('demo-'));
       if (!hasDemoFolders) {
         setFolders(prev => {

@@ -201,9 +201,9 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
     return activeManager.department;
   }, [activeManager]);
 
-  // All contracts currently stored or demo defaults
+  // All contracts currently stored
   const allContracts = useMemo(() => {
-    return performanceContracts.length > 0 ? performanceContracts : DEFAULT_DEMO_PERFORMANCE_CONTRACTS;
+    return performanceContracts;
   }, [performanceContracts]);
 
   // Filtered contracts list based on active Manager scope & secondary UI filter
