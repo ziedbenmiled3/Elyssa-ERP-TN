@@ -55,100 +55,25 @@ interface HRDashboardProps {
 export function useHRDashboardData(tenantId: string = 'GEP') {
   const [alerts, setAlerts] = useState<SecurityAlertItem[]>([]);
   const [kpis, setKpis] = useState({
-    activeAgentsOnField: 42,
-    latenessToday: 5,
-    biometricAlertsCount: 3,
-    totalHoursWorkedToday: 318.5,
+    activeAgentsOnField: 0,
+    latenessToday: 0,
+    biometricAlertsCount: 0,
+    totalHoursWorkedToday: 0,
     trends: {
-      agents: '+12%',
-      lateness: '-8%',
-      alerts: '3 à traiter',
-      hours: '+15.2h vs hier'
+      agents: '0%',
+      lateness: '0%',
+      alerts: '0 à traiter',
+      hours: '0h vs hier'
     }
   });
   const [chartData, setChartData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // Generate realistic 7-day trend chart mock data
-  const generateChartData = () => {
-    const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-    return days.map((day, idx) => ({
-      day,
-      presencesValides: 38 + Math.floor(Math.random() * 10),
-      anomaliesBiometriques: Math.floor(Math.random() * 4) + 1,
-      alertesGPS: Math.floor(Math.random() * 3),
-      heuresCumulees: 280 + idx * 12 + Math.floor(Math.random() * 20)
-    }));
-  };
+  // Zero chart data generator
+  const generateChartData = () => [];
 
-  // Sample default mock alerts for immediate demonstration
-  const sampleMockAlerts: SecurityAlertItem[] = [
-    {
-      id: 'alt_01',
-      tenantId,
-      userId: 'EMP-7042',
-      userName: 'Youssef Trabelsi',
-      userRole: 'Technicien Fibre Terrain',
-      userDepartment: 'Direction Réseaux & Infrastructure',
-      referencePhotoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
-      pointagePhotoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
-      timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-      type: 'IN',
-      locationName: 'Chantier Extension Sousse Nord',
-      gpsCoords: { lat: 35.8256, lng: 10.6369 },
-      geofenceValid: false,
-      geofenceDistance: 185,
-      biometricVerification: {
-        status: 'ALERT_BIOMETRICS',
-        confidenceScore: 0.48,
-        reasoning: "Écart significatif au niveau de l'arête nasale et de la forme de la mâchoire. Présence possible d'un tiers lors de la prise de vue."
-      },
-      resolutionStatus: 'PENDING'
-    },
-    {
-      id: 'alt_02',
-      tenantId,
-      userId: 'EMP-3019',
-      userName: 'Sarra Ben Ammar',
-      userRole: 'Inspectrice Qualité Chantier',
-      userDepartment: 'Contrôle Technique',
-      referencePhotoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
-      pointagePhotoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-      timestamp: new Date(Date.now() - 75 * 60 * 1000).toISOString(),
-      type: 'IN',
-      locationName: 'Dépôt Logistique Rades',
-      gpsCoords: { lat: 36.7681, lng: 10.2736 },
-      geofenceValid: true,
-      biometricVerification: {
-        status: 'ALERT_BIOMETRICS',
-        confidenceScore: 0.62,
-        reasoning: "Port de lunettes de protection teintées obstructives. Rapprochement facial incertain à 62%."
-      },
-      resolutionStatus: 'PENDING'
-    },
-    {
-      id: 'alt_03',
-      tenantId,
-      userId: 'EMP-9104',
-      userName: 'Mohamed Cherif',
-      userRole: 'Chauffeur Livreure Flotte',
-      userDepartment: 'Logistique & Transit',
-      referencePhotoUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&auto=format&fit=crop&q=80',
-      pointagePhotoUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=400&auto=format&fit=crop&q=80',
-      timestamp: new Date(Date.now() - 180 * 60 * 1000).toISOString(),
-      type: 'IN',
-      locationName: 'Zone Industrielle Charguia II',
-      gpsCoords: { lat: 36.8480, lng: 10.2100 },
-      geofenceValid: false,
-      geofenceDistance: 420,
-      biometricVerification: {
-        status: 'VERIFIED',
-        confidenceScore: 0.94,
-        reasoning: "Visage authentifié avec succès (94%). Cependant, le véhicule se trouve à 420m en dehors du périmètre du dépôt."
-      },
-      resolutionStatus: 'PENDING'
-    }
-  ];
+  // Sample default mock alerts disabled for clean production state
+  const sampleMockAlerts: SecurityAlertItem[] = [];
 
   useEffect(() => {
     setLoading(true);

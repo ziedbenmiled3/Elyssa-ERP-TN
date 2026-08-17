@@ -65,41 +65,7 @@ export default function AssetManager({
   const STORAGE_KEY = 'carthage_assets_immobilisations';
 
   // --- Prepopulated Assets ---
-  const DEFAULT_ASSETS: Immobilisation[] = [
-    {
-      id: 'demo-IMM-2024-001',
-      name: 'Extrudeuse Industrielle Haute Fréquence PEHD',
-      category: 'Matériel Industriel',
-      purchaseDate: '2024-01-15',
-      initialValue: 185000,
-      usefulLifeYears: 10, // 10% annual depreciation rate
-      scrapValue: 0,
-      amortizationType: 'Linéaire',
-      location: 'Usine de Sfax'
-    },
-    {
-      id: 'demo-IMM-2025-001',
-      name: 'Serveurs Rack Core i9 Datacenter Tunis',
-      category: 'Matériel Informatique',
-      purchaseDate: '2025-03-10',
-      initialValue: 24000,
-      usefulLifeYears: 3, // 33.33% annual rate
-      scrapValue: 0,
-      amortizationType: 'Linéaire',
-      location: 'Siège Social Tunis'
-    },
-    {
-      id: 'demo-IMM-2024-002',
-      name: 'Camion de Livraison Isotherme Isuzu 3.5T',
-      category: 'Matériel de Transport',
-      purchaseDate: '2024-06-20',
-      initialValue: 85000,
-      usefulLifeYears: 5, // 20% annual rate
-      scrapValue: 0,
-      amortizationType: 'Linéaire',
-      location: 'Dépôt de Sousse'
-    }
-  ];
+  const DEFAULT_ASSETS: Immobilisation[] = [];
 
   // --- States & Proxies ---
   const assets = propAssets;

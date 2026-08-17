@@ -57,90 +57,9 @@ export default function ProductionManager({
   const MO_STORAGE_KEY = 'carthage_production_manufacturing_orders';
 
   // --- Prepopulated Data ---
-  const DEFAULT_NOMENCLATURES: Nomenclature[] = [
-    {
-      id: 'demo-nom-1',
-      productName: 'Câble Électrique Isolé 2.5mm²',
-      category: 'Câblerie & Électricité',
-      estimatedTimeMinutes: 12,
-      laborCostPerUnit: 1.200,
-      materials: [
-        { id: 'm1', name: 'Cuivre Cathodique Pur', quantityNeeded: 0.18, unit: 'kg', unitCost: 24.500 },
-        { id: 'm2', name: 'Grains PVC Isolants (Gris)', quantityNeeded: 0.12, unit: 'kg', unitCost: 4.800 },
-        { id: 'm3', name: 'Touret Bois de Conditionnement', quantityNeeded: 0.01, unit: 'u', unitCost: 15.000 },
-      ]
-    },
-    {
-      id: 'demo-nom-2',
-      productName: 'Disjoncteur Divisionnaire 16A',
-      category: 'Appareillage Électrique',
-      estimatedTimeMinutes: 25,
-      laborCostPerUnit: 2.500,
-      materials: [
-        { id: 'm4', name: 'Ressort Acier Allié', quantityNeeded: 1, unit: 'u', unitCost: 0.350 },
-        { id: 'm5', name: 'Boîtier Plastique Auto-extinguible', quantityNeeded: 1, unit: 'u', unitCost: 1.100 },
-        { id: 'm6', name: 'Bandes de Cuivre de Contact', quantityNeeded: 0.05, unit: 'kg', unitCost: 26.000 },
-        { id: 'm7', name: 'Bobine de Déclenchement Magnétique', quantityNeeded: 1, unit: 'u', unitCost: 1.800 },
-      ]
-    },
-    {
-      id: 'demo-nom-3',
-      productName: 'Gaine annelée ICTA Ø20',
-      category: 'Conduits & Goulottes',
-      estimatedTimeMinutes: 8,
-      laborCostPerUnit: 0.500,
-      materials: [
-        { id: 'm8', name: 'Polyéthylène Haute Densité (PEHD)', quantityNeeded: 0.08, unit: 'kg', unitCost: 3.900 },
-        { id: 'm9', name: 'Fil de Tire-aiguille Acier', quantityNeeded: 1, unit: 'm', unitCost: 0.080 },
-      ]
-    }
-  ];
+  const DEFAULT_NOMENCLATURES: Nomenclature[] = [];
 
-  const DEFAULT_MANUFACTURING_ORDERS: ManufacturingOrder[] = [
-    {
-      id: 'demo-OF-2026-001',
-      nomenclatureId: 'demo-nom-1',
-      productName: 'Câble Électrique Isolé 2.5mm²',
-      quantityToProduce: 5000,
-      quantityProduced: 5000,
-      quantityScrapped: 120,
-      startDate: '2026-06-20',
-      endDate: '2026-06-22',
-      assignedLine: 'Ligne d\'extrusion A (Sfax)',
-      assignedTeam: 'Équipe Matin (Chef : J. Ben Ali)',
-      status: 'Terminé',
-      advancement: 100,
-      notes: 'Production conforme aux normes tunisiennes de sécurité électrique. Rebuts minimes.'
-    },
-    {
-      id: 'demo-OF-2026-002',
-      nomenclatureId: 'demo-nom-2',
-      productName: 'Disjoncteur Divisionnaire 16A',
-      quantityToProduce: 1500,
-      quantityProduced: 850,
-      quantityScrapped: 45,
-      startDate: '2026-06-25',
-      assignedLine: 'Ligne Assemblage B (Tunis)',
-      assignedTeam: 'Équipe Après-midi (Chef : M. Trabelsi)',
-      status: 'En cours',
-      advancement: 56,
-      notes: 'Cadence de montage nominale. Approvisionnement en bobines fluide.'
-    },
-    {
-      id: 'demo-OF-2026-003',
-      nomenclatureId: 'demo-nom-3',
-      productName: 'Gaine annelée ICTA Ø20',
-      quantityToProduce: 10000,
-      quantityProduced: 0,
-      quantityScrapped: 0,
-      startDate: '2026-07-02',
-      assignedLine: 'Ligne Extrusion C (Sfax)',
-      assignedTeam: 'Équipe Nuit (Chef : S. Ghorbel)',
-      status: 'Planifié',
-      advancement: 0,
-      notes: 'En attente de réception de la matière première PEHD.'
-    }
-  ];
+  const DEFAULT_MANUFACTURING_ORDERS: ManufacturingOrder[] = [];
 
   // --- States & Proxies ---
   const nomenclatures = propNomenclatures;

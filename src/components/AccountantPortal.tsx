@@ -62,121 +62,9 @@ export interface CabinetDocument {
   isSigned: boolean;
 }
 
-const INITIAL_DEMO_DOSSIERS: ClientDossier[] = [
-  {
-    id: 'dos-sfe',
-    name: 'SFE (Société de Fabrication Électrique)',
-    mf: '1482930/A/A/M/000',
-    tenant_id: 'dos-sfe',
-    legalForm: 'SUARL',
-    sector: 'Industrie & Électricité',
-    fiscalYear: '2026',
-    unprocessedDocs: 14,
-    tejStatus: 'validated',
-    cnssStatus: 'pending',
-    tvaG50Status: 'validated',
-    quarterlyRevenue: 1420000,
-    lastSyncDate: '2026-08-11 16:30'
-  },
-  {
-    id: 'dos-sfax-distrib',
-    name: 'Sfax Distribution',
-    mf: '0948215/B/A/M/000',
-    tenant_id: 'dos-sfax-distrib',
-    legalForm: 'SARL',
-    sector: 'Commerce & Grossiste',
-    fiscalYear: '2026',
-    unprocessedDocs: 32,
-    tejStatus: 'validated',
-    cnssStatus: 'validated',
-    tvaG50Status: 'late',
-    quarterlyRevenue: 890000,
-    lastSyncDate: '2026-08-12 09:15'
-  },
-  {
-    id: 'dos-batiment-sahel',
-    name: 'Batiment Sahel',
-    mf: '1209384/C/A/M/000',
-    tenant_id: 'dos-batiment-sahel',
-    legalForm: 'SA',
-    sector: 'BTP & Construction',
-    fiscalYear: '2026',
-    unprocessedDocs: 8,
-    tejStatus: 'pending',
-    cnssStatus: 'validated',
-    tvaG50Status: 'validated',
-    quarterlyRevenue: 2150000,
-    lastSyncDate: '2026-08-10 14:00'
-  },
-  {
-    id: 'dos-gts',
-    name: 'GTS (Global Transport Services)',
-    mf: '1654321/D/A/M/000',
-    tenant_id: 'dos-gts',
-    legalForm: 'SARL',
-    sector: 'Logistique & Transit',
-    fiscalYear: '2026',
-    unprocessedDocs: 21,
-    tejStatus: 'validated',
-    cnssStatus: 'pending',
-    tvaG50Status: 'validated',
-    quarterlyRevenue: 640000,
-    lastSyncDate: '2026-08-11 11:45'
-  }
-];
+const INITIAL_DEMO_DOSSIERS: ClientDossier[] = [];
 
-const INITIAL_CABINET_DOCS: CabinetDocument[] = [
-  {
-    id: 'doc-1',
-    title: 'Liasse Fiscale Définitive Exercice 2025',
-    clientName: 'SFE (Société de Fabrication Électrique)',
-    category: 'Liasse Fiscale',
-    uploadDate: '2026-03-25',
-    fileSize: '4.2 MB',
-    author: 'Cabinet',
-    isSigned: true
-  },
-  {
-    id: 'doc-2',
-    title: 'PV d\'Assemblée Générale Ordinaire 2025 & Affectation Résultat',
-    clientName: 'Batiment Sahel',
-    category: 'PV dAG',
-    uploadDate: '2026-05-18',
-    fileSize: '1.8 MB',
-    author: 'Cabinet',
-    isSigned: true
-  },
-  {
-    id: 'doc-3',
-    title: 'Attestation de Régularité Fiscale DGI T2-2026',
-    clientName: 'GTS (Global Transport Services)',
-    category: 'Attestation Fiscale / CNSS',
-    uploadDate: '2026-07-02',
-    fileSize: '850 KB',
-    author: 'Cabinet',
-    isSigned: true
-  },
-  {
-    id: 'doc-4',
-    title: 'Relevés Bancaires & Factures d\'Achat Juillet 2026',
-    clientName: 'Sfax Distribution',
-    category: 'Autre',
-    uploadDate: '2026-08-05',
-    fileSize: '12.4 MB',
-    author: 'Client',
-    isSigned: false
-  },
-  {
-    id: 'doc-5',
-    title: 'Rapport Spécial du Commissaire aux Comptes',
-    clientName: 'Batiment Sahel',
-    category: 'Rapport Commissariat',
-    uploadDate: '2026-04-12',
-    fileSize: '3.1 MB',
-    author: 'Cabinet',
-    isSigned: true
-  }
-];
+const INITIAL_CABINET_DOCS: CabinetDocument[] = [];
 
 export interface AccountantPortalProps {
   onBackToLanding?: () => void;
@@ -211,7 +99,7 @@ export const AccountantPortal: React.FC<AccountantPortalProps> = ({
 
   // New Document Upload Form State
   const [newDocTitle, setNewDocTitle] = useState('');
-  const [newDocClient, setNewDocClient] = useState(INITIAL_DEMO_DOSSIERS[0].name);
+  const [newDocClient, setNewDocClient] = useState(INITIAL_DEMO_DOSSIERS[0]?.name || '');
   const [newDocCategory, setNewDocCategory] = useState<CabinetDocument['category']>('Liasse Fiscale');
 
   const showToast = (msg: string) => {

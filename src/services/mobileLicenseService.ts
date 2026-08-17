@@ -76,15 +76,8 @@ export class MobileLicenseService {
       console.warn(`[MobileLicenseService] Erreur lors du chargement des agents terrain Firestore pour ${tenantId}:`, err);
     }
 
-    // Fallback list of collaborators with MOD-03 & MOD-08 relational mapping
-    return [
-      { agentId: 'EMP-904', agentName: 'Sami Ben Ali', email: 's.benali@gep.tn', role: 'Commercial IT (Van Sales)', department: 'Commercial & Distribution', vehicleId: 'demo-v_904', vehicleLabel: 'Camionette Isuzu (240 TN 8812)', hasMobileLicense: true, assignedAt: '2026-01-15' },
-      { agentId: 'EMP-912', agentName: 'Mohamed Trabelsi', email: 'm.trabelsi@gep.tn', role: 'Chef de Chantier BTP', department: 'Operations Chantier', vehicleId: 'demo-v_912', vehicleLabel: 'Toyota Hilux (198 TN 4410)', hasMobileLicense: true, assignedAt: '2026-02-01' },
-      { agentId: 'EMP-920', agentName: 'Youssef Mansour', email: 'y.mansour@gep.tn', role: 'Chauffeur Livreur', department: 'Logistique Van Sales', vehicleId: 'demo-v_920', vehicleLabel: 'Peugeot Boxer (215 TN 1092)', hasMobileLicense: true, assignedAt: '2026-02-10' },
-      { agentId: 'EMP-935', agentName: 'Karem Chaabane', email: 'k.chaabane@gep.tn', role: 'Technicien Maintenance', department: 'Services Techniques', vehicleId: 'demo-v_935', vehicleLabel: 'Citroën Berlingo (201 TN 6621)', hasMobileLicense: true, assignedAt: '2026-02-15' },
-      { agentId: 'EMP-942', agentName: 'Fatma Gharbi', email: 'f.gharbi@gep.tn', role: 'Inspectrice Qualité Terrain', department: 'Assurance Qualité', vehicleId: 'demo-v_942', vehicleLabel: 'Renault Clio (228 TN 3301)', hasMobileLicense: true, assignedAt: '2026-02-20' },
-      { agentId: 'emp_01', agentName: 'MED ZIED BEN MILED', email: 'm.benmiled@gep.tn', role: 'Manager Terrain', department: 'Supervision', hasMobileLicense: true, assignedAt: '2026-01-15' }
-    ];
+    // Fallback list of collaborators
+    return [];
   }
 
   /**

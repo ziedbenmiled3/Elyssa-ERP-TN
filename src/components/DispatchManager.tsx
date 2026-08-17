@@ -184,12 +184,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
   };
 
   // Default drivers base
-  const defaultDrivers = [
-    { id: 'emp_drv_01', name: 'Kamel Trad (Chauffeur Logistique Poids Lourds)' },
-    { id: 'emp_drv_02', name: 'Hamza Ben Salem (Livreur / Express)' },
-    { id: 'emp_drv_03', name: 'Youssef Chahed (Chauffeur Toupie & Chantier)' },
-    { id: 'emp_drv_04', name: 'Nizar Trabelsi (Conducteur Utilitaire)' }
-  ];
+  const defaultDrivers: any[] = [];
 
   // Dynamic drivers list combining HR collaborators & default drivers filtered by driver roles
   const driversList = useMemo(() => {
@@ -237,47 +232,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
       } catch (e) {}
     }
     if (sourceVehicles.length === 0) {
-      sourceVehicles = [
-        {
-          id: 'FLEET-ISUZU-01',
-          tenantId: tenantId || 'company_1',
-          fleet_park: 'Dépôt Central Charguia',
-          device_name: 'Camion Isuzu D-Max',
-          serial_reference: 'TN-210-9842',
-          category: 'Véhicule Utilitaire / Camion',
-          status: 'Available',
-          registeredAt: new Date().toISOString(),
-          mileage: 48500,
-          assignedDriver: 'Hamza Ben Salem',
-          maxPayloadKg: 1000
-        },
-        {
-          id: 'FLEET-PARTNER-02',
-          tenantId: tenantId || 'company_1',
-          fleet_park: 'Magasin Principal Tunis',
-          device_name: 'Fourgon Peugeot Partner',
-          serial_reference: 'TN-198-4431',
-          category: 'Véhicule Utilitaire',
-          status: 'Available',
-          registeredAt: new Date().toISOString(),
-          mileage: 22100,
-          assignedDriver: 'Sami Cherif',
-          maxPayloadKg: 1200
-        },
-        {
-          id: 'FLEET-ISUZU-12T',
-          tenantId: tenantId || 'company_1',
-          fleet_park: 'Dépôt Central Radès',
-          device_name: 'Camion Isuzu 12 Tonnes Poids Lourd',
-          serial_reference: 'TN-9021-33',
-          category: 'Camion Poids Lourd',
-          status: 'Available',
-          registeredAt: new Date().toISOString(),
-          mileage: 89400,
-          assignedDriver: 'Kamel Trad',
-          maxPayloadKg: 12000
-        }
-      ] as any[];
+      sourceVehicles = [];
     }
 
     return sourceVehicles.filter(v => {

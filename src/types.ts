@@ -277,8 +277,8 @@ export interface CollaboratorAccount {
   name: string;
   email: string;
   password?: string;
-  role: 'Agent' | 'Manager' | 'Viewer' | 'Director';
-  status: 'Invited' | 'Active' | 'Suspended';
+  role: 'Agent' | 'Manager' | 'Viewer' | 'Director' | 'DG';
+  status: 'Invited' | 'Active' | 'Suspended' | 'ACTIF';
   assignedTasks: CollaboratorTask[];
   createdDate: string;
   company?: string;
@@ -289,6 +289,9 @@ export interface CollaboratorAccount {
   plainPassword?: string;
   structureType?: 'Direction' | 'Service' | 'Agence' | 'Succursale' | 'Entrepôt' | 'Usine';
   structureName?: string;
+  structure?: string;
+  tasksCount?: number;
+  isDemo?: boolean;
   matricule?: string;
   jobTitle?: string;
   phone?: string;

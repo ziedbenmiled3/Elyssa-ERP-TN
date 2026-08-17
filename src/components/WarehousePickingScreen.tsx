@@ -111,90 +111,9 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
     return () => unsub();
   }, [tenantId]);
 
-  // Seed sample multi-warehouse picking orders including SLA Quai and Cancelled Order for Reverse Logistics
+  // Seed function disabled per user directive (no demo data)
   const handleSeedDemoPickingOrders = async () => {
-    const demoOrders: PickingOrder[] = [
-      {
-        id: 'PICK-FAC-2026-0801-CHARGUIA',
-        tenantId,
-        orderId: 'FAC-2026-0801',
-        clientName: 'SOCIÉTÉ DU SAHEL DISTRIBUTION',
-        deliveryAddress: 'Zone Industrielle Akouda, Lot 14, Sousse',
-        warehouseId: 'wh_charguia',
-        warehouseName: 'Dépôt Charguia (Z.I.)',
-        dockNumber: 'Quai 1 - Dépôt Charguia',
-        status: 'pret_chargement',
-        createdAt: new Date().toISOString(),
-        preparedAt: new Date().toISOString(),
-        preparedBy: 'Mounir Sfaxi (Magasinier)',
-        totalAmountTTC: 3450.000,
-        items: [
-          { productId: 'P01', productName: 'Ciment PORTLAND 50kg Hifi', quantity: 40, warehouseName: 'Dépôt Charguia (Z.I.)' },
-          { productId: 'P02', productName: 'Briques Creuses 12 Trous (Palette)', quantity: 15, warehouseName: 'Dépôt Charguia (Z.I.)' }
-        ]
-      },
-      {
-        id: 'PICK-FAC-2026-0801-TUNIS',
-        tenantId,
-        orderId: 'FAC-2026-0801',
-        clientName: 'SOCIÉTÉ DU SAHEL DISTRIBUTION',
-        deliveryAddress: 'Zone Industrielle Akouda, Lot 14, Sousse',
-        warehouseId: 'wh_tunis',
-        warehouseName: 'Magasin Tunis Principal',
-        dockNumber: 'Quai 2 - Magasin Tunis',
-        status: 'pret_chargement',
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-        preparedAt: new Date(Date.now() - 1800000).toISOString(),
-        preparedBy: 'Habib Ben Ammar',
-        totalAmountTTC: 1280.000,
-        items: [
-          { productId: 'P03', productName: 'Peinture Satine Blanche 20L', quantity: 6, warehouseName: 'Magasin Tunis Principal' },
-          { productId: 'P04', productName: 'Gaine Électrique ICTA 20mm (Rouleau)', quantity: 10, warehouseName: 'Magasin Tunis Principal' }
-        ]
-      },
-      {
-        id: 'PICK-FAC-2026-0802-SFAX',
-        tenantId,
-        orderId: 'FAC-2026-0802',
-        clientName: 'COMPTOIR INDUSTRIEL BTP',
-        deliveryAddress: 'Chantier Rocade Sud, km 12, Sfax',
-        warehouseId: 'wh_sfax',
-        warehouseName: 'Dépôt Sfax - Poudrière',
-        dockNumber: 'Quai Non Attribué',
-        status: 'en_cours',
-        createdAt: new Date(Date.now() - 28800000).toISOString(),
-        totalAmountTTC: 5800.000,
-        items: [
-          { productId: 'P05', productName: 'Fer à Béton FeE500 Diam 12mm (Barres)', quantity: 100, warehouseName: 'Dépôt Sfax - Poudrière' }
-        ]
-      },
-      {
-        id: 'PICK-FAC-2026-0803-SOUSSE',
-        tenantId,
-        orderId: 'FAC-2026-0803',
-        clientName: 'BEN AHMED MATÉRIAUX',
-        deliveryAddress: 'Avenue Habib Bourguiba, Nabeul',
-        warehouseId: 'wh_sousse',
-        warehouseName: 'Stock Logistique Sousse',
-        dockNumber: 'Quai Non Attribué',
-        status: 'annule',
-        cancellationReason: 'Demande d\'annulation urgente du client suite erreur de commande',
-        cancellationDate: new Date(Date.now() - 1800000).toISOString(),
-        reintegrationStatus: 'a_reintegrer',
-        createdAt: new Date(Date.now() - 7200000).toISOString(),
-        totalAmountTTC: 2150.000,
-        items: [
-          { productId: 'P06', productName: 'Tuyau PVC Pression 110mm (Long. 6m)', quantity: 25, warehouseName: 'Stock Logistique Sousse' },
-          { productId: 'P07', productName: 'Raccords Laiton 3/4 (Lot de 50)', quantity: 4, warehouseName: 'Stock Logistique Sousse' }
-        ]
-      }
-    ];
-
-    for (const po of demoOrders) {
-      await setDoc(doc(db, 'company_erp_data', tenantId, 'picking_orders', po.id), po, { merge: true });
-    }
-
-    showToast('Bons de préparation & cas de test SLA/Annulation régularisés !', 'success');
+    showToast('Mode données réelles actif. Aucune donnée démo injectée.', 'info');
   };
 
   // Status Change Handler

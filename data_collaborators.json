@@ -1,15 +1,16 @@
 [
   {
-    "id": "collab_carthage_1",
+    "id": "admin_root",
     "name": "MED ZIED BEN MILED",
     "email": "contact@elyssa.pro",
-    "password": "$2b$10$.oItBgWYN3TZ9bMh1hDDkOP7puR.Plp5Jf9NiTnPxFfICV.GK/aIW",
-    "plainPassword": "bochra1985",
-    "role": "Manager",
-    "status": "Active",
+    "role": "DG",
+    "status": "ACTIF",
+    "structure": "Direction : Principale",
+    "tasksCount": 0,
     "company": "Inter-Affaires",
     "company_id": "pc-parent-elyssa",
-    "assignedTasks": [],
-    "createdDate": "2026-06-22"
+    "plainPassword": "bochra1985",
+    "password": "$2b$10$.oItBgWYN3TZ9bMh1hDDkOP7puR.Plp5Jf9NiTnPxFfICV.GK/aIW",
+    "assignedTasks": []
   }
 ]
