@@ -4242,6 +4242,7 @@ export default function App() {
       setContracts([]);
       setAbsences([]);
       setPayslips([]);
+      setPerformanceContracts([]);
       setDocuments([]);
       setAssets([]);
       setCessionEntries([]);
@@ -4257,10 +4258,33 @@ export default function App() {
       setExpenses([]);
       setIncidents([]);
       setCompanyLocations([]);
+      setIncomingEmails([]);
+      setEmailTemplates([]);
+      setCommunicationLogs([]);
+
+      // Keep only root system/super-admin in collaborators list (0 non-admin collaborators)
+      setCollaborators(prev => {
+        const rootAdmins = (prev || []).filter(c => 
+          c.email?.toLowerCase() === 'contact@elyssa.pro' || 
+          c.email?.toLowerCase() === 'admin@elyssa.pro' || 
+          c.email?.toLowerCase() === 'admin@carthage.tn' ||
+          c.email?.toLowerCase() === 'ziedbenmiled3@gmail.com' || 
+          c.role === 'SuperAdmin' ||
+          (currentUser && c.email?.toLowerCase() === currentUser.email?.toLowerCase())
+        );
+        localStorage.setItem('carthage_collaborators', JSON.stringify(rootAdmins));
+        return rootAdmins;
+      });
 
       clearDemoData();
       clearAppCache();
       setPurgeReport(report || {});
+
+      // Dispatch global purge event to notify all active sub-managers immediately
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new CustomEvent('elyssa_demo_purged', { detail: { tenantId: activeCompanyName, report } }));
+      }
     } catch (err) {
       console.error('Error during purgeCompanyDemoData:', err);
     } finally {

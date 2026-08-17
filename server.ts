@@ -4324,20 +4324,20 @@ async function purgeCompanyDemoDataHelper(company: string) {
     const keysToPurge = [
       // 1. Trésorerie & Portefeuille
       'treasury_effects', 'bank_audits', 'cash_forecasts', 'cheques_effects', 'treasury_cheques_effects', 'treasury_checks', 'bank_transfers', 'bank_transactions', 'caisse_transactions',
-      // 2. Immobilisations & Amortissements
-      'assets_register', 'depreciation_schedules', 'fixed_assets', 'assets',
+      // 2. Immobilisations, Actifs & Matériel
+      'assets_register', 'depreciation_schedules', 'fixed_assets', 'assets', 'fleet_inventory', 'hardware_assets',
       // 3. Achats & Approvisionnements
       'purchase_orders', 'purchase_requests', 'supplier_evaluations', 'purchaseRequisitions', 'purchaseOrders', 'supplierPerformance',
       // 4. Production & GPAO
       'manufacturing_orders', 'bill_of_materials', 'trs_logs', 'production_orders', 'bom_nomenclatures', 'nomenclatures', 'manufacturingOrders',
       // 5. Parc Auto & Flotte
-      'fleet_vehicles', 'fleet_expenses', 'mission_orders', 'fleet_missions', 'vehicles', 'missions', 'expenses', 'incidents', 'fuelBons', 'interventions', 'insurances',
-      // 6. Cession d'Entreprise & Audit
-      'company_transfer_audits', 'transfer_acts', 'cessionEntries', 'audit_logs', 'audit_acts',
-      // 7. Flotte Mobile & Terrain
-      'mobile_devices', 'field_sessions', 'offline_orders', 'mobile_orders', 'construction_reports', 'chantier_reports',
-      // 8. RH, Paie & Pointage
-      'attendance_logs', 'attendance_records', 'payroll_pending_adjustments', 'employees', 'contracts', 'absences', 'payslips',
+      'fleet_vehicles', 'fleet_expenses', 'mission_orders', 'fleet_missions', 'vehicles', 'vehicle_missions', 'missions', 'expenses', 'incidents', 'fuelBons', 'interventions', 'insurances',
+      // 6. Cession d'Entreprise, Audit, Traçabilité & Gouvernance
+      'company_transfer_audits', 'transfer_acts', 'cessionEntries', 'cession_events', 'audit_logs', 'audit_acts', 'company_cessions', 'dataroom', 'system_actions',
+      // 7. Flotte Mobile, Terrain & Entrepôt
+      'mobile_devices', 'field_sessions', 'offline_orders', 'mobile_orders', 'construction_reports', 'chantier_reports', 'warehouse_pickings', 'picking_orders', 'depots_stock', 'shipments', 'dispatch_tours', 'delivery_manifests', 'delivery_tours', 'warehouses',
+      // 8. RH, Collaborateurs, Objectifs & Pointage
+      'collaborators', 'mpo_contracts', 'employee_objectives', 'performance_contracts', 'attendance_logs', 'attendance_records', 'biometric_alerts', 'timesheets', 'time_tracking', 'payroll_pending_adjustments', 'employees', 'contracts', 'absences', 'payslips',
       // 9. Ventes, CRM, Stocks & Divers
       'clients', 'complaints', 'invoices', 'visitReports', 'competitors', 'suppliers', 'products', 'stockMovements', 'documents', 'importFolders', 'lcRequests', 'transit_dossiers', 'incomingEmails', 'emailTemplates', 'communicationLogs', 'juridique_shareholders', 'juridique_deadlines', 'juridique_documents'
     ];
@@ -4381,13 +4381,13 @@ async function purgeCompanyDemoDataHelper(company: string) {
     const resolvedTenantId = company.trim().toLowerCase().replace(/[^a-z0-9]/g, '-');
     const tenantSubCollectionsToPurge = [
       'treasury_effects', 'bank_audits', 'cash_forecasts', 'cheques_effects', 'treasury_cheques_effects', 'treasury_checks', 'bank_transfers', 'bank_transactions', 'caisse_transactions',
-      'assets_register', 'depreciation_schedules', 'fixed_assets', 'assets',
+      'assets_register', 'depreciation_schedules', 'fixed_assets', 'assets', 'fleet_inventory', 'hardware_assets',
       'purchase_orders', 'purchase_requests', 'supplier_evaluations', 'purchaseRequisitions', 'purchaseOrders', 'supplierPerformance',
       'manufacturing_orders', 'bill_of_materials', 'trs_logs', 'production_orders', 'bom_nomenclatures', 'nomenclatures', 'manufacturingOrders',
-      'fleet_vehicles', 'fleet_expenses', 'mission_orders', 'fleet_missions', 'vehicles', 'missions', 'expenses', 'incidents', 'fuelBons', 'interventions', 'insurances',
-      'company_transfer_audits', 'transfer_acts', 'cessionEntries', 'audit_logs', 'audit_acts',
-      'mobile_devices', 'field_sessions', 'offline_orders', 'mobile_orders', 'construction_reports', 'chantier_reports',
-      'attendance_logs', 'attendance_records', 'payroll_pending_adjustments', 'employees', 'contracts', 'absences', 'payslips',
+      'fleet_vehicles', 'fleet_expenses', 'mission_orders', 'fleet_missions', 'vehicles', 'vehicle_missions', 'missions', 'expenses', 'incidents', 'fuelBons', 'interventions', 'insurances',
+      'company_transfer_audits', 'transfer_acts', 'cessionEntries', 'cession_events', 'audit_logs', 'audit_acts', 'company_cessions', 'dataroom', 'system_actions',
+      'mobile_devices', 'field_sessions', 'offline_orders', 'mobile_orders', 'construction_reports', 'chantier_reports', 'warehouse_pickings', 'picking_orders', 'depots_stock', 'shipments', 'dispatch_tours', 'delivery_manifests', 'delivery_tours', 'warehouses',
+      'collaborators', 'mpo_contracts', 'employee_objectives', 'performance_contracts', 'attendance_logs', 'attendance_records', 'biometric_alerts', 'timesheets', 'time_tracking', 'payroll_pending_adjustments', 'employees', 'contracts', 'absences', 'payslips',
       'clients', 'complaints', 'invoices', 'visitReports', 'competitors', 'suppliers', 'products', 'stockMovements', 'documents', 'importFolders', 'lcRequests', 'transit_dossiers', 'incomingEmails', 'emailTemplates', 'communicationLogs', 'juridique_shareholders', 'juridique_deadlines', 'juridique_documents'
     ];
 
@@ -4412,9 +4412,36 @@ async function purgeCompanyDemoDataHelper(company: string) {
   // 3. Clean up top-level collections in Firestore asynchronously in background
   if (isFirestoreActive && db) {
     const targetCollections = [
-      'collaborators', 'treasury_checks', 'audit_logs', 'fixed_assets',
-      'purchase_orders', 'purchase_requests', 'production_orders', 'bom_nomenclatures',
-      'time_tracking'
+      'collaborators',
+      'mpo_contracts',
+      'employee_objectives',
+      'performance_contracts',
+      'attendance_logs',
+      'biometric_alerts',
+      'timesheets',
+      'time_tracking',
+      'warehouse_pickings',
+      'picking_orders',
+      'depots_stock',
+      'shipments',
+      'dispatch_tours',
+      'delivery_manifests',
+      'mobile_devices',
+      'field_sessions',
+      'fleet_inventory',
+      'hardware_assets',
+      'vehicles',
+      'vehicle_missions',
+      'fleet_expenses',
+      'audit_logs',
+      'cession_events',
+      'system_actions',
+      'treasury_checks',
+      'fixed_assets',
+      'purchase_orders',
+      'purchase_requests',
+      'production_orders',
+      'bom_nomenclatures'
     ];
     (async () => {
       for (const collName of targetCollections) {

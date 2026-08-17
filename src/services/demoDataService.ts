@@ -17,11 +17,13 @@ export const TENANT_SUBCOLLECTIONS = [
   'bank_transactions',
   'caisse_transactions',
 
-  // 2. Immobilisations & Amortissements
+  // 2. Immobilisations, Actifs & Matériel
   'assets_register',
   'depreciation_schedules',
   'fixed_assets',
   'assets',
+  'fleet_inventory',
+  'hardware_assets',
 
   // 3. Achats & Approvisionnements
   'purchase_orders',
@@ -39,14 +41,13 @@ export const TENANT_SUBCOLLECTIONS = [
   'bom_nomenclatures',
   'nomenclatures',
 
-  // 5. Parc Auto & Flotte
+  // 5. Parc Auto, Véhicules & Missions
   'fleet_vehicles',
-  'fleet_inventory',
   'fleet_expenses',
   'mission_orders',
   'fleet_missions',
-  'delivery_tours',
   'vehicles',
+  'vehicle_missions',
   'missions',
   'expenses',
   'incidents',
@@ -54,16 +55,18 @@ export const TENANT_SUBCOLLECTIONS = [
   'interventions',
   'insurances',
 
-  // 6. Cession d'Entreprise & Audit
+  // 6. Cession d'Entreprise, Audit, Traçabilité & Gouvernance
   'company_transfer_audits',
   'transfer_acts',
   'cessionEntries',
+  'cession_events',
   'audit_logs',
   'audit_acts',
   'company_cessions',
   'dataroom',
+  'system_actions',
 
-  // 7. Flotte Mobile & Terrain
+  // 7. Flotte Mobile, Terrain & Entrepôt
   'mobile_devices',
   'field_sessions',
   'offline_orders',
@@ -75,10 +78,25 @@ export const TENANT_SUBCOLLECTIONS = [
   'mobile_logs',
   'van_sales_logs',
   'mobile_fleet',
+  'warehouse_pickings',
+  'picking_orders',
+  'depots_stock',
+  'shipments',
+  'dispatch_tours',
+  'delivery_tours',
+  'delivery_manifests',
+  'warehouses',
 
-  // 8. RH, Paie & Pointage
+  // 8. RH, Collaborateurs, Objectifs & Pointage
+  'collaborators',
+  'mpo_contracts',
+  'performance_contracts',
+  'employee_objectives',
   'attendance_logs',
   'attendance_records',
+  'biometric_alerts',
+  'timesheets',
+  'time_tracking',
   'payroll_pending_adjustments',
   'employees',
   'contracts',
@@ -87,7 +105,6 @@ export const TENANT_SUBCOLLECTIONS = [
   'time_entries',
   'pointages',
   'pocket_punches',
-  'collaborators',
   'collaborateur_records',
   'rh_records',
 
@@ -99,7 +116,6 @@ export const TENANT_SUBCOLLECTIONS = [
   'competitors',
   'suppliers',
   'products',
-  'warehouses',
   'stockMovements',
   'documents',
   'importFolders',
@@ -188,6 +204,64 @@ export async function clearDemoData(tenantId: string): Promise<PurgeReport> {
     } catch (parentErr) {
       console.warn('[clearDemoData] Notice mise à jour document tenant parent:', parentErr);
     }
+
+    // 2b. Purge directe des collections Firestore de premier niveau
+    const rootCollectionsToPurge = [
+      'collaborators',
+      'mpo_contracts',
+      'performance_contracts',
+      'employee_objectives',
+      'attendance_logs',
+      'biometric_alerts',
+      'timesheets',
+      'time_tracking',
+      'warehouse_pickings',
+      'picking_orders',
+      'depots_stock',
+      'shipments',
+      'dispatch_tours',
+      'delivery_manifests',
+      'mobile_devices',
+      'field_sessions',
+      'fleet_inventory',
+      'hardware_assets',
+      'vehicles',
+      'vehicle_missions',
+      'fleet_expenses',
+      'audit_logs',
+      'cession_events',
+      'system_actions'
+    ];
+
+    for (const rootColName of rootCollectionsToPurge) {
+      try {
+        const rootRef = collection(db, rootColName);
+        const rootSnap = await getDocs(rootRef).catch(() => null);
+        if (rootSnap && !rootSnap.empty) {
+          const batch = writeBatch(db);
+          let delCount = 0;
+          for (const docSnap of rootSnap.docs) {
+            const data = docSnap.data();
+            const docId = docSnap.id.toLowerCase();
+            const email = String(data.email || '').toLowerCase();
+            const isSystemAdmin = email === 'contact@elyssa.pro' || email === 'admin@elyssa.pro' || email === 'admin@carthage.tn' || email === 'ziedbenmiled3@gmail.com' || data.role === 'SuperAdmin';
+            
+            if (rootColName === 'collaborators' && isSystemAdmin) {
+              continue; // Preserver uniquement l'admin racine
+            }
+
+            batch.delete(docSnap.ref);
+            delCount++;
+          }
+          if (delCount > 0) {
+            await batch.commit();
+          }
+          report[`root_${rootColName}`] = { deleted: delCount, remaining: 0 };
+        }
+      } catch (rErr) {
+        console.warn(`[clearDemoData] Notice purge collection root ${rootColName}:`, rErr);
+      }
+    }
   }
 
   // 3. Purge des clés LocalStorage associées aux données de démo
@@ -199,13 +273,16 @@ export async function clearDemoData(tenantId: string): Promise<PurgeReport> {
     'carthage_year_end_closings', 'carthage_accounting_entries', 'carthage_documents',
     'carthage_employees', 'carthage_contracts', 'carthage_absences', 'carthage_payslips',
     'carthage_collaborators', 'carthage_attendance_logs', 'carthage_attendance_records',
+    'carthage_biometric_alerts', 'carthage_timesheets', 'carthage_mpo_contracts', 'elyssa_mpo_contracts', 'carthage_employee_objectives',
     `elyssa_attendance_records_${companyId}`, 'elyssa_pocket_punches',
     'carthage_assets_immobilisations', 'carthage_cession_entries', 'carthage_company_transfer_audits', 'carthage_dataroom',
+    'carthage_audit_logs', 'carthage_cession_events', 'carthage_system_actions',
     'carthage_production_nomenclatures', 'carthage_production_manufacturing_orders', 'carthage_trs_logs',
     'carthage_purchasing_requisitions', 'carthage_purchasing_orders', 'carthage_purchasing_suppliers_performance',
     'carthage_import_folders', 'carthage_lc_requests',
-    'carthage_fleet_vehicles', 'carthage_fleet_missions', 'carthage_fleet_expenses', 'carthage_fleet_incidents', 'carthage_fuel_bons',
+    'carthage_fleet_vehicles', 'carthage_fleet_inventory', 'carthage_hardware_assets', 'carthage_fleet_missions', 'carthage_vehicle_missions', 'carthage_fleet_expenses', 'carthage_fleet_incidents', 'carthage_fuel_bons',
     'carthage_mobile_devices', 'carthage_field_sessions', 'carthage_offline_orders', 'carthage_mobile_orders',
+    'carthage_warehouse_pickings', 'carthage_picking_orders', 'carthage_depots_stock', 'carthage_shipments', 'carthage_dispatch_tours', 'carthage_delivery_manifests',
     'carthage_mobile_punches', 'carthage_van_sales_logs', 'elyssa_mobile_fleet', 'carthage_mobile_logs',
     'carthage_treasury_cheques_effects', 'carthage_treasury_bank_audits',
     'carthage_juridique_shareholders', 'carthage_juridique_deadlines', 'carthage_juridique_documents',
