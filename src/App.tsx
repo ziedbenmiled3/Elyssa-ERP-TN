@@ -4269,7 +4269,7 @@ export default function App() {
           c.email?.toLowerCase() === 'admin@elyssa.pro' || 
           c.email?.toLowerCase() === 'admin@carthage.tn' ||
           c.email?.toLowerCase() === 'ziedbenmiled3@gmail.com' || 
-          c.role === 'SuperAdmin' ||
+          (c.role as string) === 'SuperAdmin' ||
           (currentUser && c.email?.toLowerCase() === currentUser.email?.toLowerCase())
         );
         localStorage.setItem('carthage_collaborators', JSON.stringify(rootAdmins));

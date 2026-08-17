@@ -1,132 +1,113 @@
 import { db } from '../utils/firebase';
 import { collection, getDocs, writeBatch, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { seedAllDemoModulesToFirestore, getFlattenedDemoRegistry } from './demoRegistry';
 
 /**
- * Liste centralisée de TOUTES les sous-collections métiers Firestore du tenant
- * sous company_erp_data/{tenantId}/...
+ * Liste centralisée EXHAUSTIVE de TOUTES les sous-collections métiers Firestore du tenant
+ * pour les 34 modules d'Elyssa ERP sous company_erp_data/{tenantId}/...
  */
 export const TENANT_SUBCOLLECTIONS = [
-  // 1. Trésorerie & Portefeuille
-  'treasury_effects',
-  'bank_audits',
-  'cash_forecasts',
-  'cheques_effects',
-  'treasury_cheques_effects',
-  'treasury_checks',
-  'bank_transfers',
-  'bank_transactions',
-  'caisse_transactions',
+  // Module 1: Gestion des Collaborateurs
+  'collaborators', 'org_structures', 'department_assignments', 'employees', 'contracts', 'absences', 'payslips', 'collaborateur_records', 'rh_records',
 
-  // 2. Immobilisations, Actifs & Matériel
-  'assets_register',
-  'depreciation_schedules',
-  'fixed_assets',
-  'assets',
-  'fleet_inventory',
-  'hardware_assets',
+  // Module 2: Pointage & Temps de Travail
+  'biometric_alerts', 'geofence_anomalies', 'timesheets', 'attendance_logs', 'virtual_clock_events', 'attendance_records', 'time_tracking', 'time_entries', 'pointages', 'pocket_punches',
 
-  // 3. Achats & Approvisionnements
-  'purchase_orders',
-  'purchase_requests',
-  'supplier_evaluations',
-  'purchaseRequisitions',
-  'purchaseOrders',
-  'supplierPerformance',
+  // Module 3: Contrats d'Objectifs & Performance (MPO/OKR)
+  'mpo_contracts', 'performance_metrics', 'employee_objectives', 'prime_calculations', 'performance_contracts',
 
-  // 4. Production & GPAO
-  'manufacturing_orders',
-  'bill_of_materials',
-  'trs_logs',
-  'production_orders',
-  'bom_nomenclatures',
-  'nomenclatures',
+  // Module 4: Paie & Déclarations Fiscales / Sociales
+  'payroll_slips', 'cnss_declarations', 'irpp_records', 'payroll_pending_adjustments',
 
-  // 5. Parc Auto, Véhicules & Missions
-  'fleet_vehicles',
-  'fleet_expenses',
-  'mission_orders',
-  'fleet_missions',
-  'vehicles',
-  'vehicle_missions',
-  'missions',
-  'expenses',
-  'incidents',
-  'fuelBons',
-  'interventions',
-  'insurances',
+  // Module 5: Flotte Mobile & Suivi Terrain
+  'mobile_devices', 'field_sessions', 'gps_breadcrumbs', 'offline_orders_sync', 'offline_orders', 'mobile_orders', 'construction_reports', 'chantier_reports', 'mobile_punches', 'mobile_licenses', 'mobile_logs', 'van_sales_logs', 'mobile_fleet',
 
-  // 6. Cession d'Entreprise, Audit, Traçabilité & Gouvernance
-  'company_transfer_audits',
-  'transfer_acts',
-  'cessionEntries',
-  'cession_events',
-  'audit_logs',
-  'audit_acts',
-  'company_cessions',
-  'dataroom',
-  'system_actions',
+  // Module 6: Stocks & Fournisseurs
+  'inventory_items', 'stock_categories', 'stock_threshold_alerts', 'stock_valuations', 'products', 'stockMovements',
 
-  // 7. Flotte Mobile, Terrain & Entrepôt
-  'mobile_devices',
-  'field_sessions',
-  'offline_orders',
-  'mobile_orders',
-  'construction_reports',
-  'chantier_reports',
-  'mobile_punches',
-  'mobile_licenses',
-  'mobile_logs',
-  'van_sales_logs',
-  'mobile_fleet',
-  'warehouse_pickings',
-  'picking_orders',
-  'depots_stock',
-  'shipments',
-  'dispatch_tours',
-  'delivery_tours',
-  'delivery_manifests',
-  'warehouses',
+  // Module 7: Gestion des Achats & Approvisionnements
+  'purchase_orders', 'purchase_requests', 'suppliers_registry', 'vendor_ratings', 'supplier_evaluations', 'purchaseRequisitions', 'purchaseOrders', 'supplierPerformance', 'suppliers',
 
-  // 8. RH, Collaborateurs, Objectifs & Pointage
-  'collaborators',
-  'mpo_contracts',
-  'performance_contracts',
-  'employee_objectives',
-  'attendance_logs',
-  'attendance_records',
-  'biometric_alerts',
-  'timesheets',
-  'time_tracking',
-  'payroll_pending_adjustments',
-  'employees',
-  'contracts',
-  'absences',
-  'payslips',
-  'time_entries',
-  'pointages',
-  'pocket_punches',
-  'collaborateur_records',
-  'rh_records',
+  // Module 8: Gestion des Préparations & Entrepôts (Picking)
+  'warehouse_pickings', 'picking_lists', 'dock_alerts', 'warehouse_locations', 'picking_orders', 'depots_stock', 'warehouses',
 
-  // 9. Ventes, CRM, Stocks & Divers
-  'clients',
-  'complaints',
-  'invoices',
-  'visitReports',
-  'competitors',
-  'suppliers',
-  'products',
-  'stockMovements',
-  'documents',
-  'importFolders',
-  'lcRequests',
-  'transit_dossiers',
-  'incomingEmails',
-  'emailTemplates',
-  'communicationLogs',
-  'juridique_shareholders',
-  'juridique_deadlines',
-  'juridique_documents'
+  // Module 9: Expéditions & Tournées
+  'shipment_queues', 'dispatch_tours', 'tour_manifests', 'driver_cash_settlements', 'shipments', 'delivery_tours', 'delivery_manifests',
+
+  // Module 10: Production & GPAO (TRS)
+  'manufacturing_orders', 'production_boms', 'workcenter_performance', 'bill_of_materials', 'trs_logs', 'production_orders', 'bom_nomenclatures', 'nomenclatures', 'manufacturingOrders',
+
+  // Module 11: Transit & Logistique Internationale
+  'transit_folders', 'customs_declarations', 'landed_cost_calculations', 'customs_documents_eur1', 'importFolders', 'transit_dossiers',
+
+  // Module 12: Lettres de Crédit (Crédocs Bancaires)
+  'letters_of_credit', 'swift_messages', 'bank_covenants', 'lcRequests',
+
+  // Module 13: Facturation & Recouvrement
+  'invoices', 'credit_notes', 'aging_balances', 'recovery_actions',
+
+  // Module 14: Fiches Clients & CRM
+  'clients_directory', 'client_credit_limits', 'clients',
+
+  // Module 15: Caisse Intelligente (POS)
+  'pos_sessions', 'pos_receipts', 'cash_drawer_logs', 'caisse_transactions',
+
+  // Module 16: Portail Client Extérieur
+  'client_portal_users', 'portal_order_requests',
+
+  // Module 17: Rapports Terrain & Hebdo
+  'field_visit_reports', 'survey_responses', 'visitReports', 'competitors',
+
+  // Module 18: Hub de Communication
+  'marketing_campaigns', 'communication_threads', 'incomingEmails', 'emailTemplates', 'communicationLogs',
+
+  // Module 19: Suivi des Réclamations & SAV
+  'support_tickets', 'merchandise_returns', 'complaints',
+
+  // Module 20: E-Boutique & Storefront (SaaS E-Commerce)
+  'ecommerce_products', 'store_categories', 'web_orders', 'abandoned_carts', 'store_shipping_zones', 'payment_gateway_configs',
+
+  // Module 21: Comptabilité Générale & Trésorerie
+  'accounting_journals', 'general_ledger', 'journal_entries', 'bank_reconciliations', 'bank_transactions', 'documents',
+
+  // Module 22: Intégration TEJ (CIMF)
+  'tej_certificates', 'qrc_tax_records', 'tej_teletransmissions',
+
+  // Module 23: Espace Expert-Comptable
+  'accountant_client_files', 'batch_fiscal_filings',
+
+  // Module 24: Trésorerie, Effets & Chèques
+  'treasury_checks', 'treasury_effects', 'cash_forecasts', 'bank_audits', 'cheques_effects', 'treasury_cheques_effects', 'bank_transfers',
+
+  // Module 25: Immobilisations & Amortissements
+  'fixed_assets', 'depreciation_schedules', 'asset_disposals', 'assets_register', 'assets',
+
+  // Module 26: Bourse & Investissements
+  'security_portfolio', 'dividend_records',
+
+  // Module 27: Gestion de Parc Auto & Flotte
+  'fleet_vehicles', 'fleet_missions', 'fleet_expenses', 'fleet_accidents', 'vehicles', 'vehicle_missions', 'missions', 'expenses', 'incidents', 'fuelBons', 'interventions', 'insurances', 'mission_orders',
+
+  // Module 28: Gestion du Parc d'Actifs & Matériels
+  'fleet_inventory', 'equipment_maintenance', 'hardware_assets',
+
+  // Module 29: GED (Gestion Électronique des Documents)
+  'ged_documents', 'scanned_archives',
+
+  // Module 30: Module de Suivi des Actes & Cession d'Entreprise
+  'audit_logs', 'cession_events', 'valuation_metrics', 'company_transfer_audits', 'transfer_acts', 'cessionEntries', 'audit_acts', 'company_cessions', 'dataroom', 'system_actions',
+
+  // Module 31: Secrétariat Juridique & Registre Légal
+  'legal_minutes', 'shareholders_registry', 'juridique_shareholders', 'juridique_deadlines', 'juridique_documents',
+
+  // Module 32: Espace Client & Gestion des Packs SaaS
+  'client_subscriptions', 'tenant_module_permissions',
+
+  // Module 33: Tableau de Bord Décisionnel & BI Copilot
+  'bi_kpi_snapshots', 'ai_insights_logs',
+
+  // Module 34: Business Plan Stratégique & Opportunités
+  'bp_projections', 'strategic_opportunities'
 ];
 
 export interface PurgeReportDetail {
@@ -331,25 +312,41 @@ export async function purgeTenantData(tenantId: string): Promise<PurgeReport> {
 }
 
 /**
- * Recharge les données de démonstration pour un tenant via l'API backend
+ * Recharge les données de démonstration pour un tenant (34 modules)
  */
 export async function reloadDemoData(tenantId: string): Promise<any> {
   try {
-    const res = await fetch('/api/db/load-demo-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company: tenantId })
-    });
-    const result = await res.json();
-    if (res.ok && result.success) {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('storage'));
-        window.dispatchEvent(new CustomEvent('elyssa_demo_reloaded', { detail: { tenantId, updatedData: result.updatedData } }));
+    const seedReport = await seedAllDemoModulesToFirestore(tenantId);
+    
+    let backendData: any = null;
+    try {
+      const res = await fetch('/api/db/load-demo-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: tenantId })
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        backendData = result.updatedData;
       }
-      return result.updatedData;
-    } else {
-      throw new Error(result.error || 'Erreur lors du rechargement des données de démonstration');
+    } catch (apiErr) {
+      console.warn('[reloadDemoData] Backend notification failed, using client seed:', apiErr);
     }
+
+    localStorage.setItem('carthage_demo_simulation_active', 'true');
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elyssa_demo_reloaded', { 
+        detail: { 
+          tenantId, 
+          seedReport,
+          updatedData: backendData 
+        } 
+      }));
+    }
+
+    return backendData || seedReport;
   } catch (err) {
     console.error('[reloadDemoData] Erreur:', err);
     throw err;
