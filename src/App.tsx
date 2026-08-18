@@ -2277,9 +2277,12 @@ export default function App() {
   }, [activeTab]);
   
   // Force one-time cache invalidation and clean fetch on reload
-  if (typeof window !== 'undefined' && !sessionStorage.getItem('elyssa_erp_cache_purged')) {
-    clearAppCache();
-    sessionStorage.setItem('elyssa_erp_cache_purged', 'true');
+  if (typeof window !== 'undefined') {
+    ['elyssa_collaborators', 'elyssa_tours', 'elyssa_audit_logs', 'elyssa_cession_events', 'elyssa_cession_entries', 'carthage_collaborators', 'carthage_delivery_tours', 'carthage_cession_audit_entries', 'carthage_mobile_devices', 'carthage_field_sessions', 'carthage_mobile_orders', 'carthage_chantier_reports', 'carthage_fleet_inventory'].forEach(key => localStorage.removeItem(key));
+    if (!sessionStorage.getItem('elyssa_erp_cache_purged_v4')) {
+      clearAppCache();
+      sessionStorage.setItem('elyssa_erp_cache_purged_v4', 'true');
+    }
   }
 
   const [trialRegisteredCompany, setTrialRegisteredCompany] = useState<any>(() => {
@@ -2287,78 +2290,48 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [collaborators, setCollaborators] = useState<CollaboratorAccount[]>(() => {
-    const saved = localStorage.getItem('carthage_collaborators');
-    let list: CollaboratorAccount[] = [];
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Permanently prune any collaborators belonging to INTER AFFAIRES or with old administrative emails
-          list = parsed.filter(c => 
-            c.company !== 'INTER AFFAIRES' && 
-            c.email?.toLowerCase() !== 'contact@nexuswp.pro' && 
-            c.email?.toLowerCase() !== 'ziedbenmiled3@gmail.com'
-          ).map(c => {
-            if (c.email?.toLowerCase() === 'contact@carthage.tn') {
-              return { ...c, email: 'contact@elyssa.pro' };
-            }
-            return c;
-          });
-        }
-      } catch (e) {
-        console.error('Error parsing collaborators', e);
-      }
-    }
-    const defaults = [
-      {
-        id: 'collab_carthage_1',
-        name: 'MED ZIED BEN MILED',
-        email: 'contact@elyssa.pro',
-        password: 'bochra1985',
-        role: 'Manager' as const,
-        status: 'Active' as const,
-        company: 'Inter-Affaires',
-        assignedTasks: [],
-        createdDate: '2026-06-22'
-      }
-    ];
+  const ROOT_ADMIN: CollaboratorAccount = {
+    id: 'admin_root',
+    name: 'MED ZIED BEN MILED',
+    email: 'contact@elyssa.pro',
+    role: 'DG',
+    status: 'ACTIF',
+    structure: 'Direction : Principale',
+    tasksCount: 0,
+    company: 'Inter-Affaires',
+    assignedTasks: [],
+    createdDate: '2026-06-22',
+    isDemo: false
+  };
 
-    if (list.length === 0) {
-      return defaults;
-    }
-
-    // Merge missing essential zied admins to existing list to make sure they are always present!
-    const keyEmails = ['contact@elyssa.pro'];
-    const companies = ['Inter-Affaires', 'Elyssa Entreprises S.A.'];
-    
-    let updated = [...list];
-    companies.forEach(comp => {
-      keyEmails.forEach(email => {
-        const found = updated.find(c => c?.email?.toLowerCase() === email.toLowerCase() && c?.company === comp);
-        if (!found) {
-          updated.push({
-            id: `collab_auto_${comp.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')}_${email.replace(/[@.]/g, '_')}`,
-            name: 'MED ZIED BEN MILED',
-            email: email,
-            password: 'bochra1985',
-            role: 'Manager',
-            status: 'Active',
-            company: comp,
-            assignedTasks: [],
-            createdDate: '2026-06-22'
-          });
-        }
-      });
-    });
-
-    const seenCollabIds = new Set<string>();
-    return updated.filter(c => {
-      if (!c || !c.id || seenCollabIds.has(c.id)) return false;
-      seenCollabIds.add(c.id);
+  const sanitizeCollaboratorsList = (rawList: any[]): CollaboratorAccount[] => {
+    if (!Array.isArray(rawList)) return [ROOT_ADMIN];
+    const filtered = rawList.filter(c => {
+      if (!c) return false;
+      const email = (c.email || '').toLowerCase().trim();
+      const name = (c.name || '').toLowerCase().trim();
+      if (email === 'amel.m@elyssa.pro' || name.includes('amel marzouki')) return false;
+      if (email === 'bochra.b@elyssa.pro' || name.includes('bochra belkadhi')) return false;
+      if (email === 'contact@nexuswp.pro' || email === 'ziedbenmiled3@gmail.com') return false;
+      if (name.includes('mohamed ben ali') || name.includes('rim oueslati') || email.includes('mohamed.a') || email.includes('rim.o')) return false;
+      if (c.company === 'INTER AFFAIRES') return false;
+      if (c.id?.startsWith('collab_demo_')) return false;
+      if (email === 'contact@elyssa.pro' && (c.id !== 'admin_root' || c.status === 'Suspended' || c.status === 'SUSPENDU')) return false;
       return true;
     });
-  });
+
+    const nonRoot = filtered.filter(c => c.email?.toLowerCase() !== 'contact@elyssa.pro');
+    const result = [ROOT_ADMIN, ...nonRoot];
+
+    const seen = new Set<string>();
+    return result.filter(c => {
+      if (!c || !c.id || seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  };
+
+  const [collaborators, setCollaborators] = useState<CollaboratorAccount[]>([ROOT_ADMIN]);
 
   const [hasLoadedClientsFromServer, setHasLoadedClientsFromServer] = useState(false);
   const [hasLoadedCollaboratorsFromServer, setHasLoadedCollaboratorsFromServer] = useState(false);
@@ -2431,14 +2404,9 @@ export default function App() {
         if (collabsRes.ok) {
           const collabsData = await collabsRes.json();
           if (Array.isArray(collabsData)) {
-            const seen = new Set<string>();
-            const unique = collabsData.filter((c: any) => {
-              if (!c || !c.id || seen.has(c.id)) return false;
-              seen.add(c.id);
-              return true;
-            });
-            setCollaborators(unique);
-            localStorage.setItem('carthage_collaborators', JSON.stringify(unique));
+            const sanitized = sanitizeCollaboratorsList(collabsData);
+            setCollaborators(sanitized);
+            localStorage.setItem('carthage_collaborators', JSON.stringify(sanitized));
           }
         }
       } catch (err) {
@@ -5301,13 +5269,8 @@ export default function App() {
           },
           (collabsData) => {
             if (Array.isArray(collabsData)) {
-              const seen = new Set<string>();
-              const unique = collabsData.filter((c: any) => {
-                if (!c || !c.id || seen.has(c.id)) return false;
-                seen.add(c.id);
-                return true;
-              });
-              setCollaborators(unique);
+              const sanitized = sanitizeCollaboratorsList(collabsData);
+              setCollaborators(sanitized);
             }
           }
         );

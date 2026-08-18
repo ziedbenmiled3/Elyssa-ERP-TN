@@ -298,7 +298,10 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
       const items: Invoice[] = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data() as Invoice;
-        items.push({ ...data, id: docSnap.id });
+        const id = docSnap.id;
+        if (!id.startsWith('FAC-2026-08') && !id.includes('demo') && !data.invoiceNumber?.startsWith('FAC-2026-08')) {
+          items.push({ ...data, id });
+        }
       });
       setPendingInvoices(items);
       setLoadingInvoices(false);
@@ -318,7 +321,10 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
     const unsub = onSnapshot(pickingCol, (snap) => {
       const list: PickingOrder[] = [];
       snap.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() } as PickingOrder);
+        const id = docSnap.id;
+        if (!id.startsWith('PICK-FAC-2026-08') && !id.includes('demo')) {
+          list.push({ id, ...docSnap.data() } as PickingOrder);
+        }
       });
       setPickingOrders(list);
     }, (err) => {
@@ -401,7 +407,17 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
     const unsub = onSnapshot(toursCol, (snap) => {
       const tours: DeliveryTour[] = [];
       snap.forEach((docSnap) => {
-        tours.push({ id: docSnap.id, ...docSnap.data() } as DeliveryTour);
+        const id = docSnap.id;
+        const data = docSnap.data() as any;
+        const driver = (data?.driver_name || '').toLowerCase();
+        if (
+          !id.startsWith('TR-2026') &&
+          !id.includes('demo') &&
+          !driver.includes('hamza ben salem') &&
+          !driver.includes('kamel trad')
+        ) {
+          tours.push({ id, ...data } as DeliveryTour);
+        }
       });
       tours.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setDeliveryTours(tours);
@@ -1451,7 +1467,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
           </div>
         ) : filteredTours.length === 0 ? (
           <div className="py-12 text-center text-slate-400 font-sans">
-            <p className="text-xs font-bold text-slate-600">Aucune tournée active enregistrée.</p>
+            <p className="text-xs font-bold text-slate-600">Aucune tournée en cours.</p>
           </div>
         ) : (
           <div className="space-y-4">

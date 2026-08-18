@@ -148,6 +148,10 @@ export default function CollaboratorConsole({
       const nameLower = (c.name || '').toLowerCase().trim();
       if (isInterAffaires) {
         if (emailLower === 'bb@gmail.com' || emailLower === 'mondhali@gmail.com' || emailLower === 'ws@gmail.com') return false;
+        if (emailLower === 'amel.m@elyssa.pro' || nameLower.includes('amel marzouki')) return false;
+        if (emailLower === 'bochra.b@elyssa.pro' || nameLower.includes('bochra belkadhi')) return false;
+        if (nameLower.includes('mohamed ben ali') || nameLower.includes('rim oueslati') || emailLower.includes('mohamed.a') || emailLower.includes('rim.o')) return false;
+        if (emailLower === 'contact@elyssa.pro' && (c.status === 'Suspended' || c.status === 'SUSPENDU' || (c.id && c.id !== 'admin_root'))) return false;
         if (nameLower.includes('boch bej') || nameLower === 'gep' || nameLower.includes('wiem sahbani')) return false;
         if (c.id && c.id.includes('trial_owner')) return false;
       }
@@ -555,7 +559,7 @@ L'administration Elyssa ERP`;
           <div>
             <span className="text-[10px] uppercase font-extrabold text-emerald-400 tracking-wider">Comptes Actifs</span>
             <div className="text-2xl font-black text-white mt-1">
-              {displayedCollaborators.filter(c => c.status === 'Active' || c.status === 'Invited').length}
+              {displayedCollaborators.filter(c => c.status === 'Active' || c.status === 'ACTIF' || c.status === 'Invited').length}
             </div>
           </div>
           <div className="w-10 h-10 bg-emerald-950 border border-emerald-900/50 rounded-lg flex items-center justify-center text-emerald-400">
@@ -567,7 +571,7 @@ L'administration Elyssa ERP`;
           <div>
             <span className="text-[10px] uppercase font-extrabold text-amber-400 tracking-wider">Comptes Suspendus</span>
             <div className="text-2xl font-black text-white mt-1">
-              {displayedCollaborators.filter(c => c.status === 'Suspended').length}
+              {displayedCollaborators.filter(c => c.status === 'Suspended' || c.status === 'SUSPENDU').length}
             </div>
           </div>
           <div className="w-10 h-10 bg-amber-950 border border-amber-900/50 rounded-lg flex items-center justify-center text-amber-400">
@@ -579,7 +583,7 @@ L'administration Elyssa ERP`;
           <div>
             <span className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider">Tâches en Cours</span>
             <div className="text-2xl font-black text-white mt-1">
-              {displayedCollaborators.reduce((sum, c) => sum + c.assignedTasks.filter(t => t.status !== 'Completed').length, 0)}
+              {displayedCollaborators.reduce((sum, c) => sum + (c.assignedTasks ? c.assignedTasks.filter(t => t.status !== 'Completed').length : 0), 0)}
             </div>
           </div>
           <div className="w-10 h-10 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-center text-slate-400">

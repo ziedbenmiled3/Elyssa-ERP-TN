@@ -97,7 +97,10 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
     const unsub = onSnapshot(colRef, (snap) => {
       const list: PickingOrder[] = [];
       snap.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() } as PickingOrder);
+        const id = docSnap.id;
+        if (!id.startsWith('PICK-FAC-2026-08') && !id.includes('demo')) {
+          list.push({ id, ...docSnap.data() } as PickingOrder);
+        }
       });
 
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

@@ -5,6 +5,7 @@ import {
   getDocs, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   onSnapshot, 
   query 
 } from 'firebase/firestore';
@@ -91,27 +92,102 @@ export function useMobileAdmin(tenantIdParam?: string) {
     const ordersColRef = collection(db, 'company_erp_data', tenantId, 'mobile_orders');
     const reportsColRef = collection(db, 'company_erp_data', tenantId, 'chantier_reports');
 
+    const isDemoDevice = (id: string, data: any) => {
+      const name = (data?.agentName || '').toLowerCase();
+      const idLower = id.toLowerCase();
+      const agentId = (data?.agentId || '').toLowerCase();
+      return (
+        idLower.startsWith('demo') ||
+        idLower.startsWith('dev_') ||
+        idLower.startsWith('emp_agent') ||
+        idLower.includes('demo') ||
+        agentId.includes('emp_agent') ||
+        agentId.includes('demo') ||
+        name.includes('mohamed ali') ||
+        name.includes('hamza ben salem') ||
+        name.includes('démo') ||
+        name.includes('demo') ||
+        name.includes('force de vente')
+      );
+    };
+
+    const isDemoFleet = (id: string, data: any) => {
+      const idLower = id.toLowerCase();
+      const assigned = (data?.assignedTo || '').toLowerCase();
+      const name = (data?.device_name || '').toLowerCase();
+      return (
+        idLower.startsWith('flt_') ||
+        idLower.includes('demo') ||
+        assigned.includes('mohamed ali') ||
+        assigned.includes('hamza ben salem') ||
+        name.includes('demo')
+      );
+    };
+
+    const isDemoSession = (id: string, data: any) => {
+      const idLower = id.toLowerCase();
+      const agent = (data?.agentName || '').toLowerCase();
+      return (
+        idLower.includes('demo') ||
+        idLower.startsWith('sess_') ||
+        agent.includes('mohamed ali') ||
+        agent.includes('hamza ben salem') ||
+        agent.includes('démo')
+      );
+    };
+
+    const isDemoOrder = (id: string, data: any) => {
+      const idLower = id.toLowerCase();
+      const agent = (data?.agentName || '').toLowerCase();
+      const client = (data?.clientName || '').toLowerCase();
+      return (
+        idLower.includes('demo') ||
+        idLower.startsWith('ord_') ||
+        agent.includes('mohamed ali') ||
+        agent.includes('hamza ben salem') ||
+        client.includes('comptoir industriel')
+      );
+    };
+
+    const isDemoReport = (id: string, data: any) => {
+      const idLower = id.toLowerCase();
+      const chef = (data?.chefChantierName || '').toLowerCase();
+      return (
+        idLower.includes('demo') ||
+        idLower.startsWith('rep_') ||
+        chef.includes('mohamed ali') ||
+        chef.includes('hamza ben salem')
+      );
+    };
+
     // Subscribe to Devices
     const unsubDevices = onSnapshot(
       devicesColRef,
       (snapshot) => {
-        if (!snapshot.empty) {
-          const loadedDevices: MobileDevice[] = snapshot.docs.map(docSnap => {
+        if (snapshot.empty) {
+          setDevices([]);
+        } else {
+          const loadedDevices: MobileDevice[] = [];
+          snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            return {
-              id: docSnap.id,
-              tenantId: data.tenantId || tenantId,
-              agentId: data.agentId || 'agent_unk',
-              agentName: data.agentName || 'Agent Inconnu',
-              deviceModel: data.deviceModel || 'Terminal Mobile',
-              assigned_module: data.assigned_module || 'standard',
-              lastSync: data.lastSync || new Date().toISOString(),
-              status: data.status || 'PENDING',
-              batteryLevel: data.batteryLevel,
-              appVersion: data.appVersion,
-              macAddress: data.macAddress,
-              phoneNumber: data.phoneNumber,
-            };
+            if (isDemoDevice(docSnap.id, data)) {
+              deleteDoc(doc(db, 'company_erp_data', tenantId, 'mobile_devices', docSnap.id)).catch(() => {});
+            } else {
+              loadedDevices.push({
+                id: docSnap.id,
+                tenantId: data.tenantId || tenantId,
+                agentId: data.agentId || 'agent_unk',
+                agentName: data.agentName || 'Agent Inconnu',
+                deviceModel: data.deviceModel || 'Terminal Mobile',
+                assigned_module: data.assigned_module || 'standard',
+                lastSync: data.lastSync || new Date().toISOString(),
+                status: data.status || 'PENDING',
+                batteryLevel: data.batteryLevel,
+                appVersion: data.appVersion,
+                macAddress: data.macAddress,
+                phoneNumber: data.phoneNumber,
+              });
+            }
           });
           setDevices(loadedDevices);
         }
@@ -127,19 +203,26 @@ export function useMobileAdmin(tenantIdParam?: string) {
     const unsubFleet = onSnapshot(
       fleetColRef,
       (snapshot) => {
-        if (!snapshot.empty) {
-          const loadedFleet: FleetInventoryItem[] = snapshot.docs.map(docSnap => {
+        if (snapshot.empty) {
+          setFleetInventory([]);
+        } else {
+          const loadedFleet: FleetInventoryItem[] = [];
+          snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            return {
-              id: docSnap.id,
-              tenantId: data.tenantId || tenantId,
-              fleet_park: data.fleet_park || 'Stock Réserve',
-              device_name: data.device_name || 'Terminal Mobile',
-              serial_reference: data.serial_reference || 'IMEI Non Spécifié',
-              status: data.status || 'Available',
-              assignedTo: data.assignedTo,
-              registeredAt: data.registeredAt || new Date().toISOString()
-            };
+            if (isDemoFleet(docSnap.id, data)) {
+              deleteDoc(doc(db, 'company_erp_data', tenantId, 'fleet_inventory', docSnap.id)).catch(() => {});
+            } else {
+              loadedFleet.push({
+                id: docSnap.id,
+                tenantId: data.tenantId || tenantId,
+                fleet_park: data.fleet_park || 'Stock Réserve',
+                device_name: data.device_name || 'Terminal Mobile',
+                serial_reference: data.serial_reference || 'IMEI Non Spécifié',
+                status: data.status || 'Available',
+                assignedTo: data.assignedTo,
+                registeredAt: data.registeredAt || new Date().toISOString()
+              });
+            }
           });
           setFleetInventory(loadedFleet);
         }
@@ -153,20 +236,27 @@ export function useMobileAdmin(tenantIdParam?: string) {
     const unsubSessions = onSnapshot(
       sessionsColRef,
       (snapshot) => {
-        if (!snapshot.empty) {
-          const loadedSessions: FieldSession[] = snapshot.docs.map(docSnap => {
+        if (snapshot.empty) {
+          setSessions([]);
+        } else {
+          const loadedSessions: FieldSession[] = [];
+          snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            return {
-              id: docSnap.id,
-              tenantId: data.tenantId || tenantId,
-              agentId: data.agentId || 'agent_unk',
-              agentName: data.agentName || 'Agent Terrain',
-              type: data.type || 'VAN_SALES',
-              checkIn: data.checkIn || { timestamp: new Date().toISOString(), lat: 36.8065, lng: 10.1815 },
-              checkOut: data.checkOut,
-              status: data.status || 'OPEN',
-              notes: data.notes
-            };
+            if (isDemoSession(docSnap.id, data)) {
+              deleteDoc(doc(db, 'company_erp_data', tenantId, 'field_sessions', docSnap.id)).catch(() => {});
+            } else {
+              loadedSessions.push({
+                id: docSnap.id,
+                tenantId: data.tenantId || tenantId,
+                agentId: data.agentId || 'agent_unk',
+                agentName: data.agentName || 'Agent Terrain',
+                type: data.type || 'VAN_SALES',
+                checkIn: data.checkIn || { timestamp: new Date().toISOString(), lat: 36.8065, lng: 10.1815 },
+                checkOut: data.checkOut,
+                status: data.status || 'OPEN',
+                notes: data.notes
+              });
+            }
           });
           setSessions(loadedSessions);
         }
@@ -180,26 +270,33 @@ export function useMobileAdmin(tenantIdParam?: string) {
     const unsubOrders = onSnapshot(
       ordersColRef,
       (snapshot) => {
-        if (!snapshot.empty) {
-          const loadedOrders: MobileOrder[] = snapshot.docs.map(docSnap => {
+        if (snapshot.empty) {
+          setOrders([]);
+        } else {
+          const loadedOrders: MobileOrder[] = [];
+          snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            return {
-              id: docSnap.id,
-              tenantId: data.tenantId || tenantId,
-              localUuid: data.localUuid || docSnap.id,
-              agentId: data.agentId,
-              agentName: data.agentName,
-              clientId: data.clientId || 'cli_unk',
-              clientName: data.clientName || 'Client Inconnu',
-              items: data.items || [],
-              totalHT: data.totalHT || 0,
-              totalTTC: data.totalTTC || 0,
-              paymentStatus: data.paymentStatus || 'PENDING',
-              paymentMethod: data.paymentMethod,
-              signatureUrl: data.signatureUrl,
-              status: data.status || 'PENDING_VALIDATION',
-              createdAt: data.createdAt || new Date().toISOString()
-            };
+            if (isDemoOrder(docSnap.id, data)) {
+              deleteDoc(doc(db, 'company_erp_data', tenantId, 'mobile_orders', docSnap.id)).catch(() => {});
+            } else {
+              loadedOrders.push({
+                id: docSnap.id,
+                tenantId: data.tenantId || tenantId,
+                localUuid: data.localUuid || docSnap.id,
+                agentId: data.agentId,
+                agentName: data.agentName,
+                clientId: data.clientId || 'cli_unk',
+                clientName: data.clientName || 'Client Inconnu',
+                items: data.items || [],
+                totalHT: data.totalHT || 0,
+                totalTTC: data.totalTTC || 0,
+                paymentStatus: data.paymentStatus || 'PENDING',
+                paymentMethod: data.paymentMethod,
+                signatureUrl: data.signatureUrl,
+                status: data.status || 'PENDING_VALIDATION',
+                createdAt: data.createdAt || new Date().toISOString()
+              });
+            }
           });
           setOrders(loadedOrders);
         }
@@ -213,24 +310,31 @@ export function useMobileAdmin(tenantIdParam?: string) {
     const unsubReports = onSnapshot(
       reportsColRef,
       (snapshot) => {
-        if (!snapshot.empty) {
-          const loadedReports: ChantierReport[] = snapshot.docs.map(docSnap => {
+        if (snapshot.empty) {
+          setReports([]);
+        } else {
+          const loadedReports: ChantierReport[] = [];
+          snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            return {
-              id: docSnap.id,
-              tenantId: data.tenantId || tenantId,
-              chantierId: data.chantierId || 'CH-001',
-              chantierName: data.chantierName,
-              chefChantierId: data.chefChantierId || 'chef_unk',
-              chefChantierName: data.chefChantierName,
-              date: data.date || new Date().toISOString(),
-              workersPresent: data.workersPresent || 0,
-              materialsConsumed: data.materialsConsumed || [],
-              photoUrls: data.photoUrls || [],
-              signatureUrl: data.signatureUrl,
-              notes: data.notes || '',
-              status: data.status || 'PENDING'
-            };
+            if (isDemoReport(docSnap.id, data)) {
+              deleteDoc(doc(db, 'company_erp_data', tenantId, 'chantier_reports', docSnap.id)).catch(() => {});
+            } else {
+              loadedReports.push({
+                id: docSnap.id,
+                tenantId: data.tenantId || tenantId,
+                chantierId: data.chantierId || 'CH-001',
+                chantierName: data.chantierName,
+                chefChantierId: data.chefChantierId || 'chef_unk',
+                chefChantierName: data.chefChantierName,
+                date: data.date || new Date().toISOString(),
+                workersPresent: data.workersPresent || 0,
+                materialsConsumed: data.materialsConsumed || [],
+                photoUrls: data.photoUrls || [],
+                signatureUrl: data.signatureUrl,
+                notes: data.notes || '',
+                status: data.status || 'PENDING'
+              });
+            }
           });
           setReports(loadedReports);
         }

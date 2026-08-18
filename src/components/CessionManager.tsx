@@ -94,14 +94,7 @@ export function CessionManager({
         console.error(e); 
       }
     } else {
-      const autoSampleEntries = AUTOMATED_SYSTEM_SAMPLES.map(sample => createAutoAuditEntry(sample));
-      const combined = [...autoSampleEntries, ...INITIAL_CESSION_ENTRIES];
-      setLocalData(combined);
-      try {
-        localStorage.setItem('elyssa_cession_entries', JSON.stringify(combined));
-      } catch (e) {
-        console.error('Error saving initial cession entries:', e);
-      }
+      setLocalData([]);
     }
     setIsHydrated(true);
   }, []);
