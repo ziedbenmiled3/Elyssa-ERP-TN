@@ -1993,24 +1993,23 @@ function AppMain() {
 
   const [hideLockedModules, setHideLockedModules] = useState<boolean>(() => {
     const val = localStorage.getItem('carthage_hide_locked_modules');
-    return val === null ? true : val === 'true';
+    return val === null ? false : val === 'true';
   });
 
   const checkAccess = (moduleId: string, companyId: string): boolean => {
     if (!currentUser) return false;
 
-    const userEmail = String(currentUser.email || '').toLowerCase().trim();
-    const roleUpper = String(currentUser.role || '').toUpperCase().trim();
-    if (userEmail === 'md@gmail.com' || roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'DIRIGEANT' || roleUpper === 'DG' || roleUpper === 'GERANT' || roleUpper === 'MANAGER' || roleUpper === 'DIRECTOR') {
+    // SuperAdmin or Parent Publisher bypass
+    if (currentUser.role === 'SuperAdmin' && (superAdminOverride || companyId === 'Inter-Affaires' || companyId === 'Elyssa Entreprises S.A.')) {
       return true;
     }
 
     const targetComp = String(companyId || activeCompanyName || '').toUpperCase().trim();
-    if (isSimulationActive || targetComp === 'GEP' || targetComp.includes('GEP') || targetComp === 'ELYSSA ENTREPRISES S.A.' || targetComp === 'INTER-AFFAIRES' || targetComp === 'MD' || targetComp === 'PC-MD') {
+    if (isSimulationActive || targetComp === 'ELYSSA ENTREPRISES S.A.' || targetComp === 'INTER-AFFAIRES') {
       return true;
     }
 
-    // Core modules (Paramètres de l'entreprise, TEJ, Admin, Copilot) are always accessible
+    // Core modules (Paramètres de l'entreprise, TEJ, Admin, Copilot, Dashboards) are always free and accessible
     if (['saas_config', 'admin', 'company_settings', 'tej', 'copilot', 'dashboard', 'executive_dashboard'].includes(moduleId)) {
       return true;
     }
@@ -2036,13 +2035,13 @@ function AppMain() {
 
     // If no client record exists yet for companyId, construct a fallback active client record
     if (!client) {
-      if (companyId?.toLowerCase() === 'elyssa entreprises s.a.' || companyId?.toLowerCase() === 'md' || companyId?.toLowerCase() === 'pc-md') {
+      if (companyId?.toLowerCase() === 'elyssa entreprises s.a.' || companyId?.toLowerCase() === 'inter-affaires') {
         return true;
       }
       client = {
         id: `pc-${companyId?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'default'}`,
         companyName: companyId,
-        packId: 'custom',
+        packId: 'standard',
         status: 'active',
         license_status: 'paid',
         modules: []
@@ -2050,7 +2049,7 @@ function AppMain() {
     }
 
     const packIdStr = String(client.packId || '').toLowerCase();
-    if (packIdStr === 'full' || packIdStr === 'custom' || packIdStr === 'industrial' || packIdStr === 'enterprise' || packIdStr === 'industriel' || packIdStr === 'full_industrial') {
+    if (packIdStr === 'full' || packIdStr === 'industrial' || packIdStr === 'enterprise' || packIdStr === 'industriel' || packIdStr === 'full_industrial' || packIdStr === 'premium') {
       return true;
     }
 
@@ -2069,11 +2068,8 @@ function AppMain() {
       return canAccess(moduleId, packId, customMods);
     }
 
-    if (licenseStatus === 'paid') {
-      let packId = client.packId || 'custom';
-      if (packId === 'trial') {
-        packId = 'custom';
-      }
+    if (licenseStatus === 'paid' || client.status === 'active') {
+      let packId = client.packId || 'standard';
       return canAccess(moduleId, packId, customMods);
     }
 
@@ -2083,27 +2079,22 @@ function AppMain() {
   const isModuleUnlockedState = (tabId: string): boolean => {
     if (!currentUser) return false;
 
-    const userEmail = String(currentUser.email || '').toLowerCase().trim();
-    const roleUpper = String(currentUser.role || '').toUpperCase().trim();
-    if (userEmail === 'md@gmail.com' || roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'DIRIGEANT' || roleUpper === 'DG' || roleUpper === 'GERANT' || roleUpper === 'MANAGER' || roleUpper === 'DIRECTOR') {
+    // SuperAdmin or Parent Publisher
+    if (currentUser.role === 'SuperAdmin' && (superAdminOverride || activeCompanyName === 'Inter-Affaires' || activeCompanyName === 'Elyssa Entreprises S.A.')) {
       return true;
     }
 
     const targetComp = String(activeCompanyName || '').toUpperCase().trim();
-    if (targetComp === 'GEP' || targetComp.includes('GEP') || targetComp === 'MD' || targetComp === 'PC-MD') {
+    if (isSimulationActive || targetComp === 'ELYSSA ENTREPRISES S.A.' || targetComp === 'INTER-AFFAIRES') {
       return true;
     }
 
-    // If super admin override is active, unlock everything
-    if (currentUser?.role === 'SuperAdmin' && superAdminOverride) {
-      return true;
-    }
     // core modules are always free and unlocked
     if (['admin', 'saas_config', 'company_settings', 'tej', 'copilot', 'dashboard', 'executive_dashboard'].includes(tabId)) {
       return true;
     }
     
-    // Delegate to checkAccess for strict compartmentalization
+    // Delegate to checkAccess for strict pack/license checking
     return checkAccess(tabId, activeCompanyName);
   };
 

@@ -1,3 +1,6 @@
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
+
 /**
  * Matrice d'Accès de Sécurité Elyssa ERP (RBAC - Role-Based Access Control)
  * 
@@ -19,14 +22,12 @@ export const canAccess = (moduleId: string, pack: string, customModules: string[
     return true;
   }
 
-  // Full, Custom, Enterprise and Industrial packs provide full complete access to all modules without exception
-  if (packId === 'full' || packId === 'custom' || packId === 'enterprise' || packId === 'industrial' || packId === 'industriel' || packId === 'full_industrial' || packId === 'premium') {
+  // Full, Enterprise and Industrial packs provide full complete access to all modules without exception
+  if (packId === 'full' || packId === 'enterprise' || packId === 'industrial' || packId === 'industriel' || packId === 'full_industrial' || packId === 'premium') {
     return true;
   }
 
-  // CRITICAL PROTECTION: Check if the module is explicitly present in customModules / purchased modules array
-  // This guarantees that any company (e.g. WS) that purchased modules à la carte will NEVER lose access
-  // even if module catalog definitions or pack names are modified.
+  // Check if the module is explicitly present in customModules / purchased modules array
   if (customModules && customModules.length > 0) {
     const normalizedCustomModules = customModules.map(m => m.toLowerCase().trim());
     if (normalizedCustomModules.includes(modId)) return true;
@@ -50,13 +51,13 @@ export const canAccess = (moduleId: string, pack: string, customModules: string[
     if (modId === 'hub_com' || modId === 'communication') {
       if (normalizedCustomModules.includes('communication') || normalizedCustomModules.includes('hub_com')) return true;
     }
-    if (modId === 'production' || modId === 'nomenclatures' || modId === 'manufacturingOrders') {
+    if (modId === 'production' || modId === 'nomenclatures' || modId === 'manufacturingorders') {
       if (normalizedCustomModules.includes('production')) return true;
     }
-    if (modId === 'purchasing' || modId === 'purchaseRequisitions' || modId === 'purchaseOrders') {
+    if (modId === 'purchasing' || modId === 'purchaserequisitions' || modId === 'purchaseorders') {
       if (normalizedCustomModules.includes('purchasing')) return true;
     }
-    if (modId === 'asset' || modId === 'assets' || modId === 'cessionEntries') {
+    if (modId === 'asset' || modId === 'assets' || modId === 'cessionentries') {
       if (normalizedCustomModules.includes('asset') || normalizedCustomModules.includes('cession')) return true;
     }
     if (modId === 'treasury') {
@@ -78,118 +79,108 @@ export const canAccess = (moduleId: string, pack: string, customModules: string[
     'ged', 'reports'
   ];
 
-  // 2. Premium / Full ERP
-  const premiumModules = [
-    ...standardModules,
-    'caisse',
-    'communication', 'hub_com',
-    'stock', 'stocks',
-    'clients', 'complaints', 'market', 'collaborators', 'payroll', 'attendance', 'fleet', 'purchasing', 'asset', 'treasury', 'steering',
-    'business_plan', 'juridique', 'portail_client', 'cession', 'investment'
+  // 2. Solo / Indépendant
+  const independentModules = [
+    'dashboard', 'executive_dashboard',
+    'billing', 'facturation',
+    'clients', 'reports', 'company_settings', 'tej'
   ];
 
-  // 3. Industrial
-  const industrialModules = [
-    ...premiumModules,
-    'production',
-    'transit_logistique', 'transit',
-    'lc_manager', 'credoc',
-    'mobile_terrain', 'mobile_fleet'
+  // 3. PME Commerce & Services
+  const pmeCommerceModules = [
+    'dashboard', 'executive_dashboard',
+    'caisse', 'billing', 'facturation',
+    'stock', 'stocks', 'payroll', 'attendance', 'clients', 'reports', 'company_settings', 'tej'
   ];
 
-  // 4. RH Only (Pack RH uniquement)
-  const rhOnlyModules = [
-    'dashboard', 'executive_dashboard', 'payroll', 'collaborators', 'attendance', 'ged', 'reports'
+  // 4. Manufacture & GPAO (Formule 159 DT / 199 DT)
+  const manufactureGpaoModules = [
+    'dashboard', 'executive_dashboard',
+    'production', 'stock', 'stocks',
+    'purchasing', 'warehouse_picking', 'payroll', 'attendance', 'ged', 'reports', 'company_settings', 'tej'
   ];
 
-  // 5. Logistics (Pack Distribution)
-  const logisticsModules = [
-    'dashboard', 'executive_dashboard', 'clients', 'stock', 'stocks', 'fleet', 'mobile_terrain', 'mobile_fleet', 'complaints', 'transit_logistique', 'transit', 'lc_manager', 'credoc', 'purchasing'
+  // 5. Grossiste & Négoce Distribution
+  const grossisteNegoceModules = [
+    'dashboard', 'executive_dashboard',
+    'stock', 'stocks', 'purchasing', 'dispatch_tours', 'fleet', 'fleet_management',
+    'finance', 'comptabilite', 'mobile_terrain', 'mobile_fleet', 'clients', 'billing', 'facturation', 'reports', 'company_settings', 'tej'
   ];
 
-  // 6. Trial Pack (Modules d'essai autorisés)
-  const trialModules = [
-    'dashboard', 'executive_dashboard', 'steering', 'reports', 'caisse', 'clients', 'communication', 'hub_com', 'complaints', 'billing', 'facturation', 'stock', 'stocks', 'payroll', 'collaborators', 'attendance', 'company_settings', 'ged',
-    'fleet', 'mobile_terrain', 'mobile_fleet', 'finance', 'comptabilite', 'investment', 'market', 'transit_logistique', 'transit', 'lc_manager', 'credoc', 'cession', 'production', 'purchasing', 'asset', 'treasury', 'business_plan', 'juridique', 'portail_client', 'tej'
+  // 6. Import / Export & Commerce Int.
+  const importExportModules = [
+    'dashboard', 'executive_dashboard',
+    'transit_logistique', 'transit', 'lc_manager', 'credoc',
+    'purchasing', 'stock', 'stocks', 'treasury', 'billing', 'facturation', 'reports', 'company_settings', 'tej'
   ];
 
-  // 7. Formule Cabinet Comptable & Audit
+  // 7. BTP & Génie Civil
+  const btpGenieCivilModules = [
+    'dashboard', 'executive_dashboard',
+    'billing', 'facturation', 'attendance', 'mobile_terrain', 'fleet_management', 'fleet', 'purchasing', 'reports', 'company_settings', 'tej'
+  ];
+
+  // 8. Express & Livraison
+  const expressLivraisonModules = [
+    'dashboard', 'executive_dashboard',
+    'dispatch_tours', 'mobile_terrain', 'mobile_fleet', 'fleet_management', 'fleet', 'billing', 'facturation', 'complaints', 'reports', 'company_settings', 'tej'
+  ];
+
+  // 9. Cabinet Comptable & Audit
   const cabinetComptableModules = [
     'dashboard', 'executive_dashboard',
     'accountant_portal',
     'finance', 'comptabilite',
     'payroll', 'collaborators', 'attendance',
-    'tej',
-    'billing', 'facturation',
-    'asset', 'assets',
-    'ged',
-    'juridique',
-    'company_settings',
-    'reports'
+    'tej', 'billing', 'facturation',
+    'asset', 'assets', 'ged', 'juridique', 'company_settings', 'reports'
   ];
 
-  // Vérification de la matrice d'accès selon le pack
-  if (packId === 'standard' || packId === 'independent') {
-    return standardModules.includes(modId);
-  } else if (packId === 'premium' || packId === 'full') {
-    return premiumModules.includes(modId);
-  } else if (packId === 'industrial' || packId === 'industriel') {
-    return industrialModules.includes(modId);
+  // 10. RH Only
+  const rhOnlyModules = [
+    'dashboard', 'executive_dashboard',
+    'payroll', 'collaborators', 'attendance', 'ged', 'reports', 'company_settings', 'tej'
+  ];
+
+  // 11. Logistics / Distribution
+  const logisticsModules = [
+    'dashboard', 'executive_dashboard',
+    'clients', 'stock', 'stocks', 'fleet', 'mobile_terrain', 'mobile_fleet', 'complaints',
+    'transit_logistique', 'transit', 'lc_manager', 'credoc', 'purchasing', 'reports', 'company_settings', 'tej'
+  ];
+
+  // 12. Trial Pack (Sandbox complète)
+  const trialModules = [
+    'dashboard', 'executive_dashboard', 'steering', 'reports', 'caisse', 'clients', 'communication', 'hub_com', 'complaints', 'billing', 'facturation', 'stock', 'stocks', 'payroll', 'collaborators', 'attendance', 'company_settings', 'ged',
+    'fleet', 'mobile_terrain', 'mobile_fleet', 'finance', 'comptabilite', 'investment', 'market', 'transit_logistique', 'transit', 'lc_manager', 'credoc', 'cession', 'production', 'purchasing', 'asset', 'treasury', 'business_plan', 'juridique', 'portail_client', 'tej', 'dispatch_tours', 'warehouse_picking', 'fleet_management'
+  ];
+
+  if (packId === 'manufacture_gpao' || packId === 'manufacture' || packId === 'gpao') {
+    return manufactureGpaoModules.includes(modId);
+  } else if (packId === 'grossiste_negoce' || packId === 'grossiste' || packId === 'negoce') {
+    return grossisteNegoceModules.includes(modId);
+  } else if (packId === 'import_export' || packId === 'transitaire') {
+    return importExportModules.includes(modId);
+  } else if (packId === 'btp_genie_civil' || packId === 'btp') {
+    return btpGenieCivilModules.includes(modId);
+  } else if (packId === 'express_livraison' || packId === 'livraison') {
+    return expressLivraisonModules.includes(modId);
+  } else if (packId === 'pme_commerce' || packId === 'commerce') {
+    return pmeCommerceModules.includes(modId);
+  } else if (packId === 'independent' || packId === 'solo') {
+    return independentModules.includes(modId);
+  } else if (packId === 'cabinet_comptable' || packId === 'cabinet' || packId === 'cabinet_comptable_audit') {
+    return cabinetComptableModules.includes(modId);
   } else if (packId === 'rh_only') {
     return rhOnlyModules.includes(modId);
   } else if (packId === 'logistics') {
     return logisticsModules.includes(modId);
   } else if (packId === 'trial') {
     return trialModules.includes(modId);
-  } else if (packId === 'cabinet_comptable' || packId === 'cabinet' || packId === 'cabinet_comptable_audit') {
-    return cabinetComptableModules.includes(modId);
-  } else if (packId === 'custom' || packId === 'full' || packId === 'enterprise') {
-    // Custom / Full ERP pack provides complete access to all modules included in subscription
-    if (customModules && customModules.length > 0) {
-      const normalizedCustomModules = customModules.map(m => m.toLowerCase().trim());
-      
-      if (normalizedCustomModules.includes(modId)) return true;
-
-      // Handle aliasing and grouped modules:
-      if (modId === 'billing' || modId === 'facturation') {
-        if (normalizedCustomModules.includes('billing') || normalizedCustomModules.includes('facturation')) return true;
-      }
-      if (modId === 'finance' || modId === 'comptabilite') {
-        if (normalizedCustomModules.includes('finance') || normalizedCustomModules.includes('accounting') || normalizedCustomModules.includes('comptabilite')) return true;
-      }
-      if (modId === 'payroll' || modId === 'collaborators' || modId === 'attendance') {
-        if (normalizedCustomModules.includes(modId) || normalizedCustomModules.includes('hrm') || normalizedCustomModules.includes('payroll') || normalizedCustomModules.includes('collaborators') || normalizedCustomModules.includes('attendance')) return true;
-      }
-      if (modId === 'transit' || modId === 'transit_logistique' || modId === 'credoc' || modId === 'lc_manager') {
-        if (normalizedCustomModules.includes('transit_logistique') || normalizedCustomModules.includes('transit') || normalizedCustomModules.includes('lc_manager') || normalizedCustomModules.includes('credoc')) return true;
-      }
-      if (modId === 'stock' || modId === 'stocks') {
-        if (normalizedCustomModules.includes('stock') || normalizedCustomModules.includes('stocks')) return true;
-      }
-      if (modId === 'hub_com' || modId === 'communication') {
-        if (normalizedCustomModules.includes('communication') || normalizedCustomModules.includes('hub_com')) return true;
-      }
-      if (modId === 'production' || modId === 'nomenclatures' || modId === 'manufacturingOrders') {
-        if (normalizedCustomModules.includes('production')) return true;
-      }
-      if (modId === 'purchasing' || modId === 'purchaseRequisitions' || modId === 'purchaseOrders') {
-        if (normalizedCustomModules.includes('purchasing')) return true;
-      }
-      if (modId === 'asset' || modId === 'assets' || modId === 'cessionEntries') {
-        if (normalizedCustomModules.includes('asset') || normalizedCustomModules.includes('cession')) return true;
-      }
-      if (modId === 'treasury') {
-        if (normalizedCustomModules.includes('treasury') || normalizedCustomModules.includes('finance')) return true;
-      }
-      if (modId === 'investment' || modId === 'bourse') {
-        if (normalizedCustomModules.includes('investment') || normalizedCustomModules.includes('bourse')) return true;
-      }
-      if (modId === 'mobile_terrain' || modId === 'mobile_fleet' || modId === 'mobile' || modId === 'mod-11') {
-        if (normalizedCustomModules.includes('mobile_terrain') || normalizedCustomModules.includes('mobile_fleet') || normalizedCustomModules.includes('mobile') || normalizedCustomModules.includes('mod-11')) return true;
-      }
-    }
-    // Full ERP / Custom active pack unlocks all standard, premium & industrial ERP modules
-    return true;
+  } else if (packId === 'standard') {
+    return standardModules.includes(modId);
+  } else if (packId === 'custom') {
+    return customModules && customModules.length > 0 ? customModules.map(m => m.toLowerCase().trim()).includes(modId) : standardModules.includes(modId);
   }
 
   // Par défaut, retour à l'accès Standard
@@ -198,9 +189,6 @@ export const canAccess = (moduleId: string, pack: string, customModules: string[
 
 // getEffectivePack checking the database for 'paid' status in absolute priority.
 // If license_status === 'paid', then is_trial is forced to false, regardless of time remaining.
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from './firebase';
-
 export interface EffectivePackResult {
   packId: string;
   is_trial: boolean;

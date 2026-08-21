@@ -1227,17 +1227,22 @@ async function saveCollaborators(data: any[], targetCompanyId?: string): Promise
   await ensureFirebaseAuth();
   if (isFirestoreActive && db) {
     try {
-      const snapshot = await withTimeout(getDocs(collection(db, 'collaborators')), 4000);
+      const snapshot = await withTimeout(getDocs(collection(db, 'collaborators')), 6000);
       const incomingIds = new Set(data.map(item => item.id).filter(Boolean));
 
+      const deletions: Promise<any>[] = [];
       for (const docSnap of snapshot.docs) {
         const id = docSnap.id;
         const docData = docSnap.data();
         const matchesCompany = !targetCompanyId || docData.company_id === targetCompanyId || docData.companyId === targetCompanyId;
         if (matchesCompany && !incomingIds.has(id)) {
           console.log(`[PERSISTENT DELETE FIRESTORE] Deleting collaborator document from Firestore - ID: ${id}`);
-          await withTimeout(deleteDoc(doc(db, 'collaborators', id)), 4000).catch(err => console.warn("Error deleting collaborator doc from Firestore:", err));
+          deletions.push(withTimeout(deleteDoc(doc(db, 'collaborators', id)), 6000).catch(err => console.warn("Silently handled delete collaborator from Firestore:", err?.message || err)));
         }
+      }
+
+      if (deletions.length > 0) {
+        await Promise.allSettled(deletions);
       }
 
       const upserts = data.map(async (item) => {
@@ -1259,7 +1264,7 @@ async function saveCollaborators(data: any[], targetCompanyId?: string): Promise
             return;
           }
 
-          await withTimeout(setDoc(doc(db, 'collaborators', id), rest), 4000);
+          await withTimeout(setDoc(doc(db, 'collaborators', id), rest), 6000).catch(err => console.warn("Silently handled setDoc collaborator in Firestore:", err?.message || err));
         }
       });
 
