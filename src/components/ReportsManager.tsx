@@ -780,7 +780,7 @@ export default function ReportsManager({
 
                 <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-t">
                   <span className="text-[9.5px] text-slate-400 font-semibold flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-indigo-400" /> Elyssa CRM/ERP Agenda Module
+                    <MapPin className="w-3.5 h-3.5 text-indigo-400" /> Elyssa ERP Agenda Module
                   </span>
                   <button 
                     onClick={() => setSelectedCalendarVisit(null)}

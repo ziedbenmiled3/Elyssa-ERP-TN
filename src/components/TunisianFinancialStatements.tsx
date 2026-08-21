@@ -29,6 +29,9 @@ import {
 import { jsPDF } from 'jspdf';
 import { Invoice, BankTransaction, BankAccount, YearEndClosing } from '../types';
 
+const fmt = (val: number | undefined | null, locale = 'fr-TN', options?: Intl.NumberFormatOptions) =>
+  (typeof val === 'number' && !isNaN(val) ? val : 0).toLocaleString(locale, options);
+
 interface TunisianFinancialStatementsProps {
   invoices: Invoice[];
   bankAccounts: BankAccount[];
@@ -762,39 +765,39 @@ export default function TunisianFinancialStatements({
           <div className="p-3 bg-slate-800/40 border border-slate-700/50 rounded-xl space-y-1">
             <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Chiffre d'Affaires HT</span>
             <span className="text-lg font-black font-mono text-indigo-400">
-              {financialResults.productionExercice.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND
+              {fmt(financialResults?.productionExercice)} TND
             </span>
           </div>
 
           <div className="p-3 bg-slate-800/40 border border-slate-700/50 rounded-xl space-y-1">
             <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Valeur Ajoutée (VA)</span>
             <span className="text-lg font-black font-mono text-indigo-400">
-              {financialResults.valeurAjoutee.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND
+              {fmt(financialResults?.valeurAjoutee)} TND
             </span>
           </div>
 
           <div className="p-3 bg-slate-800/40 border border-slate-700/50 rounded-xl space-y-1">
             <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Résultat Courant (SCE)</span>
-            <span className={`text-lg font-black font-mono ${financialResults.resultatCourantAvantImpots >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {financialResults.resultatCourantAvantImpots.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND
+            <span className={`text-lg font-black font-mono ${(financialResults?.resultatCourantAvantImpots ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {fmt(financialResults?.resultatCourantAvantImpots)} TND
             </span>
           </div>
 
           <div className="p-3 bg-slate-800/40 border border-slate-700/50 rounded-xl space-y-1">
             <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Impôt sur Sociétés dû</span>
             <span className="text-lg font-black font-mono text-amber-400">
-              {fiscalResults.finalTaxDue.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND
+              {fmt(fiscalResults?.finalTaxDue)} TND
             </span>
           </div>
         </div>
       </div>
 
       {/* DISCREPANCY WARNING (IF BALANCING TRIAL SHEET IS NOT SECURED) */}
-      {trialDiscrepancy > 0.001 && (
+      {(trialDiscrepancy ?? 0) > 0.001 && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
           <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <h4 className="text-xs font-bold text-amber-800">Déséquilibre de la Balance Générale ({trialDiscrepancy.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND)</h4>
+            <h4 className="text-xs font-bold text-amber-800">Déséquilibre de la Balance Générale ({fmt(trialDiscrepancy)} TND)</h4>
             <p className="text-[11px] text-amber-700">
               Les débits ne sont pas rigoureusement égaux aux crédits. Pour simuler ou corriger une écriture d'ajustement (ex: dotation aux amortissements, variation des stocks ou capital social complémentaire), utilisez l'onglet de saisie d'ajustements ci-dessous.
             </p>
@@ -995,10 +998,10 @@ export default function TunisianFinancialStatements({
                       <tr key={e.code} className="hover:bg-slate-50/50">
                         <td className="p-2 pl-4 font-mono font-bold text-slate-800">{e.code}</td>
                         <td className="p-2 font-semibold text-slate-800">{e.label}</td>
-                        <td className="p-2 text-right font-mono text-slate-500">{e.debit > 0 ? e.debit.toLocaleString('fr-TN', { minimumFractionDigits: 3 }) : '-'}</td>
-                        <td className="p-2 text-right font-mono text-slate-500">{e.credit > 0 ? e.credit.toLocaleString('fr-TN', { minimumFractionDigits: 3 }) : '-'}</td>
-                        <td className="p-2 text-right font-mono text-emerald-700 bg-emerald-50/10 font-bold">{e.debitBalance > 0 ? e.debitBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3 }) : '-'}</td>
-                        <td className="p-2 text-right font-mono text-indigo-800 bg-indigo-50/10 font-bold">{e.creditBalance > 0 ? e.creditBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3 }) : '-'}</td>
+                        <td className="p-2 text-right font-mono text-slate-500">{(e.debit ?? 0) > 0 ? fmt(e.debit) : '-'}</td>
+                        <td className="p-2 text-right font-mono text-slate-500">{(e.credit ?? 0) > 0 ? fmt(e.credit) : '-'}</td>
+                        <td className="p-2 text-right font-mono text-emerald-700 bg-emerald-50/10 font-bold">{(e.debitBalance ?? 0) > 0 ? fmt(e.debitBalance) : '-'}</td>
+                        <td className="p-2 text-right font-mono text-indigo-800 bg-indigo-50/10 font-bold">{(e.creditBalance ?? 0) > 0 ? fmt(e.creditBalance) : '-'}</td>
                       </tr>
                     );
                   })}
@@ -1006,10 +1009,10 @@ export default function TunisianFinancialStatements({
                   {/* TOTAL LINE */}
                   <tr className="bg-slate-50 font-black text-xs text-slate-800 border-t-2 border-slate-200">
                     <td colSpan={2} className="p-3 pl-4 text-left font-extrabold uppercase">TOTAUX DE CONTRÔLE</td>
-                    <td className="p-3 text-right font-mono">{totalBalanceDebits.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-3 text-right font-mono">{totalBalanceCredits.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-3 text-right font-mono text-emerald-800 bg-emerald-50/50">{totalBalanceDebitBalances.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-3 text-right font-mono text-indigo-950 bg-indigo-50/50">{totalBalanceCreditBalances.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-3 text-right font-mono">{fmt(totalBalanceDebits)}</td>
+                    <td className="p-3 text-right font-mono">{fmt(totalBalanceCredits)}</td>
+                    <td className="p-3 text-right font-mono text-emerald-800 bg-emerald-50/50">{fmt(totalBalanceDebitBalances)}</td>
+                    <td className="p-3 text-right font-mono text-indigo-950 bg-indigo-50/50">{fmt(totalBalanceCreditBalances)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1050,9 +1053,9 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Immobilisations corporelles (Terrains, Bâtiments, Véhicules)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.brutImmobCorp.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.amortImmobCorp.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono text-indigo-800 font-bold">{bilanActif.netImmobCorp.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.brutImmobCorp)}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.amortImmobCorp)}</td>
+                    <td className="p-2.5 text-right font-mono text-indigo-800 font-bold">{fmt(bilanActif?.netImmobCorp)}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Immobilisations financières</td>
@@ -1062,9 +1065,9 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr className="bg-indigo-50/20 font-bold text-slate-800">
                     <td className="p-2.5 pl-4 uppercase text-[10px]">TOTAL ACTIFS NON COURANTS (I)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.totalNonCourantBrut.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.totalNonCourantAmort.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono text-indigo-900">{bilanActif.totalNonCourantNet.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.totalNonCourantBrut)}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.totalNonCourantAmort)}</td>
+                    <td className="p-2.5 text-right font-mono text-indigo-900">{fmt(bilanActif?.totalNonCourantNet)}</td>
                   </tr>
 
                   {/* ACTIFS COURANTS */}
@@ -1073,41 +1076,41 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Stocks & En-cours (Marchandises, matières premières)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.stockBrut.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.stockDeprec.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono font-bold">{bilanActif.stockNet.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.stockBrut)}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.stockDeprec)}</td>
+                    <td className="p-2.5 text-right font-mono font-bold">{fmt(bilanActif?.stockNet)}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Clients et comptes rattachés (Créances clients)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.clientBrut.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.clientDeprec.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono font-bold">{bilanActif.clientNet.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.clientBrut)}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.clientDeprec)}</td>
+                    <td className="p-2.5 text-right font-mono font-bold">{fmt(bilanActif?.clientNet)}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Autres actifs courants (TVA récupérable, Retenues à la source subies)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.otherCurrentAssetsBrut.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.otherCurrentAssetsBrut)}</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono font-bold">{bilanActif.otherCurrentAssetsNet.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono font-bold">{fmt(bilanActif?.otherCurrentAssetsNet)}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Liquidités et équivalents de liquidités (Soldes Banques & Caisses)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.liquidities.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.liquidities)}</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono font-bold">{bilanActif.liquidities.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono font-bold">{fmt(bilanActif?.liquidities)}</td>
                   </tr>
                   <tr className="bg-indigo-50/20 font-bold text-slate-800">
                     <td className="p-2.5 pl-4 uppercase text-[10px]">TOTAL ACTIFS COURANTS (II)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.totalCourantBrut.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono">{bilanActif.totalCourantAmort.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono text-indigo-900">{bilanActif.totalCourantNet.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.totalCourantBrut)}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanActif?.totalCourantAmort)}</td>
+                    <td className="p-2.5 text-right font-mono text-indigo-900">{fmt(bilanActif?.totalCourantNet)}</td>
                   </tr>
 
                   {/* GRAND TOTAL */}
                   <tr className="bg-slate-900 text-white font-black text-xs border-t-2">
                     <td className="p-3 pl-4 uppercase">TOTAL GÉNÉRAL DE L'ACTIF (I + II)</td>
-                    <td className="p-3 text-right font-mono">{bilanActif.totalActifBrut.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-3 text-right font-mono">{bilanActif.totalActifAmort.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-3 text-right font-mono text-emerald-400 font-extrabold">{bilanActif.totalActifNet.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-3 text-right font-mono">{fmt(bilanActif?.totalActifBrut)}</td>
+                    <td className="p-3 text-right font-mono">{fmt(bilanActif?.totalActifAmort)}</td>
+                    <td className="p-3 text-right font-mono text-emerald-400 font-extrabold">{fmt(bilanActif?.totalActifNet)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1140,25 +1143,25 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Capital social</td>
-                    <td className="p-2.5 text-right font-mono">{bilanPassif.capitalSocial.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanPassif?.capitalSocial)}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Réserves légales & réglementaires</td>
-                    <td className="p-2.5 text-right font-mono">{bilanPassif.reserves.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanPassif?.reserves)}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Report à nouveau (Excedént / Déficit cumulé)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanPassif.reportANouveau.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanPassif?.reportANouveau)}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Résultat net de l'exercice (Solde après IS)</td>
-                    <td className={`p-2.5 text-right font-mono font-bold ${bilanPassif.resultPeriod >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      {bilanPassif.resultPeriod.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
+                    <td className={`p-2.5 text-right font-mono font-bold ${(bilanPassif?.resultPeriod ?? 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      {fmt(bilanPassif?.resultPeriod)}
                     </td>
                   </tr>
                   <tr className="bg-indigo-50/20 font-bold text-indigo-950">
                     <td className="p-2.5 pl-4 uppercase text-[10px]">TOTAL CAPITAUX PROPRES</td>
-                    <td className="p-2.5 text-right font-mono font-black">{bilanPassif.totalCapitauxPropres.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono font-black">{fmt(bilanPassif?.totalCapitauxPropres)}</td>
                   </tr>
 
                   {/* PASSIFS NON COURANTS */}
@@ -1167,11 +1170,11 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Emprunts à long terme (Établissements financiers)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanPassif.empruntsLT.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanPassif?.empruntsLT)}</td>
                   </tr>
                   <tr className="bg-indigo-50/20 font-bold text-indigo-950">
                     <td className="p-2.5 pl-4 uppercase text-[10px]">TOTAL PASSIFS NON COURANTS</td>
-                    <td className="p-2.5 text-right font-mono font-black">{bilanPassif.totalPassifsNonCourants.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono font-black">{fmt(bilanPassif?.totalPassifsNonCourants)}</td>
                   </tr>
 
                   {/* PASSIFS COURANTS */}
@@ -1180,29 +1183,29 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Fournisseurs d'exploitation et d'immobilisations</td>
-                    <td className="p-2.5 text-right font-mono">{bilanPassif.fournisseurs.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanPassif?.fournisseurs)}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">État - Impôts & Taxes (TVA collectée, Retenue IS due)</td>
-                    <td className="p-2.5 text-right font-mono">{(bilanPassif.etatTvaCollectee + fiscalResults.finalTaxDue).toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt((bilanPassif?.etatTvaCollectee ?? 0) + (fiscalResults?.finalTaxDue ?? 0))}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Personnel & Organismes Sociaux (CNSS / Salaires nets dus)</td>
-                    <td className="p-2.5 text-right font-mono">{bilanPassif.salariesDue.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanPassif?.salariesDue)}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Associés - Comptes courants créditeurs</td>
-                    <td className="p-2.5 text-right font-mono">{bilanPassif.associesCC.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(bilanPassif?.associesCC)}</td>
                   </tr>
                   <tr className="bg-indigo-50/20 font-bold text-indigo-950">
                     <td className="p-2.5 pl-4 uppercase text-[10px]">TOTAL PASSIFS COURANTS</td>
-                    <td className="p-2.5 text-right font-mono font-black">{bilanPassif.totalPassifsCourants.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono font-black">{fmt(bilanPassif?.totalPassifsCourants)}</td>
                   </tr>
 
                   {/* PASSIF & EQUITIES */}
                   <tr className="bg-slate-900 text-white font-black text-xs border-t-2">
                     <td className="p-3 pl-4 uppercase">TOTAL PASSIFS & CAPITAUX PROPRES</td>
-                    <td className="p-3 text-right font-mono text-emerald-400 font-extrabold">{bilanPassif.totalPassifEtCapitaux.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-3 text-right font-mono text-emerald-400 font-extrabold">{fmt(bilanPassif?.totalPassifEtCapitaux)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1215,7 +1218,7 @@ export default function TunisianFinancialStatements({
                 <span>Rapprochement d'Équilibre Actif/Passif :</span>
               </span>
               <span className="font-mono font-bold text-emerald-900">
-                Écart : {Math.abs(bilanActif.totalActifNet - bilanPassif.totalPassifEtCapitaux).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND
+                Écart : {fmt(Math.abs((bilanActif?.totalActifNet ?? 0) - (bilanPassif?.totalPassifEtCapitaux ?? 0)))} TND
               </span>
             </div>
           </div>
@@ -1245,14 +1248,14 @@ export default function TunisianFinancialStatements({
                   <tr>
                     <td className="p-2.5 pl-4 text-slate-800">Chiffre d'Affaires HT (Ventes de marchandises / produits)</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono">{financialResults.productionExercice.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono font-bold text-slate-900">{financialResults.productionExercice.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(financialResults?.productionExercice, 'fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono font-bold text-slate-900">{fmt(financialResults?.productionExercice, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-4 text-slate-800">Consommations de matières & Achats intermédiaires</td>
-                    <td className="p-2.5 text-right font-mono">{financialResults.consommationsIntermediaires.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(financialResults?.consommationsIntermediaires, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono font-bold text-slate-900">({financialResults.consommationsIntermediaires.toLocaleString('fr-TN', { minimumFractionDigits: 3 })})</td>
+                    <td className="p-2.5 text-right font-mono font-bold text-slate-900">({fmt(financialResults?.consommationsIntermediaires, 'fr-TN', { minimumFractionDigits: 3 })})</td>
                   </tr>
 
                   {/* VALEUR AJOUTEE */}
@@ -1260,20 +1263,20 @@ export default function TunisianFinancialStatements({
                     <td className="p-2.5 pl-4 uppercase text-[10px]">VALEUR AJOUTÉE COMPTABLE (VA)</td>
                     <td className="p-2.5 text-right font-mono">-</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono font-black text-indigo-900">{financialResults.valeurAjoutee.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono font-black text-indigo-900">{fmt(financialResults?.valeurAjoutee, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                   </tr>
 
                   <tr>
                     <td className="p-2.5 pl-4 text-slate-800">Charges de personnel (Salaires & CNSS Patronale)</td>
-                    <td className="p-2.5 text-right font-mono">{financialResults.chargesPersonnel.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(financialResults?.chargesPersonnel, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono">({financialResults.chargesPersonnel.toLocaleString('fr-TN', { minimumFractionDigits: 3 })})</td>
+                    <td className="p-2.5 text-right font-mono">({fmt(financialResults?.chargesPersonnel, 'fr-TN', { minimumFractionDigits: 3 })})</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-4 text-slate-800">Impôts, taxes et versements assimilés (FODEC / TFP)</td>
-                    <td className="p-2.5 text-right font-mono">{financialResults.impotsTaxes.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(financialResults?.impotsTaxes, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono">({financialResults.impotsTaxes.toLocaleString('fr-TN', { minimumFractionDigits: 3 })})</td>
+                    <td className="p-2.5 text-right font-mono">({fmt(financialResults?.impotsTaxes, 'fr-TN', { minimumFractionDigits: 3 })})</td>
                   </tr>
 
                   {/* EBE */}
@@ -1281,14 +1284,14 @@ export default function TunisianFinancialStatements({
                     <td className="p-2.5 pl-4 uppercase text-[10px]">EXCÉDENT BRUT D'EXPLOITATION (EBE)</td>
                     <td className="p-2.5 text-right font-mono">-</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono font-black text-indigo-900">{financialResults.ebe.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono font-black text-indigo-900">{fmt(financialResults?.ebe, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                   </tr>
 
                   <tr>
                     <td className="p-2.5 pl-4 text-slate-800">Dotations aux Amortissements et Provisions d'exploitation</td>
-                    <td className="p-2.5 text-right font-mono">{financialResults.dotationsAmort.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(financialResults?.dotationsAmort, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono">({financialResults.dotationsAmort.toLocaleString('fr-TN', { minimumFractionDigits: 3 })})</td>
+                    <td className="p-2.5 text-right font-mono">({fmt(financialResults?.dotationsAmort, 'fr-TN', { minimumFractionDigits: 3 })})</td>
                   </tr>
 
                   {/* RESULTAT EXPLOITATION */}
@@ -1296,14 +1299,14 @@ export default function TunisianFinancialStatements({
                     <td className="p-2.5 pl-4 uppercase text-[10px]">RÉSULTAT D'EXPLOITATION (EBIT)</td>
                     <td className="p-2.5 text-right font-mono">-</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono text-slate-900">{financialResults.resultatExploitation.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono text-slate-900">{fmt(financialResults?.resultatExploitation, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                   </tr>
 
                   <tr>
                     <td className="p-2.5 pl-4 text-slate-800">Produits financiers net des charges (Intérêts placements - frais banques)</td>
-                    <td className="p-2.5 text-right font-mono">{financialResults.chargesFinancieres.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono">{financialResults.produitsFinanciers.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
-                    <td className="p-2.5 text-right font-mono">{financialResults.resultatFinancier.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(financialResults?.chargesFinancieres, 'fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(financialResults?.produitsFinanciers, 'fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(financialResults?.resultatFinancier, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                   </tr>
 
                   {/* RESULTAT COURANT AVANT IMPOT */}
@@ -1311,14 +1314,14 @@ export default function TunisianFinancialStatements({
                     <td className="p-2.5 pl-4 uppercase text-[10px]">RÉSULTAT COURANT AVANT IMPÔTS</td>
                     <td className="p-2.5 text-right font-mono">-</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono text-slate-950">{financialResults.resultatCourantAvantImpots.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono text-slate-950">{fmt(financialResults?.resultatCourantAvantImpots, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                   </tr>
 
                   <tr>
                     <td className="p-2.5 pl-4 text-slate-800">Impôt sur les sociétés (Tunisian Corporate Tax)</td>
-                    <td className="p-2.5 text-right font-mono">{fiscalResults.finalTaxDue.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(fiscalResults?.finalTaxDue, 'fr-TN', { minimumFractionDigits: 3 })}</td>
                     <td className="p-2.5 text-right font-mono">-</td>
-                    <td className="p-2.5 text-right font-mono">({fiscalResults.finalTaxDue.toLocaleString('fr-TN', { minimumFractionDigits: 3 })})</td>
+                    <td className="p-2.5 text-right font-mono">({fmt(fiscalResults?.finalTaxDue, 'fr-TN', { minimumFractionDigits: 3 })})</td>
                   </tr>
 
                   {/* NET INCOME */}
@@ -1326,7 +1329,7 @@ export default function TunisianFinancialStatements({
                     <td className="p-3 pl-4 uppercase">RÉSULTAT NET DE L'EXERCICE 2026</td>
                     <td colSpan={2} className="p-3"></td>
                     <td className={`p-3 text-right font-mono text-emerald-400 font-extrabold`}>
-                      {financialResults.netProfit.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
+                      {fmt(financialResults?.netProfit, 'fr-TN', { minimumFractionDigits: 3 })}
                     </td>
                   </tr>
                 </tbody>
@@ -1360,16 +1363,16 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Marge brute d'autofinancement (MBA)</td>
-                    <td className="p-2.5 text-right font-mono">{(financialResults.netProfit + financialResults.dotationsAmort).toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt((financialResults?.netProfit || 0) + (financialResults?.dotationsAmort || 0), 'fr-TN', { minimumFractionDigits: 3 })}</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Variation du Besoin en Fonds de Roulement (BFR) - Clients & Stocks</td>
-                    <td className="p-2.5 text-right font-mono">({(bilanActif.stockNet + bilanActif.clientNet - bilanPassif.fournisseurs * 0.4).toLocaleString('fr-TN', { minimumFractionDigits: 3 })})</td>
+                    <td className="p-2.5 text-right font-mono">({fmt((bilanActif?.stockNet || 0) + (bilanActif?.clientNet || 0) - (bilanPassif?.fournisseurs || 0) * 0.4, 'fr-TN', { minimumFractionDigits: 3 })})</td>
                   </tr>
                   <tr className="bg-indigo-50/10 font-bold text-indigo-950">
                     <td className="p-2.5 pl-4 uppercase text-[10px]">Flux de Trésorerie Net de l'Exploitation (A)</td>
                     <td className="p-2.5 text-right font-mono">
-                      {(financialResults.netProfit + financialResults.dotationsAmort - (bilanActif.stockNet + bilanActif.clientNet - bilanPassif.fournisseurs * 0.4)).toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
+                      {fmt((financialResults?.netProfit || 0) + (financialResults?.dotationsAmort || 0) - ((bilanActif?.stockNet || 0) + (bilanActif?.clientNet || 0) - (bilanPassif?.fournisseurs || 0) * 0.4), 'fr-TN', { minimumFractionDigits: 3 })}
                     </td>
                   </tr>
 
@@ -1379,7 +1382,7 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Acquisition d'immobilisations (Matériel, locaux, informatique)</td>
-                    <td className="p-2.5 text-right font-mono">({(bilanActif.brutImmobCorp * 0.15).toLocaleString('fr-TN', { minimumFractionDigits: 3 })})</td>
+                    <td className="p-2.5 text-right font-mono">({fmt((bilanActif?.brutImmobCorp || 0) * 0.15, 'fr-TN', { minimumFractionDigits: 3 })})</td>
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Cession d'éléments d'actif corporel</td>
@@ -1387,7 +1390,7 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr className="bg-indigo-50/10 font-bold text-indigo-950">
                     <td className="p-2.5 pl-4 uppercase text-[10px]">Flux de Trésorerie Net de l'Investissement (B)</td>
-                    <td className="p-2.5 text-right font-mono">({(bilanActif.brutImmobCorp * 0.15).toLocaleString('fr-TN', { minimumFractionDigits: 3 })})</td>
+                    <td className="p-2.5 text-right font-mono">({fmt((bilanActif?.brutImmobCorp || 0) * 0.15, 'fr-TN', { minimumFractionDigits: 3 })})</td>
                   </tr>
 
                   {/* ACTIVITE FINANCEMENT */}
@@ -1400,22 +1403,24 @@ export default function TunisianFinancialStatements({
                   </tr>
                   <tr>
                     <td className="p-2.5 pl-6 text-slate-800">Emprunts contractés ou remboursements de dettes financières</td>
-                    <td className="p-2.5 text-right font-mono">({(bilanPassif.empruntsLT * 0.1).toLocaleString('fr-TN', { minimumFractionDigits: 3 })})</td>
+                    <td className="p-2.5 text-right font-mono">({fmt((bilanPassif?.empruntsLT || 0) * 0.1, 'fr-TN', { minimumFractionDigits: 3 })})</td>
                   </tr>
                   <tr className="bg-indigo-50/10 font-bold text-indigo-950">
                     <td className="p-2.5 pl-4 uppercase text-[10px]">Flux de Trésorerie Net de Financement (C)</td>
-                    <td className="p-2.5 text-right font-mono">{(20000.000 - (bilanPassif.empruntsLT * 0.1)).toLocaleString('fr-TN', { minimumFractionDigits: 3 })}</td>
+                    <td className="p-2.5 text-right font-mono">{fmt(20000.000 - ((bilanPassif?.empruntsLT || 0) * 0.1), 'fr-TN', { minimumFractionDigits: 3 })}</td>
                   </tr>
 
                   {/* VARIATION GLOBALE */}
                   <tr className="bg-slate-900 text-white font-black text-xs border-t-2">
                     <td className="p-3 pl-4 uppercase">VARIATION NETTE DE TRÉSORERIE (A + B + C)</td>
                     <td className="p-3 text-right font-mono text-emerald-400 font-extrabold">
-                      {(
-                        (financialResults.netProfit + financialResults.dotationsAmort - (bilanActif.stockNet + bilanActif.clientNet - bilanPassif.fournisseurs * 0.4))
-                        - (bilanActif.brutImmobCorp * 0.15)
-                        + (20000.000 - (bilanPassif.empruntsLT * 0.1))
-                      ).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND
+                      {fmt(
+                        ((financialResults?.netProfit || 0) + (financialResults?.dotationsAmort || 0) - ((bilanActif?.stockNet || 0) + (bilanActif?.clientNet || 0) - (bilanPassif?.fournisseurs || 0) * 0.4))
+                        - ((bilanActif?.brutImmobCorp || 0) * 0.15)
+                        + (20000.000 - ((bilanPassif?.empruntsLT || 0) * 0.1)),
+                        'fr-TN',
+                        { minimumFractionDigits: 3 }
+                      )} TND
                     </td>
                   </tr>
                 </tbody>
@@ -1455,7 +1460,7 @@ export default function TunisianFinancialStatements({
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                   <h4 className="text-xs font-extrabold text-rose-800 uppercase flex items-center justify-between mb-3">
                     <span>1. Réintégrations Fiscales (+)</span>
-                    <span className="p-0.5 px-2 bg-rose-100 text-rose-800 rounded-lg text-[10px] font-mono">{fiscalResults.sumReintegrations.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    <span className="p-0.5 px-2 bg-rose-100 text-rose-800 rounded-lg text-[10px] font-mono">{fmt(fiscalResults?.sumReintegrations, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                   </h4>
 
                   <ul className="space-y-2 mb-4 text-[11px] font-semibold text-slate-600">
@@ -1463,7 +1468,7 @@ export default function TunisianFinancialStatements({
                       <li key={r.id} className="flex justify-between items-center p-2 bg-white rounded-lg border border-slate-150">
                         <span>{r.label}</span>
                         <div className="flex items-center space-x-2 font-mono">
-                          <span className="text-rose-700">{r.amount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                          <span className="text-rose-700">{fmt(r?.amount, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                           <button
                             type="button"
                             onClick={() => setReintegrations(prev => prev.filter(item => item.id !== r.id))}
@@ -1512,7 +1517,7 @@ export default function TunisianFinancialStatements({
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                   <h4 className="text-xs font-extrabold text-emerald-800 uppercase flex items-center justify-between mb-3">
                     <span>2. Déductions Fiscales (-)</span>
-                    <span className="p-0.5 px-2 bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-mono">{fiscalResults.sumDeductions.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    <span className="p-0.5 px-2 bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-mono">{fmt(fiscalResults?.sumDeductions, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                   </h4>
 
                   <ul className="space-y-2 mb-4 text-[11px] font-semibold text-slate-600">
@@ -1520,7 +1525,7 @@ export default function TunisianFinancialStatements({
                       <li key={d.id} className="flex justify-between items-center p-2 bg-white rounded-lg border border-slate-150">
                         <span>{d.label}</span>
                         <div className="flex items-center space-x-2 font-mono">
-                          <span className="text-emerald-700">{d.amount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                          <span className="text-emerald-700">{fmt(d?.amount, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                           <button
                             type="button"
                             onClick={() => setDeductions(prev => prev.filter(item => item.id !== d.id))}
@@ -1577,37 +1582,37 @@ export default function TunisianFinancialStatements({
                 <div className="space-y-3.5 text-xs font-semibold">
                   <div className="flex justify-between items-center pb-2.5 border-b border-slate-800">
                     <span className="text-slate-400">Résultat Courant Comptable avant Impôt</span>
-                    <span className="font-mono text-white">{fiscalResults.rComptable.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    <span className="font-mono text-white">{fmt(fiscalResults?.rComptable, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                   </div>
 
                   <div className="flex justify-between items-center pb-2.5 border-b border-slate-800">
                     <span className="text-slate-400">Cumul des Réintégrations Fiscales (+)</span>
-                    <span className="font-mono text-rose-450">+{fiscalResults.sumReintegrations.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    <span className="font-mono text-rose-450">+{fmt(fiscalResults?.sumReintegrations, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                   </div>
 
                   <div className="flex justify-between items-center pb-2.5 border-b border-slate-800">
                     <span className="text-slate-400">Cumul des Déductions Fiscales (-)</span>
-                    <span className="font-mono text-emerald-400">-{fiscalResults.sumDeductions.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    <span className="font-mono text-emerald-400">-{fmt(fiscalResults?.sumDeductions, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                   </div>
 
                   <div className="flex justify-between items-center pb-2.5 border-b border-slate-800 bg-indigo-950/20 p-2 rounded-lg">
                     <span className="text-indigo-400 font-bold">Assiette / Résultat Fiscal de l'exercice</span>
-                    <span className="font-mono text-white font-bold">{fiscalResults.taxableProfit.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    <span className="font-mono text-white font-bold">{fmt(fiscalResults?.taxableProfit, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                   </div>
 
                   <div className="flex justify-between items-center pb-2.5 border-b border-slate-800">
                     <span className="text-slate-400">Taux d'Impôt applicable (IS)</span>
-                    <span className="font-mono text-white bg-indigo-500/20 p-1 px-2.5 rounded-lg text-[10px]">{(fiscalResults.isRate * 100).toFixed(0)} %</span>
+                    <span className="font-mono text-white bg-indigo-500/20 p-1 px-2.5 rounded-lg text-[10px]">{((fiscalResults?.isRate || 0) * 100).toFixed(0)} %</span>
                   </div>
 
                   <div className="flex justify-between items-center pb-2.5 border-b border-slate-800">
                     <span className="text-slate-400">Impôt Théorique déterminé</span>
-                    <span className="font-mono text-white">{fiscalResults.isDetermined.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    <span className="font-mono text-white">{fmt(fiscalResults?.isDetermined, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                   </div>
 
                   <div className="flex justify-between items-center pb-2.5 border-b border-slate-800">
                     <span className="text-slate-400">Minimum d'Impôt Tunisien (0.2% de CA, min 300 TND)</span>
-                    <span className="font-mono text-amber-400">{fiscalResults.minTaxValue.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    <span className="font-mono text-amber-400">{fmt(fiscalResults?.minTaxValue, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                   </div>
 
                   <div className="flex justify-between items-center p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
@@ -1615,7 +1620,7 @@ export default function TunisianFinancialStatements({
                       <span className="text-amber-400 font-bold block">IMPÔT SUR LES SOCIÉTÉS (IS) FINAL DU</span>
                       <span className="text-[9px] text-slate-400">Le montant le plus élevé entre l'impôt théorique et le minimum légal de 0.2%</span>
                     </div>
-                    <span className="font-mono text-lg font-black text-amber-400">{fiscalResults.finalTaxDue.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    <span className="font-mono text-lg font-black text-amber-400">{fmt(fiscalResults?.finalTaxDue, 'fr-TN', { minimumFractionDigits: 3 })} TND</span>
                   </div>
                 </div>
               </div>

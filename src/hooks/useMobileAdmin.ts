@@ -5,7 +5,7 @@ import {
   getDocs, 
   setDoc, 
   updateDoc, 
-  deleteDoc,
+  deleteDoc, 
   onSnapshot, 
   query 
 } from 'firebase/firestore';
@@ -19,18 +19,19 @@ import {
   FleetInventoryItem,
   FleetDeviceStatus
 } from '../types/mobileTerrain';
+import {
+  TRIAL_FLEET_INVENTORY,
+  TRIAL_MOBILE_DEVICES,
+  TRIAL_FIELD_SESSIONS,
+  TRIAL_MOBILE_ORDERS,
+  TRIAL_CHANTIER_REPORTS
+} from '../data/mockTrialData';
 
-// Fallback empty dataset for MDM Fleet Inventory
-const DEMO_FLEET_INVENTORY: FleetInventoryItem[] = [];
-
-// Fallback empty dataset for initial render and offline/sandbox mode
-const DEMO_DEVICES: MobileDevice[] = [];
-
-const DEMO_SESSIONS: FieldSession[] = [];
-
-const DEMO_ORDERS: MobileOrder[] = [];
-
-const DEMO_REPORTS: ChantierReport[] = [];
+const DEMO_FLEET_INVENTORY: FleetInventoryItem[] = TRIAL_FLEET_INVENTORY;
+const DEMO_DEVICES: MobileDevice[] = TRIAL_MOBILE_DEVICES;
+const DEMO_SESSIONS: FieldSession[] = TRIAL_FIELD_SESSIONS;
+const DEMO_ORDERS: MobileOrder[] = TRIAL_MOBILE_ORDERS;
+const DEMO_REPORTS: ChantierReport[] = TRIAL_CHANTIER_REPORTS;
 
 enum OperationType {
   CREATE = 'create',
@@ -64,14 +65,22 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   console.warn('[Firestore Mobile Admin Error]:', JSON.stringify(errInfo));
 }
 
-export function useMobileAdmin(tenantIdParam?: string) {
+export function useMobileAdmin(tenantIdParam?: string, isDemoTenantParam?: boolean) {
   const tenantId = tenantIdParam || 'Inter-Affaires';
+  const isDemo = Boolean(
+    isDemoTenantParam || 
+    tenantId === 'company_demo' || 
+    tenantId === 'MD' || 
+    tenantId === 'DEMO_STORE' || 
+    tenantId === 'Mode Simulation (Démo Multi-Sociétés)' || 
+    tenantId.toLowerCase().includes('demo')
+  );
 
-  const [devices, setDevices] = useState<MobileDevice[]>(DEMO_DEVICES);
-  const [fleetInventory, setFleetInventory] = useState<FleetInventoryItem[]>(DEMO_FLEET_INVENTORY);
-  const [sessions, setSessions] = useState<FieldSession[]>(DEMO_SESSIONS);
-  const [orders, setOrders] = useState<MobileOrder[]>(DEMO_ORDERS);
-  const [reports, setReports] = useState<ChantierReport[]>(DEMO_REPORTS);
+  const [devices, setDevices] = useState<MobileDevice[]>([]);
+  const [fleetInventory, setFleetInventory] = useState<FleetInventoryItem[]>([]);
+  const [sessions, setSessions] = useState<FieldSession[]>([]);
+  const [orders, setOrders] = useState<MobileOrder[]>([]);
+  const [reports, setReports] = useState<ChantierReport[]>([]);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,109 +101,38 @@ export function useMobileAdmin(tenantIdParam?: string) {
     const ordersColRef = collection(db, 'company_erp_data', tenantId, 'mobile_orders');
     const reportsColRef = collection(db, 'company_erp_data', tenantId, 'chantier_reports');
 
-    const isDemoDevice = (id: string, data: any) => {
-      const name = (data?.agentName || '').toLowerCase();
-      const idLower = id.toLowerCase();
-      const agentId = (data?.agentId || '').toLowerCase();
-      return (
-        idLower.startsWith('demo') ||
-        idLower.startsWith('dev_') ||
-        idLower.startsWith('emp_agent') ||
-        idLower.includes('demo') ||
-        agentId.includes('emp_agent') ||
-        agentId.includes('demo') ||
-        name.includes('mohamed ali') ||
-        name.includes('hamza ben salem') ||
-        name.includes('démo') ||
-        name.includes('demo') ||
-        name.includes('force de vente')
-      );
-    };
-
-    const isDemoFleet = (id: string, data: any) => {
-      const idLower = id.toLowerCase();
-      const assigned = (data?.assignedTo || '').toLowerCase();
-      const name = (data?.device_name || '').toLowerCase();
-      return (
-        idLower.startsWith('flt_') ||
-        idLower.includes('demo') ||
-        assigned.includes('mohamed ali') ||
-        assigned.includes('hamza ben salem') ||
-        name.includes('demo')
-      );
-    };
-
-    const isDemoSession = (id: string, data: any) => {
-      const idLower = id.toLowerCase();
-      const agent = (data?.agentName || '').toLowerCase();
-      return (
-        idLower.includes('demo') ||
-        idLower.startsWith('sess_') ||
-        agent.includes('mohamed ali') ||
-        agent.includes('hamza ben salem') ||
-        agent.includes('démo')
-      );
-    };
-
-    const isDemoOrder = (id: string, data: any) => {
-      const idLower = id.toLowerCase();
-      const agent = (data?.agentName || '').toLowerCase();
-      const client = (data?.clientName || '').toLowerCase();
-      return (
-        idLower.includes('demo') ||
-        idLower.startsWith('ord_') ||
-        agent.includes('mohamed ali') ||
-        agent.includes('hamza ben salem') ||
-        client.includes('comptoir industriel')
-      );
-    };
-
-    const isDemoReport = (id: string, data: any) => {
-      const idLower = id.toLowerCase();
-      const chef = (data?.chefChantierName || '').toLowerCase();
-      return (
-        idLower.includes('demo') ||
-        idLower.startsWith('rep_') ||
-        chef.includes('mohamed ali') ||
-        chef.includes('hamza ben salem')
-      );
-    };
-
     // Subscribe to Devices
     const unsubDevices = onSnapshot(
       devicesColRef,
       (snapshot) => {
         if (snapshot.empty) {
-          setDevices([]);
+          setDevices(isDemo ? DEMO_DEVICES : []);
         } else {
           const loadedDevices: MobileDevice[] = [];
           snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            if (isDemoDevice(docSnap.id, data)) {
-              deleteDoc(doc(db, 'company_erp_data', tenantId, 'mobile_devices', docSnap.id)).catch(() => {});
-            } else {
-              loadedDevices.push({
-                id: docSnap.id,
-                tenantId: data.tenantId || tenantId,
-                agentId: data.agentId || 'agent_unk',
-                agentName: data.agentName || 'Agent Inconnu',
-                deviceModel: data.deviceModel || 'Terminal Mobile',
-                assigned_module: data.assigned_module || 'standard',
-                lastSync: data.lastSync || new Date().toISOString(),
-                status: data.status || 'PENDING',
-                batteryLevel: data.batteryLevel,
-                appVersion: data.appVersion,
-                macAddress: data.macAddress,
-                phoneNumber: data.phoneNumber,
-              });
-            }
+            loadedDevices.push({
+              id: docSnap.id,
+              tenantId: data.tenantId || tenantId,
+              agentId: data.agentId || 'agent_unk',
+              agentName: data.agentName || 'Agent Inconnu',
+              deviceModel: data.deviceModel || 'Terminal Mobile',
+              assigned_module: data.assigned_module || 'standard',
+              lastSync: data.lastSync || new Date().toISOString(),
+              status: data.status || 'PENDING',
+              batteryLevel: data.batteryLevel,
+              appVersion: data.appVersion,
+              macAddress: data.macAddress,
+              phoneNumber: data.phoneNumber,
+            });
           });
-          setDevices(loadedDevices);
+          setDevices(loadedDevices.length > 0 ? loadedDevices : (isDemo ? DEMO_DEVICES : []));
         }
         setLoading(false);
       },
       (err) => {
         handleFirestoreError(err, OperationType.LIST, `company_erp_data/${tenantId}/mobile_devices`);
+        setDevices(isDemo ? DEMO_DEVICES : []);
         setLoading(false);
       }
     );
@@ -204,31 +142,32 @@ export function useMobileAdmin(tenantIdParam?: string) {
       fleetColRef,
       (snapshot) => {
         if (snapshot.empty) {
-          setFleetInventory([]);
+          setFleetInventory(isDemo ? DEMO_FLEET_INVENTORY : []);
         } else {
           const loadedFleet: FleetInventoryItem[] = [];
           snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            if (isDemoFleet(docSnap.id, data)) {
-              deleteDoc(doc(db, 'company_erp_data', tenantId, 'fleet_inventory', docSnap.id)).catch(() => {});
-            } else {
-              loadedFleet.push({
-                id: docSnap.id,
-                tenantId: data.tenantId || tenantId,
-                fleet_park: data.fleet_park || 'Stock Réserve',
-                device_name: data.device_name || 'Terminal Mobile',
-                serial_reference: data.serial_reference || 'IMEI Non Spécifié',
-                status: data.status || 'Available',
-                assignedTo: data.assignedTo,
-                registeredAt: data.registeredAt || new Date().toISOString()
-              });
-            }
+            loadedFleet.push({
+              id: docSnap.id,
+              tenantId: data.tenantId || tenantId,
+              category: data.category || 'Terminal Mobile',
+              fleet_park: data.fleet_park || 'Stock Réserve',
+              device_name: data.device_name || 'Terminal Mobile',
+              serial_reference: data.serial_reference || 'IMEI Non Spécifié',
+              status: data.status || 'Available',
+              assignedTo: data.assignedTo,
+              assignedDriver: data.assignedDriver || data.assignedTo,
+              registeredAt: data.registeredAt || new Date().toISOString(),
+              mileage: data.mileage || 0,
+              maxPayloadKg: data.maxPayloadKg || 0
+            });
           });
-          setFleetInventory(loadedFleet);
+          setFleetInventory(loadedFleet.length > 0 ? loadedFleet : (isDemo ? DEMO_FLEET_INVENTORY : []));
         }
       },
       (err) => {
         handleFirestoreError(err, OperationType.LIST, `company_erp_data/${tenantId}/fleet_inventory`);
+        setFleetInventory(isDemo ? DEMO_FLEET_INVENTORY : []);
       }
     );
 
@@ -237,32 +176,30 @@ export function useMobileAdmin(tenantIdParam?: string) {
       sessionsColRef,
       (snapshot) => {
         if (snapshot.empty) {
-          setSessions([]);
+          setSessions(isDemo ? DEMO_SESSIONS : []);
         } else {
           const loadedSessions: FieldSession[] = [];
           snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            if (isDemoSession(docSnap.id, data)) {
-              deleteDoc(doc(db, 'company_erp_data', tenantId, 'field_sessions', docSnap.id)).catch(() => {});
-            } else {
-              loadedSessions.push({
-                id: docSnap.id,
-                tenantId: data.tenantId || tenantId,
-                agentId: data.agentId || 'agent_unk',
-                agentName: data.agentName || 'Agent Terrain',
-                type: data.type || 'VAN_SALES',
-                checkIn: data.checkIn || { timestamp: new Date().toISOString(), lat: 36.8065, lng: 10.1815 },
-                checkOut: data.checkOut,
-                status: data.status || 'OPEN',
-                notes: data.notes
-              });
-            }
+            loadedSessions.push({
+              id: docSnap.id,
+              tenantId: data.tenantId || tenantId,
+              agentId: data.agentId || 'agent_unk',
+              agentName: data.agentName || 'Agent Terrain',
+              type: data.type || 'VAN_SALES',
+              vehicleId: data.vehicleId,
+              checkIn: data.checkIn || { timestamp: new Date().toISOString(), lat: 36.8065, lng: 10.1815 },
+              checkOut: data.checkOut,
+              status: data.status || 'OPEN',
+              notes: data.notes
+            });
           });
-          setSessions(loadedSessions);
+          setSessions(loadedSessions.length > 0 ? loadedSessions : (isDemo ? DEMO_SESSIONS : []));
         }
       },
       (err) => {
         handleFirestoreError(err, OperationType.LIST, `company_erp_data/${tenantId}/field_sessions`);
+        setSessions(isDemo ? DEMO_SESSIONS : []);
       }
     );
 
@@ -271,38 +208,35 @@ export function useMobileAdmin(tenantIdParam?: string) {
       ordersColRef,
       (snapshot) => {
         if (snapshot.empty) {
-          setOrders([]);
+          setOrders(isDemo ? DEMO_ORDERS : []);
         } else {
           const loadedOrders: MobileOrder[] = [];
           snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            if (isDemoOrder(docSnap.id, data)) {
-              deleteDoc(doc(db, 'company_erp_data', tenantId, 'mobile_orders', docSnap.id)).catch(() => {});
-            } else {
-              loadedOrders.push({
-                id: docSnap.id,
-                tenantId: data.tenantId || tenantId,
-                localUuid: data.localUuid || docSnap.id,
-                agentId: data.agentId,
-                agentName: data.agentName,
-                clientId: data.clientId || 'cli_unk',
-                clientName: data.clientName || 'Client Inconnu',
-                items: data.items || [],
-                totalHT: data.totalHT || 0,
-                totalTTC: data.totalTTC || 0,
-                paymentStatus: data.paymentStatus || 'PENDING',
-                paymentMethod: data.paymentMethod,
-                signatureUrl: data.signatureUrl,
-                status: data.status || 'PENDING_VALIDATION',
-                createdAt: data.createdAt || new Date().toISOString()
-              });
-            }
+            loadedOrders.push({
+              id: docSnap.id,
+              tenantId: data.tenantId || tenantId,
+              localUuid: data.localUuid || docSnap.id,
+              agentId: data.agentId,
+              agentName: data.agentName,
+              clientId: data.clientId || 'cli_unk',
+              clientName: data.clientName || 'Client Inconnu',
+              items: data.items || [],
+              totalHT: data.totalHT || 0,
+              totalTTC: data.totalTTC || 0,
+              paymentStatus: data.paymentStatus || 'PENDING',
+              paymentMethod: data.paymentMethod,
+              signatureUrl: data.signatureUrl,
+              status: data.status || 'PENDING_VALIDATION',
+              createdAt: data.createdAt || new Date().toISOString()
+            });
           });
-          setOrders(loadedOrders);
+          setOrders(loadedOrders.length > 0 ? loadedOrders : (isDemo ? DEMO_ORDERS : []));
         }
       },
       (err) => {
         handleFirestoreError(err, OperationType.LIST, `company_erp_data/${tenantId}/mobile_orders`);
+        setOrders(isDemo ? DEMO_ORDERS : []);
       }
     );
 
@@ -311,36 +245,33 @@ export function useMobileAdmin(tenantIdParam?: string) {
       reportsColRef,
       (snapshot) => {
         if (snapshot.empty) {
-          setReports([]);
+          setReports(isDemo ? DEMO_REPORTS : []);
         } else {
           const loadedReports: ChantierReport[] = [];
           snapshot.docs.forEach(docSnap => {
             const data = docSnap.data();
-            if (isDemoReport(docSnap.id, data)) {
-              deleteDoc(doc(db, 'company_erp_data', tenantId, 'chantier_reports', docSnap.id)).catch(() => {});
-            } else {
-              loadedReports.push({
-                id: docSnap.id,
-                tenantId: data.tenantId || tenantId,
-                chantierId: data.chantierId || 'CH-001',
-                chantierName: data.chantierName,
-                chefChantierId: data.chefChantierId || 'chef_unk',
-                chefChantierName: data.chefChantierName,
-                date: data.date || new Date().toISOString(),
-                workersPresent: data.workersPresent || 0,
-                materialsConsumed: data.materialsConsumed || [],
-                photoUrls: data.photoUrls || [],
-                signatureUrl: data.signatureUrl,
-                notes: data.notes || '',
-                status: data.status || 'PENDING'
-              });
-            }
+            loadedReports.push({
+              id: docSnap.id,
+              tenantId: data.tenantId || tenantId,
+              chantierId: data.chantierId || 'CH-001',
+              chantierName: data.chantierName,
+              chefChantierId: data.chefChantierId || 'chef_unk',
+              chefChantierName: data.chefChantierName,
+              date: data.date || new Date().toISOString(),
+              workersPresent: data.workersPresent || 0,
+              materialsConsumed: data.materialsConsumed || [],
+              photoUrls: data.photoUrls || [],
+              signatureUrl: data.signatureUrl,
+              notes: data.notes || '',
+              status: data.status || 'PENDING'
+            });
           });
-          setReports(loadedReports);
+          setReports(loadedReports.length > 0 ? loadedReports : (isDemo ? DEMO_REPORTS : []));
         }
       },
       (err) => {
         handleFirestoreError(err, OperationType.LIST, `company_erp_data/${tenantId}/chantier_reports`);
+        setReports(isDemo ? DEMO_REPORTS : []);
       }
     );
 
@@ -351,7 +282,7 @@ export function useMobileAdmin(tenantIdParam?: string) {
       unsubOrders();
       unsubReports();
     };
-  }, [tenantId]);
+  }, [tenantId, isDemo]);
 
   /**
    * 1. Approver un terminal en attente (PENDING -> ACTIVE)

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { TRIAL_TREASURY_ITEMS } from '../data/mockTrialData';
 import { 
   Briefcase, 
   TrendingUp, 
@@ -52,7 +53,7 @@ interface BankCommissionAudit {
   auditDate: string;
 }
 
-export default function TreasuryManager({ currentUser }: { currentUser: any }) {
+export default function TreasuryManager({ currentUser, isTrial = false }: { currentUser: any; isTrial?: boolean }) {
   const TREASURY_KEY = 'carthage_treasury_cheques_effects';
   const AUDIT_KEY = 'carthage_treasury_bank_audits';
 
@@ -200,6 +201,13 @@ export default function TreasuryManager({ currentUser }: { currentUser: any }) {
     } catch (e) {
       console.error("Failed to read TREASURY_KEY from localStorage", e);
     }
+    if (!isTrial) {
+      parsedItems = Array.isArray(parsedItems) 
+        ? parsedItems.filter(i => !String(i.id).startsWith('demo-') && !String(i.id).startsWith('TR-CHE-2026-') && !String(i.id).startsWith('TR-EFF-2026-')) 
+        : [];
+    } else if (!parsedItems || parsedItems.length === 0) {
+      parsedItems = TRIAL_TREASURY_ITEMS as ChequeEffet[];
+    }
     setItems(parsedItems);
 
     let parsedAudits: BankCommissionAudit[] = [];
@@ -210,6 +218,11 @@ export default function TreasuryManager({ currentUser }: { currentUser: any }) {
       }
     } catch (e) {
       console.error("Failed to read AUDIT_KEY from localStorage", e);
+    }
+    if (!isTrial) {
+      parsedAudits = Array.isArray(parsedAudits)
+        ? parsedAudits.filter(a => !String(a.id).startsWith('demo-') && !String(a.id).startsWith('AUD-2026-'))
+        : [];
     }
     setAudits(parsedAudits);
 
@@ -717,7 +730,7 @@ export default function TreasuryManager({ currentUser }: { currentUser: any }) {
                         {/* Amount */}
                         <td className="p-4 text-right">
                           <span className="text-slate-950 font-black font-mono">
-                            {item.amount.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                            {(item.amount ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                           </span>
                         </td>
 
@@ -801,7 +814,7 @@ export default function TreasuryManager({ currentUser }: { currentUser: any }) {
                       <div>
                         <span className="text-[9px] text-slate-400 block font-bold uppercase">Montant Nominal</span>
                         <span className="text-xs font-black text-slate-950">
-                          {selectedItem.amount.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                          {(selectedItem.amount ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                         </span>
                       </div>
                       <div>
@@ -874,7 +887,7 @@ export default function TreasuryManager({ currentUser }: { currentUser: any }) {
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Trésorerie Actuelle (Comptes Bancaires)</span>
                 <p className="text-2xl font-black text-slate-900 font-mono">
-                  {forecastMetrics.activeBankBalance.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                  {(forecastMetrics?.activeBankBalance ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                 </p>
                 <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-150 text-[11px]">
                   <span className="text-slate-500 font-semibold">Dispo immédiat</span>
@@ -886,11 +899,11 @@ export default function TreasuryManager({ currentUser }: { currentUser: any }) {
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
                 <span className="text-[10px] font-black uppercase text-indigo-650 tracking-wider">Projection à 30 jours (Fin juillet)</span>
                 <p className="text-2xl font-black text-indigo-650 font-mono">
-                  {forecastMetrics.liquid30.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                  {(forecastMetrics?.liquid30 ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                 </p>
                 <div className="flex justify-between text-[11px] font-medium font-mono text-slate-500">
-                  <span className="flex items-center text-emerald-600 font-bold"><ArrowDownLeft className="w-3.5 h-3.5 mr-0.5" /> +{forecastMetrics.cashIn30.toLocaleString('fr-FR')}</span>
-                  <span className="flex items-center text-rose-600 font-bold"><ArrowUpRight className="w-3.5 h-3.5 mr-0.5" /> -{forecastMetrics.cashOut30.toLocaleString('fr-FR')}</span>
+                  <span className="flex items-center text-emerald-600 font-bold"><ArrowDownLeft className="w-3.5 h-3.5 mr-0.5" /> +{(forecastMetrics?.cashIn30 ?? 0).toLocaleString('fr-FR')}</span>
+                  <span className="flex items-center text-rose-600 font-bold"><ArrowUpRight className="w-3.5 h-3.5 mr-0.5" /> -{(forecastMetrics?.cashOut30 ?? 0).toLocaleString('fr-FR')}</span>
                 </div>
               </div>
 
@@ -898,11 +911,11 @@ export default function TreasuryManager({ currentUser }: { currentUser: any }) {
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
                 <span className="text-[10px] font-black uppercase text-indigo-650 tracking-wider">Projection à 60 jours (Fin août)</span>
                 <p className="text-2xl font-black text-indigo-650 font-mono">
-                  {forecastMetrics.liquid60.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                  {(forecastMetrics?.liquid60 ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                 </p>
                 <div className="flex justify-between text-[11px] font-medium font-mono text-slate-500">
-                  <span className="flex items-center text-emerald-600 font-bold"><ArrowDownLeft className="w-3.5 h-3.5 mr-0.5" /> +{forecastMetrics.cashIn60.toLocaleString('fr-FR')}</span>
-                  <span className="flex items-center text-rose-600 font-bold"><ArrowUpRight className="w-3.5 h-3.5 mr-0.5" /> -{forecastMetrics.cashOut60.toLocaleString('fr-FR')}</span>
+                  <span className="flex items-center text-emerald-600 font-bold"><ArrowDownLeft className="w-3.5 h-3.5 mr-0.5" /> +{(forecastMetrics?.cashIn60 ?? 0).toLocaleString('fr-FR')}</span>
+                  <span className="flex items-center text-rose-600 font-bold"><ArrowUpRight className="w-3.5 h-3.5 mr-0.5" /> -{(forecastMetrics?.cashOut60 ?? 0).toLocaleString('fr-FR')}</span>
                 </div>
               </div>
 
@@ -910,11 +923,11 @@ export default function TreasuryManager({ currentUser }: { currentUser: any }) {
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
                 <span className="text-[10px] font-black uppercase text-indigo-650 tracking-wider">Projection à 90 jours (Fin sept.)</span>
                 <p className="text-2xl font-black text-indigo-650 font-mono">
-                  {forecastMetrics.liquid90.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                  {(forecastMetrics?.liquid90 ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                 </p>
                 <div className="flex justify-between text-[11px] font-medium font-mono text-slate-500">
-                  <span className="flex items-center text-emerald-600 font-bold"><ArrowDownLeft className="w-3.5 h-3.5 mr-0.5" /> +{forecastMetrics.cashIn90.toLocaleString('fr-FR')}</span>
-                  <span className="flex items-center text-rose-600 font-bold"><ArrowUpRight className="w-3.5 h-3.5 mr-0.5" /> -{forecastMetrics.cashOut90.toLocaleString('fr-FR')}</span>
+                  <span className="flex items-center text-emerald-600 font-bold"><ArrowDownLeft className="w-3.5 h-3.5 mr-0.5" /> +{(forecastMetrics?.cashIn90 ?? 0).toLocaleString('fr-FR')}</span>
+                  <span className="flex items-center text-rose-600 font-bold"><ArrowUpRight className="w-3.5 h-3.5 mr-0.5" /> -{(forecastMetrics?.cashOut90 ?? 0).toLocaleString('fr-FR')}</span>
                 </div>
               </div>
             </div>

@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 import { PickingOrder, PickingOrderStatus } from '../types/mobileTerrain';
+import { TRIAL_PICKING_ORDERS } from '../data/mockTrialData';
 import { 
   Warehouse, 
   Boxes, 
@@ -33,11 +34,13 @@ import {
 interface WarehousePickingScreenProps {
   tenantId: string;
   currentUser?: any;
+  isTrial?: boolean;
 }
 
 export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
   tenantId,
-  currentUser
+  currentUser,
+  isTrial = false
 }) => {
   const [pickingOrders, setPickingOrders] = useState<PickingOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,16 +106,29 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
         }
       });
 
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setPickingOrders(list);
+      if (list.length === 0 && isTrial) {
+        setPickingOrders(TRIAL_PICKING_ORDERS);
+      } else {
+        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setPickingOrders(list);
+      }
       setLoading(false);
     }, (err) => {
       console.warn('Picking orders listener error:', err);
+      if (isTrial) {
+        setPickingOrders(TRIAL_PICKING_ORDERS);
+      }
       setLoading(false);
     });
 
     return () => unsub();
-  }, [tenantId]);
+  }, [tenantId, isTrial]);
+
+  useEffect(() => {
+    if (isTrial && pickingOrders.length === 0) {
+      setPickingOrders(TRIAL_PICKING_ORDERS);
+    }
+  }, [isTrial]);
 
   // Seed function disabled per user directive (no demo data)
   const handleSeedDemoPickingOrders = async () => {
@@ -717,7 +733,7 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
                     {po.reintegrationStatus === 'reintegre' ? (
                       <div className="text-[11px] text-emerald-300 font-mono bg-emerald-950/50 p-2 rounded border border-emerald-500/30 flex items-center justify-between">
                         <span>✅ Stock réintégré en rayon par {po.reintegratedBy}</span>
-                        <span>{po.reintegratedAt ? new Date(po.reintegratedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                        <span>{po.reintegratedAt && !isNaN(new Date(po.reintegratedAt).getTime()) ? new Date(po.reintegratedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                       </div>
                     ) : (
                       <button
@@ -778,7 +794,7 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
                 {isReady && po.preparedBy && (
                   <div className="p-2.5 bg-emerald-950/30 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-mono flex items-center justify-between">
                     <span>Préparé par: {po.preparedBy}</span>
-                    <span>{po.preparedAt ? new Date(po.preparedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                    <span>{po.preparedAt && !isNaN(new Date(po.preparedAt).getTime()) ? new Date(po.preparedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                   </div>
                 )}
 

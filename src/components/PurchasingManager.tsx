@@ -131,6 +131,41 @@ export default function PurchasingManager({
 
   const DEFAULT_SUPPLIERS: SupplierPerformance[] = [];
 
+  const DEMO_PURCHASE_ORDERS: PurchaseOrder[] = [
+    {
+      id: "demo-po_1",
+      supplierName: "Les Ciments de Bizerte",
+      itemDescription: "Approvisionnement Ciment CPJ45 800 Sacs",
+      quantity: 800,
+      unitCost: 11.200,
+      vatRate: 19,
+      fodecActive: true,
+      amountHT: 8960.000,
+      amountTTC: 10751.040,
+      orderDate: "2026-08-12",
+      deliveryDueDate: "2026-08-20",
+      paymentTerms: "Chèque à 60 Jours",
+      status: "Reçu conforme",
+      notes: "Bon de commande d'approvisionnement usine"
+    },
+    {
+      id: "demo-po_2",
+      supplierName: "EL FOULADH Menzel Bourguiba",
+      itemDescription: "Réapprovisionnement Rond à Béton Ø12mm 500 Barres",
+      quantity: 500,
+      unitCost: 28.500,
+      vatRate: 19,
+      fodecActive: true,
+      amountHT: 14250.000,
+      amountTTC: 17098.500,
+      orderDate: "2026-08-14",
+      deliveryDueDate: "2026-08-25",
+      paymentTerms: "Traite 90 Jours",
+      status: "Envoyé",
+      notes: "Barres d'acier haute adhérence FeE500"
+    }
+  ];
+
   // --- States & Proxies ---
   const requisitions = propRequisitions;
   const setRequisitions = (val: any) => {
@@ -290,19 +325,21 @@ export default function PurchasingManager({
             setOcrResult(extracted);
             
             // Map supplier name with existing supplier names if possible
-            const matchedSup = suppliers.find(s => 
-              s.name.toLowerCase().includes(extracted.supplier.toLowerCase()) || 
-              extracted.supplier.toLowerCase().includes(s.name.toLowerCase())
-            );
+            const extSupStr = String(extracted?.supplier || '').toLowerCase();
+            const matchedSup = suppliers.find(s => {
+              const sNameStr = String(s?.name || '').toLowerCase();
+              return sNameStr && extSupStr && (sNameStr.includes(extSupStr) || extSupStr.includes(sNameStr));
+            });
             
             if (matchedSup) {
               setFormSupplier(matchedSup.name);
             } else {
-              if (extracted.supplier.toUpperCase().includes("SOTUMETAL")) {
+              const extUpper = String(extracted?.supplier || '').toUpperCase();
+              if (extUpper.includes("SOTUMETAL")) {
                 setFormSupplier("SOTUMETAL S.A. (Tunis)");
-              } else if (extracted.supplier.toUpperCase().includes("PLASTIQUE")) {
+              } else if (extUpper.includes("PLASTIQUE")) {
                 setFormSupplier("TUNISIE PLASTIQUES S.A.");
-              } else if (extracted.supplier.toUpperCase().includes("MED")) {
+              } else if (extUpper.includes("MED")) {
                 setFormSupplier("COMPOSANTS ÉLECTRIQUES MED");
               } else {
                 setFormSupplier("");
@@ -372,52 +409,21 @@ export default function PurchasingManager({
 
   // --- Load / Save ---
   useEffect(() => {
-    if (requisitions.length === 0) {
-      const savedReqs = localStorage.getItem(REQ_STORAGE_KEY);
-      if (savedReqs) {
-        try {
-          const parsed = JSON.parse(savedReqs);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            onUpdateRequisitions(parsed);
-          }
-        } catch (e) {
-          console.error('Error parsing requisitions:', e);
-        }
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (purchaseOrders.length === 0) {
+    if (isDemoCompany && purchaseOrders.length === 0) {
       const savedPOs = localStorage.getItem(PO_STORAGE_KEY);
       if (savedPOs) {
         try {
           const parsed = JSON.parse(savedPOs);
           if (Array.isArray(parsed) && parsed.length > 0) {
             onUpdatePurchaseOrders(parsed);
+            return;
           }
-        } catch (e) {
-          console.error('Error parsing purchase orders:', e);
-        }
+        } catch (_) {}
       }
+      onUpdatePurchaseOrders(DEMO_PURCHASE_ORDERS);
+      localStorage.setItem(PO_STORAGE_KEY, JSON.stringify(DEMO_PURCHASE_ORDERS));
     }
-  }, []);
-
-  useEffect(() => {
-    if (suppliers.length === 0) {
-      const savedSuppliers = localStorage.getItem(SUPPLIER_PERF_KEY);
-      if (savedSuppliers) {
-        try {
-          const parsed = JSON.parse(savedSuppliers);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            onUpdateSuppliers(parsed);
-          }
-        } catch (e) {
-          console.error('Error parsing suppliers:', e);
-        }
-      }
-    }
-  }, []);
+  }, [isDemoCompany]);
 
   const saveReqsToStorage = (updated: PurchaseRequisition[]) => {
     onUpdateRequisitions(updated);
@@ -450,31 +456,40 @@ export default function PurchasingManager({
   };
 
   const isDemoBC = (po: any) => {
-    return po?.id?.startsWith('demo-') || po?.is_demo === true || po?.isDemo === true || ['BC-2026-001', 'BC-2026-002', 'BC-2026-003'].includes(po?.id);
+    return isDemoCompany && (po?.id?.startsWith('demo-') || po?.is_demo === true || po?.isDemo === true || ['BC-2026-001', 'BC-2026-002', 'BC-2026-003'].includes(po?.id));
   };
 
   const filteredBCs = useMemo(() => {
-    return purchaseOrders.filter(po => {
-      const matchesSearch = po.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            po.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            po.itemDescription.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = (searchQuery || '').toLowerCase().trim();
+    return (purchaseOrders || []).filter(po => {
+      if (!po) return false;
+      const supplierName = String(po.supplierName || '').toLowerCase();
+      const id = String(po.id || '').toLowerCase();
+      const itemDescription = String(po.itemDescription || '').toLowerCase();
+      const matchesSearch = !q || supplierName.includes(q) || id.includes(q) || itemDescription.includes(q);
       const matchesStatus = poFilter === 'Tous' || po.status === poFilter;
       return matchesSearch && matchesStatus;
     });
   }, [purchaseOrders, searchQuery, poFilter]);
 
   const filteredDAs = useMemo(() => {
-    return requisitions.filter(da => {
-      return da.itemDescription.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             da.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             da.requestedBy.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = (searchQuery || '').toLowerCase().trim();
+    return (requisitions || []).filter(da => {
+      if (!da) return false;
+      const itemDescription = String(da.itemDescription || '').toLowerCase();
+      const id = String(da.id || '').toLowerCase();
+      const requestedBy = String(da.requestedBy || '').toLowerCase();
+      return !q || itemDescription.includes(q) || id.includes(q) || requestedBy.includes(q);
     });
   }, [requisitions, searchQuery]);
 
   const filteredSuppliers = useMemo(() => {
-    return suppliers.filter(s => {
-      return s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             s.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = (searchQuery || '').toLowerCase().trim();
+    return (suppliers || []).filter(s => {
+      if (!s) return false;
+      const name = String(s.name || '').toLowerCase();
+      const category = String(s.category || '').toLowerCase();
+      return !q || name.includes(q) || category.includes(q);
     });
   }, [suppliers, searchQuery]);
 
@@ -809,7 +824,7 @@ export default function PurchasingManager({
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Volume Global d'Achats</span>
             <p className="text-2xl font-black text-slate-800 font-mono">
-              {purchasingStats.totalSpentTND.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+              {(purchasingStats?.totalSpentTND ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
             </p>
           </div>
           <div className="p-3 bg-emerald-50 text-emerald-650 rounded-xl">
@@ -1032,7 +1047,7 @@ export default function PurchasingManager({
                           <td className="p-4">
                             <div className="space-y-0.5">
                               <span className="font-semibold text-slate-600 block">{po.itemDescription}</span>
-                              <span className="text-[10px] text-slate-400">Qté : {po.quantity.toLocaleString('fr-FR')} unités</span>
+                              <span className="text-[10px] text-slate-400">Qté : {(po.quantity ?? 0).toLocaleString('fr-FR')} unités</span>
                             </div>
                           </td>
 
@@ -1040,10 +1055,10 @@ export default function PurchasingManager({
                           <td className="p-4 text-right">
                             <div className="space-y-0.5">
                               <span className="text-slate-950 font-black font-mono">
-                                {po.amountTTC.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                                {(po.amountTTC ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                               </span>
                               <span className="text-[10px] text-slate-400 font-bold font-mono block">
-                                HT : {po.amountHT.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} TND
+                                HT : {(po.amountHT ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 3 })} TND
                               </span>
                             </div>
                           </td>
@@ -1130,7 +1145,7 @@ export default function PurchasingManager({
                     <div className="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-150 font-mono">
                       <div className="flex justify-between">
                         <span className="text-slate-500">Montant HT :</span>
-                        <span className="font-bold text-slate-800">{selectedBC.amountHT.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</span>
+                        <span className="font-bold text-slate-800">{(selectedBC.amountHT ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</span>
                       </div>
                       <div className="flex justify-between border-b border-slate-200/50 pb-1.5 mb-1.5">
                         <span className="text-slate-500">Taux TVA appliqué :</span>
@@ -1146,7 +1161,7 @@ export default function PurchasingManager({
                       </div>
                       <div className="flex justify-between text-xs font-black text-indigo-650">
                         <span>VALEUR TOTAL TTC :</span>
-                        <span>{selectedBC.amountTTC.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</span>
+                        <span>{(selectedBC.amountTTC ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</span>
                       </div>
                     </div>
 
@@ -1264,7 +1279,7 @@ export default function PurchasingManager({
 
                     <div className="flex sm:flex-col items-end gap-2 text-right">
                       <span className="text-sm font-black text-slate-900 font-mono">
-                        {da.estimatedCost.toLocaleString('fr-FR')} TND
+                        {(da.estimatedCost ?? 0).toLocaleString('fr-FR')} TND
                       </span>
                       <span className={`inline-block text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
                         da.status === 'En attente' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
@@ -1306,7 +1321,7 @@ export default function PurchasingManager({
                     <div className="grid grid-cols-2 gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-150">
                       <div>
                         <span className="text-[9px] text-slate-400 block font-bold">Budget prévisionnel</span>
-                        <span className="font-bold text-slate-800 font-mono">{selectedDA.estimatedCost.toLocaleString('fr-FR')} TND</span>
+                        <span className="font-bold text-slate-800 font-mono">{(selectedDA.estimatedCost ?? 0).toLocaleString('fr-FR')} TND</span>
                       </div>
                       <div>
                         <span className="text-[9px] text-slate-400 block font-bold">Quantité requise</span>
@@ -1386,7 +1401,7 @@ export default function PurchasingManager({
                   <span className="text-[10px] uppercase font-black text-slate-400 block tracking-wider">Qualité Globale</span>
                   <span className="text-xl font-black font-mono text-slate-900">
                     {suppliers.length > 0
-                      ? (suppliers.reduce((sum, s) => sum + s.conformityRate, 0) / suppliers.length).toFixed(1)
+                      ? (suppliers.reduce((sum, s) => sum + (s.conformityRate ?? 0), 0) / suppliers.length).toFixed(1)
                       : '0'}%
                   </span>
                   <span className="text-[9px] text-emerald-600 font-bold block">Taux de conformité moyen</span>
@@ -1401,7 +1416,7 @@ export default function PurchasingManager({
                   <span className="text-[10px] uppercase font-black text-slate-400 block tracking-wider">Retard de Livraison</span>
                   <span className="text-xl font-black font-mono text-slate-900">
                     {suppliers.length > 0
-                      ? (suppliers.reduce((sum, s) => sum + s.delayRate, 0) / suppliers.length).toFixed(1)
+                      ? (suppliers.reduce((sum, s) => sum + (s.delayRate ?? 0), 0) / suppliers.length).toFixed(1)
                       : '0'}%
                   </span>
                   <span className="text-[9px] text-slate-500 block">Délai moyen constaté</span>
@@ -1415,7 +1430,7 @@ export default function PurchasingManager({
                 <div>
                   <span className="text-[10px] uppercase font-black text-slate-400 block tracking-wider">Volume d'Achat</span>
                   <span className="text-xl font-black font-mono text-slate-900">
-                    {(suppliers.reduce((sum, s) => sum + s.totalVolume, 0)).toLocaleString('fr-FR')} DT
+                    {(suppliers.reduce((sum, s) => sum + (s.totalVolume ?? 0), 0)).toLocaleString('fr-FR')} DT
                   </span>
                   <span className="text-[9px] text-emerald-600 font-bold block">Budget engagé cumulé</span>
                 </div>
@@ -1614,7 +1629,7 @@ export default function PurchasingManager({
                         <div className="border-t border-slate-100 pt-3 space-y-2 text-xs font-medium text-slate-600">
                           <div className="flex justify-between items-center">
                             <span>Volume d'achat cumulé :</span>
-                            <span className="font-bold text-slate-800 font-mono">{sup.totalVolume.toLocaleString('fr-FR')} TND</span>
+                            <span className="font-bold text-slate-800 font-mono">{(sup.totalVolume ?? 0).toLocaleString('fr-FR')} TND</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="flex items-center space-x-1">
@@ -1763,7 +1778,7 @@ export default function PurchasingManager({
                 </div>
               </div>
               <p className="text-[10.5px] text-amber-700 font-semibold leading-relaxed">
-                Toute demande dont le budget dépasse {approvalThreshold.toLocaleString()} TND restera en attente d'évaluation manuelle par le Chef de Service ou le Directeur Financier.
+                Toute demande dont le budget dépasse {(approvalThreshold ?? 0).toLocaleString()} TND restera en attente d'évaluation manuelle par le Chef de Service ou le Directeur Financier.
               </p>
             </div>
           </motion.div>
@@ -2273,7 +2288,7 @@ export default function PurchasingManager({
                   <input
                     type="text"
                     disabled
-                    value={`${emailSup.name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@contact.tn`}
+                    value={`${String(emailSup?.name || 'fournisseur').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}@contact.tn`}
                     className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2 text-slate-500 cursor-not-allowed font-mono"
                   />
                 </div>

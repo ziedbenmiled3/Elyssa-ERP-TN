@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Supplier, StockMovement } from '../types';
 import IframePrintHelper from './IframePrintHelper';
 import { 
@@ -50,10 +50,91 @@ interface StockManagerProps {
   readOnly?: boolean;
   companyLocations: any[];
   onUpdateCompanyLocations: (locs: any[]) => void;
+  activeTenantId?: string;
+  isDemoCompany?: boolean;
 }
 
+export const DEFAULT_DEMO_PRODUCTS: Product[] = [
+  {
+    id: "demo-prod_1",
+    sku: "CIM-CPJ45",
+    name: "Ciment CPJ 45 (Sac 50kg)",
+    category: "Gros Œuvre",
+    type: "PRODUIT_FINI",
+    unitPrice: 14.500,
+    costPrice: 11.200,
+    marginPercentage: 29.46,
+    stockLevel: 1200,
+    minStockLevel: 300,
+    unit: "Sac",
+    supplierId: "demo-sup_1",
+    supplierName: "Les Ciments de Bizerte",
+    createdDate: "2026-01-15",
+    warehouseId: "WH-RADES-01",
+    warehouse_location: "Dépôt Central Radès",
+    is_demo: true
+  },
+  {
+    id: "demo-prod_2",
+    sku: "FER-BETON-12",
+    name: "Rond à béton Ø12mm (Barre 12m)",
+    category: "Gros Œuvre",
+    type: "PRODUIT_FINI",
+    unitPrice: 28.000,
+    costPrice: 21.000,
+    marginPercentage: 33.33,
+    stockLevel: 850,
+    minStockLevel: 200,
+    unit: "Barre",
+    supplierId: "demo-sup_2",
+    supplierName: "EL FOULADH Menzel Bourguiba",
+    createdDate: "2026-01-15",
+    warehouseId: "WH-RADES-01",
+    warehouse_location: "Dépôt Central Radès",
+    is_demo: true
+  },
+  {
+    id: "demo-prod_3",
+    sku: "PNT-BLA-15L",
+    name: "Peinture Blanche 15L",
+    category: "Finition & Décoration",
+    type: "PRODUIT_FINI",
+    unitPrice: 85.000,
+    costPrice: 62.000,
+    marginPercentage: 37.10,
+    stockLevel: 180,
+    minStockLevel: 40,
+    unit: "Pot",
+    supplierId: "demo-sup_3",
+    supplierName: "Astral Tunisie",
+    createdDate: "2026-02-01",
+    warehouseId: "WH-TUNIS-02",
+    warehouse_location: "Magasin Principal Tunis",
+    is_demo: true
+  },
+  {
+    id: "demo-prod_4",
+    sku: "OUT-PRO-230",
+    name: "Outillage pro (Meuleuse & Découpe 230mm)",
+    category: "Outillage Pro",
+    type: "PRODUIT_FINI",
+    unitPrice: 145.000,
+    costPrice: 105.000,
+    marginPercentage: 38.10,
+    stockLevel: 95,
+    minStockLevel: 20,
+    unit: "Unité",
+    supplierId: "demo-sup_4",
+    supplierName: "Bosch Tunisie Tools",
+    createdDate: "2026-02-10",
+    warehouseId: "WH-TUNIS-02",
+    warehouse_location: "Magasin Principal Tunis",
+    is_demo: true
+  }
+];
+
 export default function StockManager({
-  products,
+  products: incomingProducts,
   suppliers,
   stockMovements,
   onUpdateProducts,
@@ -61,8 +142,50 @@ export default function StockManager({
   onUpdateStockMovements,
   readOnly = false,
   companyLocations,
-  onUpdateCompanyLocations
+  onUpdateCompanyLocations,
+  activeTenantId,
+  isDemoCompany = false
 }: StockManagerProps) {
+  // Strict check for Demo tenant vs Production tenant
+  const isDemoTenant = useMemo(() => {
+    if (isDemoCompany) return true;
+    const tid = String(activeTenantId || localStorage.getItem('carthage_active_company') || '').toLowerCase().trim();
+    if (tid.includes('parent') || tid.includes('prod') || tid === 'inter-affaires' || tid === 'company_parent' || tid === 'elyssa entreprises s.a.') {
+      return false;
+    }
+    return tid === 'inter-affaires-demo' || tid === 'demo' || tid === 'company_demo' || tid.includes('démo') || tid.includes('demo') || tid.includes('sandbox');
+  }, [activeTenantId, isDemoCompany]);
+
+  // Direct state initialization: STRICT isolation (empty [] for PROD, demo only for demo tenants)
+  const [products, setProducts] = useState<Product[]>(() => {
+    if (!isDemoTenant) {
+      try {
+        localStorage.removeItem('carthage_demo_products');
+      } catch (_) {}
+      return Array.isArray(incomingProducts) 
+        ? incomingProducts.filter(p => !p.is_demo && !String(p.id || '').startsWith('demo-')) 
+        : [];
+    }
+    if (Array.isArray(incomingProducts) && incomingProducts.length > 0) {
+      return incomingProducts;
+    }
+    return DEFAULT_DEMO_PRODUCTS;
+  });
+
+  useEffect(() => {
+    if (!isDemoTenant) {
+      try {
+        localStorage.removeItem('carthage_demo_products');
+      } catch (_) {}
+      const sanitized = Array.isArray(incomingProducts) 
+        ? incomingProducts.filter(p => !p.is_demo && !String(p.id || '').startsWith('demo-')) 
+        : [];
+      setProducts(sanitized);
+    } else if (Array.isArray(incomingProducts) && incomingProducts.length > 0) {
+      setProducts(incomingProducts);
+    }
+  }, [incomingProducts, isDemoTenant]);
+
   // Tabs: 'products' | 'movements' | 'suppliers' | 'settings' | 'inventory'
   const [subTab, setSubTab] = useState<'products' | 'movements' | 'suppliers' | 'settings' | 'inventory'>('products');
 
@@ -774,13 +897,13 @@ export default function StockManager({
           <div className="flex items-center justify-between gap-4">
             <span className="text-slate-400">Stock Réel :</span>
             <span className={`font-mono font-bold ${isUnderThreshold ? 'text-rose-450' : 'text-emerald-400'}`}>
-              {data.stockLevel.toLocaleString('fr-Fr')} {data.unit}
+              {(data?.stockLevel ?? 0).toLocaleString('fr-FR')} {data?.unit || ''}
             </span>
           </div>
           <div className="flex items-center justify-between gap-4">
             <span className="text-slate-400">Seuil d'Alerte :</span>
             <span className="font-mono font-bold text-amber-400">
-              {data.minStockLevel.toLocaleString('fr-Fr')} {data.unit}
+              {(data?.minStockLevel ?? 0).toLocaleString('fr-FR')} {data?.unit || ''}
             </span>
           </div>
           {isUnderThreshold ? (
@@ -908,7 +1031,7 @@ export default function StockManager({
           <div className="space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">Valeur Globale du Stock (P.A.)</span>
             <div className="text-xl font-black text-slate-900 font-mono">
-              {totalStockValue.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-xs font-semibold text-slate-500">TND</span>
+              {(totalStockValue ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-xs font-semibold text-slate-500">TND</span>
             </div>
           </div>
           <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600">
@@ -1339,9 +1462,13 @@ export default function StockManager({
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {filteredProducts.map(prod => {
-                    const isLow = prod.stockLevel <= prod.minStockLevel;
-                    const stockValue = prod.stockLevel * prod.costPrice;
-                    const profitPercentage = prod.costPrice > 0 ? ((prod.unitPrice - prod.costPrice) / prod.costPrice) * 100 : 0;
+                    const stockLvl = prod.stockLevel ?? 0;
+                    const minStockLvl = prod.minStockLevel ?? 0;
+                    const costP = prod.costPrice ?? 0;
+                    const unitP = prod.unitPrice ?? 0;
+                    const isLow = stockLvl <= minStockLvl;
+                    const stockValue = stockLvl * costP;
+                    const profitPercentage = costP > 0 ? ((unitP - costP) / costP) * 100 : 0;
                     
                     return (
                       <tr key={prod.id} className="hover:bg-slate-50/25 transition">
@@ -1374,7 +1501,7 @@ export default function StockManager({
                         <td className="py-4 px-6">
                           <div className="flex items-center space-x-2">
                             <span className={`font-mono font-black text-sm ${isLow ? 'text-rose-650 font-extrabold' : 'text-slate-800'}`}>
-                              {prod.stockLevel.toLocaleString('fr-FR')} {prod.unit}
+                              {stockLvl.toLocaleString('fr-FR')} {prod.unit || ''}
                             </span>
                             {isLow ? (
                               <span className="bg-rose-50 text-rose-700 px-2 py-0.5 rounded text-[9px] font-extrabold tracking-wider uppercase animate-pulse flex items-center space-x-1 border border-rose-100">
@@ -1389,11 +1516,11 @@ export default function StockManager({
                         <td className="py-4 px-6 text-right font-mono">
                           <div>
                             <span className="text-slate-400">P.A: </span>
-                            <strong className="text-slate-800">{prod.costPrice.toFixed(3)} TND</strong>
+                            <strong className="text-slate-800">{costP.toFixed(3)} TND</strong>
                           </div>
                           <div>
                             <span className="text-slate-400">P.V: </span>
-                            <strong className="text-indigo-600">{prod.unitPrice.toFixed(3)} TND</strong>
+                            <strong className="text-indigo-600">{unitP.toFixed(3)} TND</strong>
                           </div>
                           <span className="text-[10px] text-emerald-600 font-bold">+{profitPercentage.toFixed(0)}% marge</span>
                         </td>
@@ -1484,7 +1611,7 @@ export default function StockManager({
                           )}
                         </td>
                         <td className={`py-4 px-6 text-right font-mono font-black text-sm ${isIncoming ? 'text-emerald-700' : isOutgoing ? 'text-rose-650' : 'text-amber-600'}`}>
-                          {isIncoming ? '+' : isOutgoing ? '-' : ''}{m.quantity.toLocaleString('fr-FR')}
+                          {isIncoming ? '+' : isOutgoing ? '-' : ''}{(m.quantity ?? 0).toLocaleString('fr-FR')}
                         </td>
                         <td className="py-4 px-6 font-semibold text-slate-600">
                           {m.reference}
@@ -1649,10 +1776,10 @@ export default function StockManager({
 
               {/* Financial Metrics Live Preview */}
               {(() => {
-                const totalStockValue = products.reduce((acc, p) => acc + (p.stockLevel * p.costPrice), 0);
-                const estimatedAnnualHoldingCost = totalStockValue * (holdingCostPercentage / 100);
-                const lowStockItems = products.filter(p => p.stockLevel < p.minStockLevel);
-                const totalEstimatedDailyShortageRisk = lowStockItems.reduce((acc, p) => acc + ((p.minStockLevel - p.stockLevel) * stockoutCostPerDay), 0);
+                const totalStockValue = products.reduce((acc, p) => acc + ((p.stockLevel ?? 0) * (p.costPrice ?? 0)), 0);
+                const estimatedAnnualHoldingCost = totalStockValue * ((holdingCostPercentage || 0) / 100);
+                const lowStockItems = products.filter(p => (p.stockLevel ?? 0) < (p.minStockLevel ?? 0));
+                const totalEstimatedDailyShortageRisk = lowStockItems.reduce((acc, p) => acc + (((p.minStockLevel ?? 0) - (p.stockLevel ?? 0)) * (stockoutCostPerDay || 0)), 0);
 
                 return (
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-3.5 mt-2">
@@ -1660,11 +1787,11 @@ export default function StockManager({
                     <div className="grid grid-cols-2 gap-4 text-xs font-medium">
                       <div className="space-y-1 bg-white p-3 rounded-lg border border-slate-150">
                         <span className="text-slate-400 text-[9.5px] uppercase block">Valeur Globale du Stock :</span>
-                        <span className="text-sm font-black font-mono text-slate-900">{totalStockValue.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</span>
+                        <span className="text-sm font-black font-mono text-slate-900">{(totalStockValue ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</span>
                       </div>
                       <div className="space-y-1 bg-white p-3 rounded-lg border border-slate-150">
                         <span className="text-slate-400 text-[9.5px] uppercase block">Coût de Détention Annuel :</span>
-                        <span className="text-sm font-black font-mono text-rose-600">{estimatedAnnualHoldingCost.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</span>
+                        <span className="text-sm font-black font-mono text-rose-600">{(estimatedAnnualHoldingCost ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</span>
                       </div>
                     </div>
                     {lowStockItems.length > 0 && (
@@ -1674,7 +1801,7 @@ export default function StockManager({
                           <span>Risque de Rupture Actuel ({lowStockItems.length} articles)</span>
                         </span>
                         <p className="text-amber-700 text-[10.5px] leading-normal font-semibold">
-                          Le coût estimé de pénalité / d'opportunité en cas de non-réapprovisionnement immédiat s'élève à <strong className="font-mono">{totalEstimatedDailyShortageRisk.toLocaleString('fr-FR')} TND</strong> par jour de rupture.
+                          Le coût estimé de pénalité / d'opportunité en cas de non-réapprovisionnement immédiat s'élève à <strong className="font-mono">{(totalEstimatedDailyShortageRisk ?? 0).toLocaleString('fr-FR')} TND</strong> par jour de rupture.
                         </p>
                       </div>
                     )}
@@ -1822,7 +1949,7 @@ export default function StockManager({
                     <div className="bg-slate-50 border border-slate-150 rounded-xl p-3.5 space-y-1">
                       <span className="text-slate-450 text-[9.5px] uppercase block font-black font-sans tracking-wide">Valorisation Écart Global</span>
                       <div className={`text-sm font-black font-mono ${totalDiscrepancyValue === 0 ? 'text-slate-650' : totalDiscrepancyValue > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {totalDiscrepancyValue > 0 ? '+' : ''}{totalDiscrepancyValue.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                        {totalDiscrepancyValue > 0 ? '+' : ''}{(totalDiscrepancyValue ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                       </div>
                     </div>
                   </div>
@@ -1887,7 +2014,7 @@ export default function StockManager({
                                     <td className="py-3.5 px-4 font-mono font-bold text-indigo-650">{prod.sku}</td>
                                     <td className="py-3.5 px-4">
                                       <div className="font-bold text-slate-900">{prod.name}</div>
-                                      <div className="text-[10px] text-slate-400 font-medium">Coût Unitaire : {prod.costPrice.toFixed(3)} TND</div>
+                                      <div className="text-[10px] text-slate-400 font-medium">Coût Unitaire : {(prod.costPrice ?? 0).toFixed(3)} TND</div>
                                     </td>
                                     <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-600">
                                       {theoretical} <span className="text-[10px] text-slate-400 font-sans font-medium">{prod.unit}</span>
@@ -1928,9 +2055,9 @@ export default function StockManager({
                                       ) : valDiff === 0 ? (
                                         <span className="text-slate-400">0.000 TND</span>
                                       ) : valDiff > 0 ? (
-                                        <span className="text-emerald-600 font-extrabold">+{valDiff.toFixed(3)} TND</span>
+                                        <span className="text-emerald-600 font-extrabold">+{(valDiff ?? 0).toFixed(3)} TND</span>
                                       ) : (
-                                        <span className="text-rose-600 font-extrabold">{valDiff.toFixed(3)} TND</span>
+                                        <span className="text-rose-600 font-extrabold">{(valDiff ?? 0).toFixed(3)} TND</span>
                                       )}
                                     </td>
                                   </tr>
@@ -2581,7 +2708,7 @@ export default function StockManager({
                             <td className="p-3 font-mono font-bold text-indigo-700">{p.sku}</td>
                             <td className="p-3 font-semibold text-slate-800">{p.name}</td>
                             <td className="p-3 text-slate-500">{p.category}</td>
-                            <td className="p-3 text-right font-mono font-bold text-slate-700">{p.costPrice ? `${p.costPrice.toLocaleString('fr-FR')} TND` : '-'}</td>
+                            <td className="p-3 text-right font-mono font-bold text-slate-700">{(p.costPrice ?? 0) > 0 ? `${(p.costPrice ?? 0).toLocaleString('fr-FR')} TND` : '-'}</td>
                             <td className="p-3 text-right font-mono text-slate-400">{p.minStockLevel} unités</td>
                           </tr>
                         ))

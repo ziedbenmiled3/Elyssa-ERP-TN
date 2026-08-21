@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, MessageSquare, Send, Sparkles, User, Loader2, Bot } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -151,11 +152,17 @@ export function CopilotChatDrawer({
                 <div 
                   className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                     msg.sender === 'user' 
-                      ? 'bg-indigo-600 text-white rounded-tr-sm' 
+                      ? 'bg-indigo-600 text-white rounded-tr-sm whitespace-pre-wrap' 
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-sm border border-slate-200 dark:border-slate-700'
                   }`}
                 >
-                  {msg.text}
+                  {msg.sender === 'user' ? (
+                    msg.text
+                  ) : (
+                    <div className="prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 text-xs sm:text-sm space-y-1.5 [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4 [&>p]:m-0">
+                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

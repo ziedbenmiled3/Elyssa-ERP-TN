@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useMobileAdmin } from '../hooks/useMobileAdmin';
 import { FleetDeviceStatus, FleetInventoryItem } from '../types/mobileTerrain';
+import { TRIAL_FLEET_INVENTORY } from '../data/mockTrialData';
 import { 
   Boxes, 
   Search, 
@@ -22,14 +23,25 @@ import {
 
 interface FleetAssetManagerProps {
   tenantId: string;
+  isTrial?: boolean;
 }
 
-export const FleetAssetManager: React.FC<FleetAssetManagerProps> = ({ tenantId }) => {
+export const FleetAssetManager: React.FC<FleetAssetManagerProps> = ({ tenantId, isTrial = false }) => {
   const { 
-    fleetInventory, 
+    fleetInventory: rawFleetInventory, 
     addFleetItem, 
     updateFleetItemStatus 
   } = useMobileAdmin(tenantId);
+
+  const fleetInventory = useMemo(() => {
+    if (rawFleetInventory && rawFleetInventory.length > 0) {
+      return rawFleetInventory;
+    }
+    if (isTrial) {
+      return TRIAL_FLEET_INVENTORY;
+    }
+    return [];
+  }, [rawFleetInventory, isTrial]);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -328,10 +340,10 @@ export const FleetAssetManager: React.FC<FleetAssetManagerProps> = ({ tenantId }
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[480px]">
           <table className="w-full text-left border-collapse" id="table-asset-inventory">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+            <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs">
+              <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 tracking-wider">
                 <th className="px-6 py-3.5">Catégorie</th>
                 <th className="px-6 py-3.5">Équipement / Nom / Marque</th>
                 <th className="px-6 py-3.5">Référence Unique / N° Série / VIN</th>

@@ -1,6 +1,8 @@
 import { doc, getDoc, setDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 import { TenantSubscription, FieldAgentLicense } from '../types/mobileTerrain';
+import { TRIAL_FIELD_AGENT_LICENSES, TRIAL_TENANT_SUBSCRIPTION } from '../data/mockTrialData';
+import { InternalChatService } from './internalChatService';
 
 export interface MobileLoginValidationResult {
   authorized: boolean;
@@ -19,7 +21,18 @@ export class MobileLicenseService {
   /**
    * Récupère la souscription courante d'un tenant (ou génère un fallback par défaut selon sa config).
    */
-  public static async getTenantSubscription(tenantId: string): Promise<TenantSubscription> {
+  public static async getTenantSubscription(tenantId: string, isDemoTenant: boolean = false): Promise<TenantSubscription> {
+    // 1. Check LocalStorage
+    try {
+      const savedLocal = localStorage.getItem(`elyssa_tenant_subscription_${tenantId}`);
+      if (savedLocal) {
+        return JSON.parse(savedLocal) as TenantSubscription;
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Check Firestore
     try {
       const subRef = doc(db, 'company_erp_data', tenantId, 'subscription', 'current');
       const subSnap = await getDoc(subRef);
@@ -31,52 +44,187 @@ export class MobileLicenseService {
       console.warn(`[MobileLicenseService] Erreur lors du chargement de la souscription Firestore pour ${tenantId}:`, err);
     }
 
-    // Default mock subscription per tenant
+    // 3. Mode Évaluation / Démo / MD
     const isGep = tenantId === 'GEP';
+    if (isGep) {
+      return {
+        tenantId,
+        plan: 'PRO',
+        activeModules: ['MOD-01', 'MOD-02', 'MOD-03', 'MOD-11'],
+        quotas: {
+          maxUsers: 25,
+          maxFieldAgents: 10,
+          monthlyBiometricVerifications: 500
+        },
+        addOnPricing: {
+          mobileFleetActive: true,
+          pricePerExtraFieldAgent: 39
+        }
+      };
+    }
+
+    // Default / MD / Trial / PROD default subscription
     return {
-      tenantId,
-      plan: isGep ? 'PRO' : 'ESSENTIAL',
-      activeModules: isGep ? ['MOD-01', 'MOD-02', 'MOD-03', 'MOD-11'] : ['MOD-01', 'MOD-02'],
-      quotas: {
-        maxUsers: isGep ? 25 : 5,
-        maxFieldAgents: isGep ? 10 : 3,
-        monthlyBiometricVerifications: isGep ? 500 : 50
-      },
-      addOnPricing: {
-        mobileFleetActive: isGep,
-        pricePerExtraFieldAgent: 39 // 39 TND / mois
-      }
+      ...TRIAL_TENANT_SUBSCRIPTION,
+      tenantId: tenantId || 'Inter-Affaires'
     };
   }
 
   /**
    * Récupère la liste des collaborateurs et leur statut de licence terrain pour un tenant.
    */
-  public static async getTenantFieldAgents(tenantId: string): Promise<FieldAgentLicense[]> {
+  public static async getTenantFieldAgents(
+    tenantId: string,
+    isDemoTenant: boolean = false,
+    collaborators?: any[]
+  ): Promise<FieldAgentLicense[]> {
+    // 1. MODE DÉMO (Inter-Affaires Démo, company_demo, etc.)
+    if (isDemoTenant) {
+      try {
+        const saved = localStorage.getItem(`elyssa_mobile_licenses_${tenantId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const collsRef = collection(db, 'company_erp_data', tenantId, 'collaborators');
+        const snap = await getDocs(collsRef);
+
+        if (!snap.empty) {
+          return snap.docs.map(doc => {
+            const data = doc.data();
+            return {
+              agentId: doc.id,
+              agentName: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent',
+              email: data.email || 'agent@elyssa-erp.tn',
+              role: data.role || 'Collaborateur',
+              department: data.department || data.structureName || 'Opérations Terrain',
+              hasMobileLicense: Boolean(data.hasMobileLicense),
+              assignedAt: data.mobileLicenseAssignedAt,
+              lastMobileSync: data.lastMobileSync
+            };
+          });
+        }
+      } catch (err) {
+        console.warn(`[MobileLicenseService] Erreur chargement agents terrain Firestore démo pour ${tenantId}:`, err);
+      }
+
+      // Équipe démo canonique : Mohamed Ali Gharbi & Hamza Ben Salem ont la licence active (2/5)
+      return TRIAL_FIELD_AGENT_LICENSES.map(agent => ({ ...agent }));
+    }
+
+    // 2. MODE PROD (Inter-Affaires Parent ou tout tenant réel) :
+    // UNIQUEMENT les salariés réels enregistrés (0 profil démo injecté)
+
+    // a) Si des collaborateurs sont fournis depuis le state parent
+    if (collaborators && collaborators.length > 0) {
+      const realCollabs = collaborators.filter(c => {
+        if (!c) return false;
+        const emailLower = (c.email || '').toLowerCase().trim();
+        const idLower = (c.id || '').toLowerCase().trim();
+        // Filtrer strictement tout compte démo résiduel
+        if (
+          idLower.startsWith('demo-') ||
+          emailLower.endsWith('@elyssa-erp.tn') ||
+          emailLower.includes('doudou') ||
+          emailLower.includes('benamor') ||
+          emailLower.includes('dridi') ||
+          emailLower.includes('bensoltane') ||
+          emailLower.includes('mansour')
+        ) {
+          return false;
+        }
+        const comp = (c.company || c.company_id || c.companyId || '').trim().toLowerCase();
+        const activeComp = (tenantId || '').trim().toLowerCase();
+        return comp === activeComp || !comp || activeComp === 'inter-affaires' || activeComp === 'elyssa entreprises s.a.';
+      });
+
+      if (realCollabs.length > 0) {
+        let savedLicenses: Record<string, boolean> = {};
+        try {
+          const saved = localStorage.getItem(`elyssa_mobile_licenses_${tenantId}`);
+          if (saved) {
+            const parsed: FieldAgentLicense[] = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              parsed.forEach(p => {
+                if (p.agentId) savedLicenses[p.agentId] = p.hasMobileLicense;
+              });
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        return realCollabs.map(c => ({
+          agentId: c.id,
+          agentName: c.name,
+          email: c.email,
+          role: c.role || 'Collaborateur',
+          department: c.structureName || c.structureType || 'Opérations',
+          hasMobileLicense: savedLicenses[c.id] ?? Boolean(c.hasMobileLicense ?? false),
+          assignedAt: c.mobileLicenseAssignedAt,
+          lastMobileSync: c.lastMobileSync
+        }));
+      }
+    }
+
+    // b) Check LocalStorage pour PROD en filtrant les comptes démo
+    try {
+      const saved = localStorage.getItem(`elyssa_mobile_licenses_${tenantId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const cleanReal = parsed.filter((p: any) => {
+            const email = (p.email || '').toLowerCase();
+            const id = (p.agentId || '').toLowerCase();
+            return !id.startsWith('demo-') && !email.endsWith('@elyssa-erp.tn');
+          });
+          if (cleanReal.length > 0) {
+            return cleanReal;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // c) Check Firestore pour PROD
     try {
       const collsRef = collection(db, 'company_erp_data', tenantId, 'collaborators');
       const snap = await getDocs(collsRef);
 
       if (!snap.empty) {
-        return snap.docs.map(doc => {
-          const data = doc.data();
-          return {
-            agentId: doc.id,
-            agentName: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent',
-            email: data.email || 'agent@elyssa-erp.tn',
-            role: data.role || 'Collaborateur',
-            department: data.department || 'Opérations Terrain',
-            hasMobileLicense: Boolean(data.hasMobileLicense),
-            assignedAt: data.mobileLicenseAssignedAt,
-            lastMobileSync: data.lastMobileSync
-          };
-        });
+        const cleanDocs = snap.docs
+          .map(doc => {
+            const data = doc.data();
+            return {
+              agentId: doc.id,
+              agentName: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent',
+              email: data.email || '',
+              role: data.role || 'Collaborateur',
+              department: data.department || data.structureName || 'Opérations',
+              hasMobileLicense: Boolean(data.hasMobileLicense),
+              assignedAt: data.mobileLicenseAssignedAt,
+              lastMobileSync: data.lastMobileSync
+            };
+          })
+          .filter(a => !a.agentId.startsWith('demo-') && !a.email.endsWith('@elyssa-erp.tn'));
+
+        if (cleanDocs.length > 0) {
+          return cleanDocs;
+        }
       }
     } catch (err) {
-      console.warn(`[MobileLicenseService] Erreur lors du chargement des agents terrain Firestore pour ${tenantId}:`, err);
+      console.warn(`[MobileLicenseService] Erreur chargement agents terrain Firestore prod pour ${tenantId}:`, err);
     }
 
-    // Fallback list of collaborators
+    // Par défaut en PROD : 0 collaborateur tant qu'aucun salarié réel n'est créé
     return [];
   }
 
@@ -169,11 +317,20 @@ export class MobileLicenseService {
         return {
           ...agent,
           hasMobileLicense: targetState,
-          assignedAt: targetState ? new Date().toISOString().split('T')[0] : undefined
+          assignedAt: targetState ? (agent.assignedAt || new Date().toISOString().split('T')[0]) : undefined,
+          lastMobileSync: targetState ? (agent.lastMobileSync || new Date().toISOString().replace('T', ' ').substring(0, 16)) : agent.lastMobileSync
         };
       }
       return agent;
     });
+
+    // Sauvegarde en LocalStorage pour persistance instantanée
+    try {
+      localStorage.setItem(`elyssa_mobile_licenses_${tenantId}`, JSON.stringify(updatedAgents));
+      window.dispatchEvent(new Event('storage'));
+    } catch {
+      // ignore
+    }
 
     // Mise à jour dans Firestore si possible
     try {
@@ -186,11 +343,26 @@ export class MobileLicenseService {
       console.warn(`[MobileLicenseService] Mise à jour locale (Firestore non accessible):`, err);
     }
 
+    // Notification instantanée dans le Hub de Communication & Messagerie Interne
+    const targetAgent = currentAgents.find(a => a.agentId === agentId);
+    if (targetAgent) {
+      InternalChatService.sendMobileLicenseNotification(
+        tenantId,
+        {
+          agentId: targetAgent.agentId,
+          agentName: targetAgent.agentName,
+          email: targetAgent.email,
+          role: targetAgent.role
+        },
+        targetState
+      ).catch(e => console.warn('[MobileLicenseService] Erreur notification interne:', e));
+    }
+
     return {
       success: true,
       message: targetState
-        ? `Licence Mobile Terrain activée pour l'agent.`
-        : `Licence Mobile Terrain révoquée pour l'agent.`,
+        ? `Licence Mobile Terrain activée avec succès pour l'agent.`
+        : `Licence Mobile Terrain désactivée pour l'agent.`,
       updatedAgents
     };
   }
@@ -215,6 +387,13 @@ export class MobileLicenseService {
       },
       activeModules: Array.from(new Set([...currentSub.activeModules, 'MOD-11']))
     };
+
+    try {
+      localStorage.setItem(`elyssa_tenant_subscription_${tenantId}`, JSON.stringify(updatedSub));
+      window.dispatchEvent(new Event('storage'));
+    } catch {
+      // ignore
+    }
 
     try {
       const subRef = doc(db, 'company_erp_data', tenantId, 'subscription', 'current');

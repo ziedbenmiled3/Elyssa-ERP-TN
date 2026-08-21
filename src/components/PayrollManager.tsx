@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Employee, Payslip, BankAccount, BankTransaction, AbsenceRecord, WorkContract, AdminSettings, MissionOrder } from '../types';
 import { getValidMockBase64 } from '../utils/mockDynamicGed';
 import { ElyssaLogo } from './ElyssaLogo';
+import { computeTunisianPayroll, computeAnnualIRPP, TUNISIAN_TAX_CONSTANTS } from '../services/taxCalculations';
 import { 
   Users, 
   Calculator, 
@@ -33,7 +34,9 @@ import {
   Download,
   Upload,
   Paperclip,
-  RefreshCw
+  RefreshCw,
+  Search,
+  Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -54,7 +57,226 @@ interface PayrollManagerProps {
   companyLocations?: any[];
   onUpdateCompanyLocations?: (locations: any[]) => void;
   missions?: MissionOrder[];
+  isTrial?: boolean;
+  activeCompanyName?: string;
 }
+
+// 7 Collaborateurs Démo Normalisés pour la Paie & RH
+export const INTER_AFFAIRES_EMPLOYEES: Employee[] = [
+  {
+    id: 'emp-ia-1',
+    matricule: 'IA-001',
+    name: 'MED ZIED BEN MILED',
+    email: 'ziedbenmiled3@gmail.com',
+    jobTitle: 'Directeur Général',
+    department: 'Direction',
+    baseSalary: 6000.000,
+    familySituation: 'Married_2',
+    isChefDeFamille: true,
+    status: 'Active',
+    company: 'Inter-Affaires',
+    companyId: 'Inter-Affaires'
+  },
+  {
+    id: 'emp-ia-2',
+    matricule: 'IA-002',
+    name: 'Amel Marzouki',
+    email: 'a.marzouki@inter-affaires.tn',
+    jobTitle: 'Responsable Opérations',
+    department: 'Opérations',
+    baseSalary: 2800.000,
+    familySituation: 'Single',
+    isChefDeFamille: false,
+    status: 'Active',
+    company: 'Inter-Affaires',
+    companyId: 'Inter-Affaires'
+  },
+  {
+    id: 'emp-ia-3',
+    matricule: 'IA-003',
+    name: 'Bochra Belkadhi',
+    email: 'b.belkadhi@inter-affaires.tn',
+    jobTitle: 'Responsable Administratif & Financier',
+    department: 'Finance',
+    baseSalary: 2500.000,
+    familySituation: 'Married_1',
+    isChefDeFamille: true,
+    status: 'Active',
+    company: 'Inter-Affaires',
+    companyId: 'Inter-Affaires'
+  },
+  {
+    id: 'emp-ia-4',
+    matricule: 'IA-004',
+    name: 'Oumaima Trabelsi',
+    email: 'o.trabelsi@inter-affaires.tn',
+    jobTitle: 'Chargée de Clientèle',
+    department: 'Commercial',
+    baseSalary: 1500.000,
+    familySituation: 'Single',
+    isChefDeFamille: false,
+    status: 'Active',
+    company: 'Inter-Affaires',
+    companyId: 'Inter-Affaires'
+  }
+];
+
+export const UNIFIED_7_PAYROLL_EMPLOYEES: Employee[] = [
+  {
+    id: 'demo-emp_0',
+    matricule: 'EMP-0000',
+    name: 'Meriam Doudou',
+    email: 'm.doudou@elyssa-erp.tn',
+    jobTitle: 'Gérante / Direction Générale',
+    department: 'Direction Générale',
+    ssn: '10019283-01',
+    cin: '04123456',
+    rib: '03001010015920038000',
+    baseSalary: 4500.000,
+    transportAllowance: 0,
+    presenceAllowance: 0,
+    otherAllowances: 0,
+    familySituation: 'Married_2',
+    isChefDeFamille: true,
+    status: 'Active',
+    hiringDate: '2022-01-01',
+    hireDate: '2022-01-01',
+    company: 'MD',
+    companyId: 'MD'
+  },
+  {
+    id: 'demo-emp_1',
+    matricule: 'EMP-0001',
+    name: 'Khaled Ben Amor',
+    email: 'k.benamor@elyssa-erp.tn',
+    jobTitle: 'Directeur Financier & Recouvrement',
+    department: 'Finance',
+    ssn: '14839211-92',
+    cin: '08912345',
+    rib: '03001010015920038472',
+    baseSalary: 2600.000,
+    transportAllowance: 180.000,
+    presenceAllowance: 80.000,
+    otherAllowances: 300.000,
+    familySituation: 'Married_2',
+    isChefDeFamille: true,
+    status: 'Active',
+    hiringDate: '2023-01-15',
+    hireDate: '2023-01-15',
+    company: 'MD',
+    companyId: 'MD'
+  },
+  {
+    id: 'demo-emp_2',
+    matricule: 'EMP-0002',
+    name: 'Ines Dridi',
+    email: 'i.dridi@elyssa-erp.tn',
+    jobTitle: 'Responsable Rapprochement',
+    department: 'Finance',
+    ssn: '20943810-18',
+    cin: '07123456',
+    rib: '08102030026710048259',
+    baseSalary: 1750.000,
+    transportAllowance: 120.000,
+    presenceAllowance: 80.000,
+    otherAllowances: 150.000,
+    familySituation: 'Single',
+    isChefDeFamille: false,
+    status: 'Active',
+    hiringDate: '2024-03-10',
+    hireDate: '2024-03-10',
+    company: 'MD',
+    companyId: 'MD'
+  },
+  {
+    id: 'demo-emp_3',
+    matricule: 'EMP-0003',
+    name: 'Mohamed Ali Gharbi',
+    email: 'm.gharbi@elyssa-erp.tn',
+    jobTitle: 'Chargé Clientèle / Ventes',
+    department: 'Ventes',
+    ssn: '12554739-44',
+    cin: '06543210',
+    rib: '12004050037840059341',
+    baseSalary: 1400.000,
+    transportAllowance: 110.000,
+    presenceAllowance: 80.000,
+    otherAllowances: 100.000,
+    familySituation: 'Married_1',
+    isChefDeFamille: true,
+    status: 'Active',
+    hiringDate: '2025-06-18',
+    hireDate: '2025-06-18',
+    company: 'MD',
+    companyId: 'MD'
+  },
+  {
+    id: 'demo-emp_4',
+    matricule: 'EMP-0004',
+    name: 'Amel Ben Soltane',
+    email: 'a.bensoltane@elyssa-erp.tn',
+    jobTitle: 'Responsable Ressources Humaines',
+    department: 'RH',
+    ssn: '19483029-45',
+    cin: '06123456',
+    rib: '05201040059283749501',
+    baseSalary: 2100.000,
+    transportAllowance: 150.000,
+    presenceAllowance: 80.000,
+    otherAllowances: 200.000,
+    familySituation: 'Married_3',
+    isChefDeFamille: true,
+    status: 'Active',
+    hiringDate: '2024-11-01',
+    hireDate: '2024-11-01',
+    company: 'MD',
+    companyId: 'MD'
+  },
+  {
+    id: 'demo-emp_5',
+    matricule: 'EMP-0005',
+    name: 'Sami Mansour',
+    email: 's.mansour@elyssa-erp.tn',
+    jobTitle: 'Développeur ERP Principal',
+    department: 'Direction & IT',
+    ssn: '11049382-77',
+    cin: '05123456',
+    rib: '14102030048592837410',
+    baseSalary: 3200.000,
+    transportAllowance: 200.000,
+    presenceAllowance: 80.000,
+    otherAllowances: 500.000,
+    familySituation: 'Single',
+    isChefDeFamille: false,
+    status: 'Active',
+    hiringDate: '2025-01-10',
+    hireDate: '2025-01-10',
+    company: 'MD',
+    companyId: 'MD'
+  },
+  {
+    id: 'demo-emp_6',
+    matricule: 'EMP-0006',
+    name: 'Hamza Ben Salem',
+    email: 'h.bensalem@elyssa-erp.tn',
+    jobTitle: 'Chauffeur Livreur / Logistique',
+    department: 'Logistique',
+    ssn: '16928301-22',
+    cin: '08812345',
+    rib: '08102030026710048102',
+    baseSalary: 1450.000,
+    transportAllowance: 0,
+    presenceAllowance: 0,
+    otherAllowances: 0,
+    familySituation: 'Married_1',
+    isChefDeFamille: true,
+    status: 'Active',
+    hiringDate: '2024-02-15',
+    hireDate: '2024-02-15',
+    company: 'MD',
+    companyId: 'MD'
+  }
+];
 
 // Tunisian Progressive Personal Income Tax (IRPP) Calculator
 // Brackets from latest LF:
@@ -192,8 +414,51 @@ export default function PayrollManager({
   onUpdatePayslips: setPayslips,
   companyLocations: initialCompanyLocations,
   onUpdateCompanyLocations,
-  missions = []
+  missions = [],
+  isTrial,
+  activeCompanyName
 }: PayrollManagerProps) {
+  // Auto-align and enforce the 7 unified employees in the tenant payroll register
+  useEffect(() => {
+    const hasMeriam = employees.some(e => (e.name || '').toLowerCase().includes('meriam'));
+    const hasHamza = employees.some(e => (e.name || '').toLowerCase().includes('hamza'));
+    
+    if (employees.length < 7 || !hasMeriam || !hasHamza) {
+      const mergedList = UNIFIED_7_PAYROLL_EMPLOYEES.map(canonEmp => {
+        const existing = employees.find(e => 
+          (e.id && e.id === canonEmp.id) ||
+          (e.name && e.name.toLowerCase().trim() === canonEmp.name.toLowerCase().trim())
+        );
+        if (existing) {
+          return {
+            ...canonEmp,
+            ...existing,
+            // Ensure exact brut specified: Meriam Doudou (Brut 4 500 TND) and Hamza Ben Salem (Brut 1 450 TND)
+            baseSalary: canonEmp.name === 'Meriam Doudou' ? 4500.000 : (canonEmp.name === 'Hamza Ben Salem' ? 1450.000 : (existing.baseSalary || canonEmp.baseSalary)),
+            transportAllowance: (canonEmp.name === 'Meriam Doudou' || canonEmp.name === 'Hamza Ben Salem') ? 0 : (existing.transportAllowance ?? canonEmp.transportAllowance),
+            presenceAllowance: (canonEmp.name === 'Meriam Doudou' || canonEmp.name === 'Hamza Ben Salem') ? 0 : (existing.presenceAllowance ?? canonEmp.presenceAllowance),
+            otherAllowances: (canonEmp.name === 'Meriam Doudou' || canonEmp.name === 'Hamza Ben Salem') ? 0 : (existing.otherAllowances ?? canonEmp.otherAllowances),
+            jobTitle: existing.jobTitle || canonEmp.jobTitle,
+            department: existing.department || canonEmp.department,
+            status: 'Active' as const
+          } as Employee;
+        }
+        return canonEmp;
+      });
+
+      const customEmployees = employees.filter(e => 
+        !UNIFIED_7_PAYROLL_EMPLOYEES.some(d => d.id === e.id || d.name.toLowerCase() === (e.name || '').toLowerCase())
+      );
+
+      const finalEmployees: Employee[] = [...mergedList, ...customEmployees];
+      setEmployees(finalEmployees);
+      try {
+        localStorage.setItem('carthage_employees', JSON.stringify(finalEmployees));
+        localStorage.setItem('elyssa_employees', JSON.stringify(finalEmployees));
+      } catch (e) {}
+    }
+  }, [employees, setEmployees]);
+
   // Tabs: 'dashboard' | 'employees' | 'contracts' | 'absences' | 'payslips' | 'cnss' | 'calculator' | 'documents' | 'stc' | 'locations' | 'settings'
   const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'employees' | 'contracts' | 'absences' | 'payslips' | 'cnss' | 'calculator' | 'documents' | 'stc' | 'locations' | 'settings'>('dashboard');
   const isDemoEmp = (emp: any) => {
@@ -272,6 +537,23 @@ export default function PayrollManager({
   const updatePrimesList = (list: string[]) => {
     setPrimesList(list);
     localStorage.setItem('carthage_payroll_primes_list', JSON.stringify(list));
+  };
+
+  // State filters for the compact Remuneration DataGrid (Dashboard / Analyses RH)
+  const [remunSearchQuery, setRemunSearchQuery] = useState<string>('');
+  const [remunPoleFilter, setRemunPoleFilter] = useState<string>('all');
+
+  const getEmpPole = (emp: Employee): string => {
+    if (emp.department) return emp.department;
+    const title = (emp.jobTitle || '').toLowerCase();
+    const name = (emp.name || '').toLowerCase();
+    if (name.includes('meriam') || title.includes('gérant') || title.includes('générale')) return 'Direction Générale';
+    if (name.includes('khaled') || name.includes('ines') || title.includes('financ') || title.includes('rapproch') || title.includes('comptab')) return 'Finance';
+    if (name.includes('amel') || title.includes('rh') || title.includes('ressources')) return 'RH';
+    if (name.includes('mohamed') || name.includes('gharbi') || title.includes('client') || title.includes('vent') || title.includes('commerc')) return 'Ventes';
+    if (name.includes('sami') || name.includes('mansour') || title.includes('dév') || title.includes('it') || title.includes('systèm')) return 'Direction & IT';
+    if (name.includes('hamza') || name.includes('salem') || name.includes('trad') || title.includes('livr') || title.includes('chauf') || title.includes('logist')) return 'Logistique';
+    return 'Opérations';
   };
 
   // Work contracts are loaded dynamically from props and synchronized to parent company
@@ -1030,11 +1312,32 @@ export default function PayrollManager({
   const handleRestoreDemoEmployees = () => {
     const demoList: Employee[] = [
       {
+        id: 'emp_0',
+        matricule: 'EMP-0000',
+        name: 'Meriam Doudou',
+        email: 'm.doudou@carthage.com.tn',
+        jobTitle: 'Gérante / Direction Générale',
+        department: 'Direction Générale',
+        ssn: '10019283-01',
+        cin: '04123456',
+        rib: '03001010015920038000',
+        baseSalary: 4500.000,
+        transportAllowance: 250.000,
+        presenceAllowance: 80.000,
+        otherAllowances: 500.000,
+        familySituation: 'Married_2',
+        isChefDeFamille: true,
+        status: 'Active',
+        hiringDate: '2022-01-01',
+        branchId: 'loc-maman'
+      },
+      {
         id: 'emp_1',
         matricule: 'EMP-0001',
         name: 'Khaled Ben Amor',
         email: 'k.benamor@carthage.com.tn',
         jobTitle: 'Directeur Financier & Recouvrement',
+        department: 'Finance',
         ssn: '14839211-92',
         cin: '08912345',
         rib: '03001010015920038472',
@@ -1054,6 +1357,7 @@ export default function PayrollManager({
         name: 'Ines Dridi',
         email: 'i.dridi@carthage.com.tn',
         jobTitle: 'Responsable Rapprochement',
+        department: 'Finance',
         ssn: '20943810-18',
         cin: '07123456',
         rib: '08102030026710048259',
@@ -1072,7 +1376,8 @@ export default function PayrollManager({
         matricule: 'EMP-0003',
         name: 'Mohamed Ali Gharbi',
         email: 'm.gharbi@carthage.com.tn',
-        jobTitle: 'Chargé Clientèle Extérieure',
+        jobTitle: 'Chargé Clientèle / Ventes',
+        department: 'Ventes',
         ssn: '12554739-44',
         cin: '06543210',
         rib: '12004050037840059341',
@@ -1087,79 +1392,63 @@ export default function PayrollManager({
         branchId: 'loc-maman'
       },
       {
-        id: 'emp_drv_01',
-        matricule: 'EMP-0101',
-        name: 'Kamel Trad',
-        email: 'k.trad@elyssa.tn',
-        jobTitle: 'Chauffeur Logistique Poids Lourds',
-        ssn: '15839201-12',
-        cin: '05891234',
-        rib: '03001010015920038101',
-        baseSalary: 1650.000,
+        id: 'emp_4',
+        matricule: 'EMP-0004',
+        name: 'Amel Ben Soltane',
+        email: 'a.bensoltane@carthage.com.tn',
+        jobTitle: 'Responsable Ressources Humaines',
+        department: 'RH',
+        ssn: '19483029-45',
+        cin: '06123456',
+        rib: '05201040059283749501',
+        baseSalary: 2100.000,
         transportAllowance: 150.000,
         presenceAllowance: 80.000,
-        otherAllowances: 120.000,
-        familySituation: 'Married_2',
+        otherAllowances: 200.000,
+        familySituation: 'Married_3',
         isChefDeFamille: true,
         status: 'Active',
-        hiringDate: '2023-05-10',
+        hiringDate: '2024-11-01',
         branchId: 'loc-maman'
       },
       {
-        id: 'emp_drv_02',
-        matricule: 'EMP-0102',
+        id: 'emp_5',
+        matricule: 'EMP-0005',
+        name: 'Sami Mansour',
+        email: 's.mansour@carthage.com.tn',
+        jobTitle: 'Développeur ERP Principal',
+        department: 'Direction & IT',
+        ssn: '11049382-77',
+        cin: '05123456',
+        rib: '14102030048592837410',
+        baseSalary: 3200.000,
+        transportAllowance: 200.000,
+        presenceAllowance: 80.000,
+        otherAllowances: 500.000,
+        familySituation: 'Single',
+        isChefDeFamille: false,
+        status: 'Active',
+        hiringDate: '2025-01-10',
+        branchId: 'loc-maman'
+      },
+      {
+        id: 'emp_6',
+        matricule: 'EMP-0006',
         name: 'Hamza Ben Salem',
-        email: 'h.bensalem@elyssa.tn',
-        jobTitle: 'Livreur / Express',
+        email: 'h.bensalem@carthage.com.tn',
+        jobTitle: 'Chauffeur Livreur / Logistique',
+        department: 'Logistique',
         ssn: '16928301-22',
-        cin: '06812345',
+        cin: '08812345',
         rib: '08102030026710048102',
         baseSalary: 1450.000,
         transportAllowance: 120.000,
         presenceAllowance: 80.000,
         otherAllowances: 100.000,
-        familySituation: 'Single',
-        isChefDeFamille: false,
-        status: 'Active',
-        hiringDate: '2024-02-15',
-        branchId: 'loc-maman'
-      },
-      {
-        id: 'emp_drv_03',
-        matricule: 'EMP-0103',
-        name: 'Youssef Chahed',
-        email: 'y.chahed@elyssa.tn',
-        jobTitle: 'Chauffeur Toupie & Chantier',
-        ssn: '17839210-33',
-        cin: '07812345',
-        rib: '12004050037840059103',
-        baseSalary: 1700.000,
-        transportAllowance: 160.000,
-        presenceAllowance: 80.000,
-        otherAllowances: 140.000,
         familySituation: 'Married_1',
         isChefDeFamille: true,
         status: 'Active',
-        hiringDate: '2023-09-01',
-        branchId: 'loc-maman'
-      },
-      {
-        id: 'emp_drv_04',
-        matricule: 'EMP-0104',
-        name: 'Nizar Trabelsi',
-        email: 'n.trabelsi@elyssa.tn',
-        jobTitle: 'Conducteur Utilitaire',
-        ssn: '18938201-44',
-        cin: '08812345',
-        rib: '05201040059283749104',
-        baseSalary: 1500.000,
-        transportAllowance: 130.000,
-        presenceAllowance: 80.000,
-        otherAllowances: 110.000,
-        familySituation: 'Married_3',
-        isChefDeFamille: true,
-        status: 'Active',
-        hiringDate: '2024-01-20',
+        hiringDate: '2024-02-15',
         branchId: 'loc-maman'
       }
     ];
@@ -1167,45 +1456,96 @@ export default function PayrollManager({
 
     const defaultContracts: WorkContract[] = [
       {
+        id: 'ct_0',
+        employeeId: 'emp_0',
+        employeeName: 'Meriam Doudou',
+        contractType: 'CDI',
+        startDate: '2022-01-01',
+        trialPeriodMonths: 6,
+        baseSalary: 4500.000,
+        status: 'Signed',
+        dutiesDescription: 'Direction Générale, stratégie de développement, gouvernance opérationnelle et partenariats majeurs Elyssa ERP S.A.',
+        generatedAt: '2022-01-01',
+        signedAt: '2022-01-01'
+      },
+      {
         id: 'ct_1',
         employeeId: 'emp_1',
         employeeName: 'Khaled Ben Amor',
         contractType: 'CDI',
-        startDate: '2020-01-15',
+        startDate: '2023-01-15',
         trialPeriodMonths: 3,
         baseSalary: 2600.000,
         status: 'Signed',
-        dutiesDescription: 'Superviser l\'ensemble des processus financiers, élaboration du budget annuel, pilotage de la trésorerie et reporting réglementaire de Elyssa S.A. auprès de la Banque Centrale de Tunisie de Tunis.',
-        generatedAt: '2020-01-15',
-        signedAt: '2020-01-15'
+        dutiesDescription: 'Superviser l\'ensemble des processus financiers, élaboration du budget annuel, pilotage de la trésorerie et reporting réglementaire auprès de la Banque Centrale de Tunisie.',
+        generatedAt: '2023-01-15',
+        signedAt: '2023-01-15'
       },
       {
         id: 'ct_2',
         employeeId: 'emp_2',
         employeeName: 'Ines Dridi',
         contractType: 'CDD',
-        startDate: '2025-06-01',
-        endDate: '2026-05-31',
+        startDate: '2024-03-10',
+        endDate: '2026-03-09',
         trialPeriodMonths: 2,
-        baseSalary: 1550.000,
+        baseSalary: 1750.000,
         status: 'Signed',
-        dutiesDescription: 'Contrôler les opérations de rapprochement bancaire, auditer les pièces comptables de paie et s\'assurer du respect des règles fiscales de retenue à la source en Tunisie.',
-        generatedAt: '2025-05-28',
-        signedAt: '2025-05-29'
+        dutiesDescription: 'Contrôler les opérations de rapprochement bancaire, auditer les pièces comptables de paie et s\'assurer du respect des règles fiscales de retenue à la source.',
+        generatedAt: '2024-03-08',
+        signedAt: '2024-03-10'
       },
       {
         id: 'ct_3',
         employeeId: 'emp_3',
         employeeName: 'Mohamed Ali Gharbi',
-        contractType: 'CIVP',
-        startDate: '2026-03-01',
-        endDate: '2027-02-28',
-        trialPeriodMonths: 1,
-        baseSalary: 950.000,
+        contractType: 'CDI',
+        startDate: '2025-06-18',
+        trialPeriodMonths: 3,
+        baseSalary: 1400.000,
         status: 'Signed',
-        dutiesDescription: 'Assister les clients de Elyssa S.A., préparer la documentation de prospection commerciale et de service extérieur pour la zone industrielle de Charguia et Ben Arous.',
-        generatedAt: '2026-02-25',
-        signedAt: '2026-02-26'
+        dutiesDescription: 'Chargé Clientèle et développement des ventes, prospection terrain et négociation commerciale.',
+        generatedAt: '2025-06-15',
+        signedAt: '2025-06-18'
+      },
+      {
+        id: 'ct_4',
+        employeeId: 'emp_4',
+        employeeName: 'Amel Ben Soltane',
+        contractType: 'CDI',
+        startDate: '2024-11-01',
+        trialPeriodMonths: 3,
+        baseSalary: 2100.000,
+        status: 'Signed',
+        dutiesDescription: 'Gestion des ressources humaines, administration du personnel, déclarations sociales CNSS et clôture de paie.',
+        generatedAt: '2024-10-28',
+        signedAt: '2024-11-01'
+      },
+      {
+        id: 'ct_5',
+        employeeId: 'emp_5',
+        employeeName: 'Sami Mansour',
+        contractType: 'CDI',
+        startDate: '2025-01-10',
+        trialPeriodMonths: 3,
+        baseSalary: 3200.000,
+        status: 'Signed',
+        dutiesDescription: 'Architecture technique, maintenance continue du système d\'information et développement des modules ERP.',
+        generatedAt: '2025-01-08',
+        signedAt: '2025-01-10'
+      },
+      {
+        id: 'ct_6',
+        employeeId: 'emp_6',
+        employeeName: 'Hamza Ben Salem',
+        contractType: 'CDI',
+        startDate: '2024-02-15',
+        trialPeriodMonths: 3,
+        baseSalary: 1450.000,
+        status: 'Signed',
+        dutiesDescription: 'Logistique d\'expédition, gestion de la flotte de livraison, picking et distribution clients.',
+        generatedAt: '2024-02-12',
+        signedAt: '2024-02-15'
       }
     ];
     setContracts(defaultContracts);
@@ -1253,7 +1593,7 @@ export default function PayrollManager({
     ];
     setAbsences(defaultAbsences);
     setPayslips([]);
-    alert("Données de démonstration de Elyssa S.A. restaurées avec succès ! (3 collaborateurs, 3 contrats, 3 absences actives)");
+    alert("Données de démonstration unifiées (7 collaborateurs, 7 contrats, 3 absences actives) restaurées avec succès !");
   };
 
   const handleAddAbsence = (e: React.FormEvent) => {
@@ -1333,42 +1673,36 @@ export default function PayrollManager({
       });
     }
 
-    const gross = Math.max(0, (base + transport + presence + other) - absencesDeduction);
-    
-    // CNSS Employee Contribution
-    const cnssEmployee = gross * (cnssEmployeeRate / 100);
+    let childrenCount = 0;
+    if (emp.familySituation === 'Married_1') childrenCount = 1;
+    else if (emp.familySituation === 'Married_2') childrenCount = 2;
+    else if (emp.familySituation === 'Married_3') childrenCount = 3;
+    else if (emp.familySituation === 'Married_4_Plus') childrenCount = 4;
 
-    // CNSS Employer Contribution (ordinary + accident du travail)
-    const cnssEmployer = gross * ((cnssEmployerRate + cnssAccidentRate) / 100);
+    const netBase = Math.max(0, base - absencesDeduction);
+    const payrollRes = computeTunisianPayroll({
+      baseSalary: netBase,
+      transportAllowance: transport,
+      presenceAllowance: presence,
+      otherAllowances: other,
+      childrenCount,
+      isHeadOfFamily: Boolean(emp.isChefDeFamille)
+    });
 
-    const netTaxableGross = gross - cnssEmployee;
+    const gross = Number(payrollRes.grossSalary) || 0;
+    const cnssEmployee = Number(payrollRes.cnssEmployee) || 0;
+    const cnssEmployer = Number(payrollRes.cnssEmployer) || 0;
+    const irpp = Number(payrollRes.irppMonthly) || 0;
+    const css = Number(payrollRes.cssMonthly) || 0;
 
     // Professional Deductions: 10% of taxable gross, capped at 2000 TND per year (166.667 TND/month)
-    const professionalExpensesAnnualLimit = 2000;
-    const monthlyProfCeiling = professionalExpensesAnnualLimit / 12; // 166.667
-    const professionalExpenses = Math.min(netTaxableGross * 0.10, monthlyProfCeiling);
-
-    // Family Tax Deductions (Deductions IRPP Tunis):
-    // Chef de famille and Children charge
+    const netTaxableGross = Math.max(0, gross - cnssEmployee);
+    const professionalExpenses = Math.min(netTaxableGross * 0.10, 2000 / 12);
     let annualFamilyDeduction = 0;
     if (emp.isChefDeFamille) annualFamilyDeduction += abattementChefFamille;
-    
-    if (emp.familySituation === 'Married_1') annualFamilyDeduction += abattementEnfant;
-    else if (emp.familySituation === 'Married_2') annualFamilyDeduction += (abattementEnfant * 2);
-    else if (emp.familySituation === 'Married_3') annualFamilyDeduction += (abattementEnfant * 3);
-    else if (emp.familySituation === 'Married_4_Plus') annualFamilyDeduction += (abattementEnfant * 4);
-
+    annualFamilyDeduction += childrenCount * abattementEnfant;
     const monthlyFamilyDeduction = annualFamilyDeduction / 12;
-
-    // Net taxable basis monthly (recalibrated to annual basis to compute tax and dividing by 12)
-    const monthlyNetAssiette = netTaxableGross - professionalExpenses - monthlyFamilyDeduction;
-    const estimatedAnnualTaxableBasis = Math.max(0, monthlyNetAssiette * 12);
-
-    const annualIRPP = calculateAnnualTax(estimatedAnnualTaxableBasis);
-    const irpp = annualIRPP / 12;
-
-    // Social Solidarity tax (Contribution Sociale Solidaire - CSS)
-    const css = Math.max(0, monthlyNetAssiette * (cssRate / 100));
+    const monthlyNetAssiette = Math.max(0, netTaxableGross - professionalExpenses - monthlyFamilyDeduction);
 
     // Calculate non-taxable mission expense reimbursements from Fleet & Missions
     let missionReimbursements = 0;
@@ -1403,7 +1737,7 @@ export default function PayrollManager({
       });
     }
 
-    const netSalary = (gross - cnssEmployee - irpp - css) + missionReimbursements;
+    const netSalary = (Number(payrollRes.netSalary) || 0) + missionReimbursements;
 
     return {
       grossSalary: gross,
@@ -1792,45 +2126,34 @@ export default function PayrollManager({
   }, [payslips]);
 
   const simCalculation = useMemo(() => {
-    const gross = Math.max(0, simBaseSalary + simTransportAllowance + simPresenceAllowance + simOtherAllowances);
-    
-    // CNSS Employee Contribution: 9.18%
-    const cnssEmployee = simIsCivpExempt ? 0 : gross * 0.0918;
+    let childrenCount = 0;
+    if (simSituation === 'Married_1') childrenCount = 1;
+    else if (simSituation === 'Married_2') childrenCount = 2;
+    else if (simSituation === 'Married_3') childrenCount = 3;
+    else if (simSituation === 'Married_4_Plus') childrenCount = 4;
 
-    // CNSS Employer Contribution: 16.57% (ordinary) + 0.5% (accident du travail) = 17.07%
-    const cnssEmployer = simIsCivpExempt ? 0 : gross * 0.1707;
+    const payrollRes = computeTunisianPayroll({
+      baseSalary: simBaseSalary,
+      transportAllowance: simTransportAllowance,
+      presenceAllowance: simPresenceAllowance,
+      otherAllowances: simOtherAllowances,
+      childrenCount,
+      isHeadOfFamily: simIsChefDeFamille
+    });
+
+    const gross = payrollRes.grossSalary;
+    const cnssEmployee = simIsCivpExempt ? 0 : payrollRes.cnssEmployee;
+    const cnssEmployer = simIsCivpExempt ? 0 : payrollRes.cnssEmployer;
+    const irpp = simIsCivpExempt ? 0 : payrollRes.irppMonthly;
+    const css = simIsCivpExempt ? 0 : payrollRes.cssMonthly;
+    const netSalary = simIsCivpExempt ? gross : payrollRes.netSalary;
 
     const netTaxableGross = gross - cnssEmployee;
-
-    // Professional Deductions: 10% of taxable gross, capped at 2000 TND per year (166.667 TND/month)
-    const professionalExpensesAnnualLimit = 2000;
-    const monthlyProfCeiling = professionalExpensesAnnualLimit / 12; // 166.667
-    const professionalExpenses = Math.min(netTaxableGross * 0.10, monthlyProfCeiling);
-
-    // Family Tax Deductions (Deductions IRPP Tunis):
-    // Chef de famille: 300 TND / year (25 TND / month)
-    // Children charge: 100 TND / child / year (8.33 TND each, up to 4 children)
+    const professionalExpenses = Math.min(netTaxableGross * 0.10, 2000 / 12);
     let annualFamilyDeduction = 0;
     if (simIsChefDeFamille) annualFamilyDeduction += 300;
-    
-    if (simSituation === 'Married_1') annualFamilyDeduction += 100;
-    else if (simSituation === 'Married_2') annualFamilyDeduction += 200;
-    else if (simSituation === 'Married_3') annualFamilyDeduction += 300;
-    else if (simSituation === 'Married_4_Plus') annualFamilyDeduction += 400;
-
+    annualFamilyDeduction += childrenCount * 100;
     const monthlyFamilyDeduction = annualFamilyDeduction / 12;
-
-    // Net taxable basis monthly (recalibrated to annual basis to compute tax and dividing by 12)
-    const monthlyNetAssiette = netTaxableGross - professionalExpenses - monthlyFamilyDeduction;
-    const estimatedAnnualTaxableBasis = Math.max(0, monthlyNetAssiette * 12);
-
-    const annualIRPP = calculateAnnualTax(estimatedAnnualTaxableBasis);
-    const irpp = annualIRPP / 12;
-
-    // Social Solidarity tax (Contribution Sociale Solidaire - CSS)
-    const css = Math.max(0, monthlyNetAssiette * 0.01);
-
-    const netSalary = gross - cnssEmployee - irpp - css;
 
     return {
       gross,
@@ -1838,9 +2161,9 @@ export default function PayrollManager({
       cnssEmployer,
       professionalExpenses,
       familyDeduction: monthlyFamilyDeduction,
-      taxableIncome: Math.max(0, monthlyNetAssiette),
-      estimatedAnnualTaxableBasis,
-      annualIRPP,
+      taxableIncome: payrollRes.taxableGross,
+      estimatedAnnualTaxableBasis: payrollRes.annualTaxable,
+      annualIRPP: payrollRes.irppAnnual,
       irpp,
       css,
       netSalary
@@ -2052,35 +2375,140 @@ export default function PayrollManager({
 
             {/* Quick overview grids */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Salaires Bruts vs Nets preview list */}
+              {/* Salaires Bruts vs Nets preview list (Tableau Compact DataGrid) */}
               <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-3xs lg:col-span-2 space-y-4">
-                <h3 className="text-sm font-black text-slate-900 border-b pb-2.5">Distribution de la Rémunération</h3>
-                <div className="space-y-3">
-                  {employees.map(emp => {
-                    const calc = getPayrollCalculations(emp);
-                    return (
-                      <div key={emp.id} className="p-3.5 border border-slate-100 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition flex justify-between items-center gap-3">
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-bold text-slate-800">{emp.name}</h4>
-                          <span className="text-[9.5px] text-slate-400 font-medium">{emp.jobTitle}</span>
-                        </div>
-                        <div className="flex items-center gap-5">
-                          <div className="text-right">
-                            <span className="text-[9px] text-slate-400 block font-bold">BRUT</span>
-                            <span className="text-xs text-slate-705 font-mono">{calc.grossSalary.toLocaleString('fr-TN')} TND</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[9px] text-slate-400 block font-bold">COTISATIONS</span>
-                            <span className="text-xs text-rose-500 font-mono">{(calc.cnssEmployee + calc.irpp).toLocaleString('fr-TN', { maximumFractionDigits: 3 })} TND</span>
-                          </div>
-                          <div className="text-right bg-indigo-50/50 border border-indigo-100 p-1.5 px-3 rounded-lg">
-                            <span className="text-[9px] text-indigo-400 block font-bold">NET À PAYER</span>
-                            <span className="text-xs font-extrabold text-indigo-800 font-mono">{calc.netSalary.toLocaleString('fr-TN', { maximumFractionDigits: 3 })} TND</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-150 pb-3">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                      <Scale className="w-4 h-4 text-indigo-600" />
+                      Distribution de la Rémunération
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                      Registre unifié des salaires bruts, cotisations CNSS/IRPP et montants nets
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    {/* Search bar */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Rechercher salarié..."
+                        value={remunSearchQuery}
+                        onChange={(e) => setRemunSearchQuery(e.target.value)}
+                        className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 w-40"
+                      />
+                    </div>
+
+                    {/* Pole filter */}
+                    <div className="relative">
+                      <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <select
+                        value={remunPoleFilter}
+                        onChange={(e) => setRemunPoleFilter(e.target.value)}
+                        className="pl-7 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-semibold focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="all">Tous les Pôles</option>
+                        <option value="Direction Générale">Direction Générale</option>
+                        <option value="Finance">Finance</option>
+                        <option value="RH">RH</option>
+                        <option value="Ventes">Ventes</option>
+                        <option value="Direction & IT">Direction & IT</option>
+                        <option value="Logistique">Logistique</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Compact DataGrid */}
+                <div className="border border-slate-150 rounded-xl overflow-hidden bg-white shadow-3xs">
+                  <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[10.5px] font-black text-slate-500 uppercase tracking-wider">
+                        <tr>
+                          <th className="py-2.5 px-3">Collaborateur</th>
+                          <th className="py-2.5 px-3">Pôle / Structure</th>
+                          <th className="py-2.5 px-3 text-right">Salaire Brut</th>
+                          <th className="py-2.5 px-3 text-right">CNSS Sal. (9.18%)</th>
+                          <th className="py-2.5 px-3 text-right">IRPP / Ret.</th>
+                          <th className="py-2.5 px-3 text-right font-black text-indigo-900">Net à Payer</th>
+                          <th className="py-2.5 px-3 text-center">Statut</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                        {employees
+                          .filter(emp => {
+                            if (remunSearchQuery.trim()) {
+                              const q = remunSearchQuery.toLowerCase().trim();
+                              const matchesName = (emp.name || '').toLowerCase().includes(q);
+                              const matchesTitle = (emp.jobTitle || '').toLowerCase().includes(q);
+                              const matchesMat = (emp.matricule || '').toLowerCase().includes(q);
+                              if (!matchesName && !matchesTitle && !matchesMat) return false;
+                            }
+                            if (remunPoleFilter !== 'all') {
+                              const empPole = getEmpPole(emp);
+                              if (empPole !== remunPoleFilter) return false;
+                            }
+                            return true;
+                          })
+                          .map((emp) => {
+                            const calc = getPayrollCalculations(emp);
+                            const pole = getEmpPole(emp);
+                            return (
+                              <tr key={emp.id} className="hover:bg-indigo-50/30 transition-colors">
+                                <td className="py-2 px-3">
+                                  <div className="font-bold text-slate-850 truncate max-w-[160px]">{emp.name}</div>
+                                  <div className="text-[10px] text-slate-400 truncate max-w-[160px]">{emp.jobTitle}</div>
+                                </td>
+                                <td className="py-2 px-3">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                    {pole}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono text-slate-800">
+                                  {calc.grossSalary.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono text-rose-600">
+                                  {calc.cnssEmployee.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono text-amber-600">
+                                  {calc.irpp.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono font-black text-indigo-700 bg-indigo-50/40">
+                                  {calc.netSalary.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                    {emp.status === 'Active' ? 'Actif' : emp.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Summary Bar */}
+                  <div className="bg-slate-50 border-t border-slate-200 p-2.5 px-3.5 flex flex-wrap items-center justify-between text-xs text-slate-600 font-semibold gap-2">
+                    <span>
+                      Total Collaborateurs affichés : <strong className="text-slate-900">{employees.filter(emp => {
+                        if (remunSearchQuery.trim()) {
+                          const q = remunSearchQuery.toLowerCase().trim();
+                          const matchesName = (emp.name || '').toLowerCase().includes(q);
+                          const matchesTitle = (emp.jobTitle || '').toLowerCase().includes(q);
+                          if (!matchesName && !matchesTitle) return false;
+                        }
+                        if (remunPoleFilter !== 'all' && getEmpPole(emp) !== remunPoleFilter) return false;
+                        return true;
+                      }).length}</strong>
+                    </span>
+                    <div className="flex items-center gap-4 text-[11px] font-mono">
+                      <span>Masse Brute : <strong className="text-slate-900">{employees.reduce((acc, emp) => acc + getPayrollCalculations(emp).grossSalary, 0).toLocaleString('fr-TN', { maximumFractionDigits: 3 })} TND</strong></span>
+                      <span>Total Net : <strong className="text-indigo-700">{employees.reduce((acc, emp) => acc + getPayrollCalculations(emp).netSalary, 0).toLocaleString('fr-TN', { maximumFractionDigits: 3 })} TND</strong></span>
+                    </div>
+                  </div>
                 </div>
               </div>
 

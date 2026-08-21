@@ -10,13 +10,15 @@ import {
   IncomingEmail,
   EmailTemplate, 
   CommunicationLog, 
-  Client, 
+  Client,
+  Employee, 
   Invoice, 
   UserSession, 
   SupportTicket, 
   SupportTicketMessage 
 } from '../types';
 import { INITIAL_EMAIL_TEMPLATES } from '../data/mockData';
+import { MailService } from '../services/mailService';
 import { 
   Mail, 
   Inbox,
@@ -52,29 +54,36 @@ import {
   Globe
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import InternalChatHub from './InternalChatHub';
 
 interface CommunicationHubProps {
-  smtpSettings: SmtpSettings;
+  employees?: Employee[];
+  smtpSettings?: SmtpSettings;
   onUpdateSmtpSettings: (settings: SmtpSettings) => void;
-  imapSettings: ImapSettings;
+  imapSettings?: ImapSettings;
   onUpdateImapSettings: (settings: ImapSettings) => void;
-  incomingEmails: IncomingEmail[];
+  incomingEmails?: IncomingEmail[];
   onUpdateIncomingEmails: (emails: IncomingEmail[]) => void;
-  emailTemplates: EmailTemplate[];
+  emailTemplates?: EmailTemplate[];
   onUpdateEmailTemplates: (templates: EmailTemplate[]) => void;
-  communicationLogs: CommunicationLog[];
+  communicationLogs?: CommunicationLog[];
   onUpdateCommunicationLogs: (logs: CommunicationLog[]) => void;
-  clients: Client[];
-  invoices: Invoice[];
+  clients?: Client[];
+  invoices?: Invoice[];
   currentUser?: UserSession | null;
+  tenantId?: string;
+  activeCompanyName?: string;
+  isDemo?: boolean;
+  onNavigateToMobileTerrain?: () => void;
 }
 
 export default function CommunicationHub({
-  smtpSettings = { host: 'smtp.elyssa-erp.tn', port: 587, secure: false, user: '', pass: '', fromEmail: 'contact@elyssa-erp.tn', fromName: 'Elyssa ERP', isEnabled: true },
+  employees = [],
+  smtpSettings,
   onUpdateSmtpSettings,
-  imapSettings = { host: 'imap.elyssa-erp.tn', port: 993, secure: true, user: '', pass: '', isEnabled: true },
+  imapSettings,
   onUpdateImapSettings,
-  incomingEmails = [],
+  incomingEmails,
   onUpdateIncomingEmails,
   emailTemplates = [],
   onUpdateEmailTemplates,
@@ -82,9 +91,24 @@ export default function CommunicationHub({
   onUpdateCommunicationLogs,
   clients = [],
   invoices = [],
-  currentUser
+  currentUser,
+  tenantId,
+  activeCompanyName,
+  isDemo = false,
+  onNavigateToMobileTerrain
 }: CommunicationHubProps) {
-  const safeIncomingEmails = Array.isArray(incomingEmails) ? incomingEmails : [];
+  const currentEffectiveTenant = tenantId || activeCompanyName || '';
+  const isParent = MailService.isParentCompanyTenant(currentEffectiveTenant, activeCompanyName);
+
+  const defaultSmtp = MailService.getDefaultSmtpSettings(currentEffectiveTenant, activeCompanyName);
+  const defaultImap = MailService.getDefaultImapSettings(currentEffectiveTenant, activeCompanyName);
+
+  const effectiveSmtpSettings: SmtpSettings = MailService.sanitizeSmtpSettings(smtpSettings, currentEffectiveTenant, activeCompanyName);
+  const effectiveImapSettings: ImapSettings = MailService.sanitizeImapSettings(imapSettings, currentEffectiveTenant, activeCompanyName);
+
+  const safeIncomingEmails = Array.isArray(incomingEmails) 
+    ? incomingEmails 
+    : MailService.loadTenantImapInbox(currentEffectiveTenant, activeCompanyName, isDemo);
   const safeCommunicationLogs = Array.isArray(communicationLogs) ? communicationLogs : [];
   const safeClients = Array.isArray(clients) ? clients : [];
   const safeInvoices = Array.isArray(invoices) ? invoices : [];
@@ -93,16 +117,20 @@ export default function CommunicationHub({
     ? emailTemplates 
     : INITIAL_EMAIL_TEMPLATES;
 
-  // Support Tickets Sub-tab active by default
-  const [activeSubTab, setActiveSubTab] = useState<'tickets' | 'logs' | 'smtp' | 'imap' | 'inbox' | 'templates' | 'composer'>('inbox');
+  // Support Tickets & Internal Chat Sub-tabs
+  const [activeSubTab, setActiveSubTab] = useState<'internal_chat' | 'tickets' | 'logs' | 'smtp' | 'imap' | 'inbox' | 'templates' | 'composer'>('internal_chat');
   
   // SMTP Settings Local Form State
-  const [smtpForm, setSmtpForm] = useState<SmtpSettings>({ ...smtpSettings });
+  const [smtpForm, setSmtpForm] = useState<SmtpSettings>(() => {
+    return MailService.loadTenantSmtpSettings(currentEffectiveTenant, activeCompanyName);
+  });
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // IMAP Settings Local Form State
-  const [imapForm, setImapForm] = useState<ImapSettings>({ ...imapSettings });
+  const [imapForm, setImapForm] = useState<ImapSettings>(() => {
+    return MailService.loadTenantImapSettings(currentEffectiveTenant, activeCompanyName);
+  });
   const [isVerifyingImap, setIsVerifyingImap] = useState(false);
   const [verificationResultImap, setVerificationResultImap] = useState<{ success: boolean; message: string } | null>(null);
 
@@ -272,14 +300,16 @@ export default function CommunicationHub({
     localStorage.setItem('carthage_support_tickets', JSON.stringify(supportTickets));
   }, [supportTickets]);
 
-  // Synchronize SMTP and IMAP local forms when their parent props update (e.g., from Firebase fetch)
+  // Synchronize SMTP and IMAP local forms when their parent props or active tenant update
   useEffect(() => {
-    setSmtpForm({ ...smtpSettings });
-  }, [smtpSettings]);
+    const sanitized = MailService.sanitizeSmtpSettings(smtpSettings, currentEffectiveTenant, activeCompanyName);
+    setSmtpForm(sanitized);
+  }, [smtpSettings, currentEffectiveTenant, activeCompanyName]);
 
   useEffect(() => {
-    setImapForm({ ...imapSettings });
-  }, [imapSettings]);
+    const sanitized = MailService.sanitizeImapSettings(imapSettings, currentEffectiveTenant, activeCompanyName);
+    setImapForm(sanitized);
+  }, [imapSettings, currentEffectiveTenant, activeCompanyName]);
 
   // Notification Toast Helper
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -311,6 +341,7 @@ export default function CommunicationHub({
         message: data.message
       });
       if (data.success) {
+        MailService.saveTenantSmtpSettings(currentEffectiveTenant, smtpForm);
         onUpdateSmtpSettings({ ...smtpForm });
         triggerToast("Paramètres SMTP enregistrés & connectés !");
       }
@@ -325,6 +356,7 @@ export default function CommunicationHub({
   };
 
   const handleSaveSMTP = () => {
+    MailService.saveTenantSmtpSettings(currentEffectiveTenant, smtpForm);
     onUpdateSmtpSettings({ ...smtpForm });
     triggerToast("Paramètres de messagerie sauvegardés.");
   };
@@ -345,6 +377,7 @@ export default function CommunicationHub({
         message: data.message
       });
       if (data.success) {
+        MailService.saveTenantImapSettings(currentEffectiveTenant, imapForm);
         onUpdateImapSettings({ ...imapForm });
         triggerToast("Paramètres IMAP enregistrés & connectés !");
       }
@@ -359,6 +392,7 @@ export default function CommunicationHub({
   };
 
   const handleSaveIMAP = () => {
+    MailService.saveTenantImapSettings(currentEffectiveTenant, imapForm);
     onUpdateImapSettings({ ...imapForm });
     triggerToast("Paramètres de réception IMAP sauvegardés.");
   };
@@ -580,8 +614,8 @@ export default function CommunicationHub({
     if (!newTicketSubject.trim() || !newTicketDescription.trim()) return;
 
     const ticketId = `TK-${1000 + Math.floor(Math.random() * 9000)}`;
-    const ticketCreatorName = currentUser?.name || "Zied Ben Miled";
-    const ticketCreatorEmail = currentUser?.email || "contact@elyssa.pro";
+    const ticketCreatorName = currentUser?.name || (isParent ? "Zied Ben Miled" : (activeCompanyName || "Administrateur"));
+    const ticketCreatorEmail = currentUser?.email || (isParent ? "contact@elyssa.pro" : "contact@entreprise.tn");
 
     const newTicket: SupportTicket = {
       id: ticketId,
@@ -770,12 +804,12 @@ export default function CommunicationHub({
           <div>
             <span className="text-[10px] text-slate-400 uppercase font-black block">Serveur Tunnel SMTP</span>
             <div className="flex items-center space-x-1.5 mt-0.5">
-              <span className={`w-2 h-2 rounded-full ${smtpSettings.isEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+              <span className={`w-2 h-2 rounded-full ${effectiveSmtpSettings.isEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
               <span className="font-extrabold text-slate-800 text-xs">
-                {smtpSettings.isEnabled ? 'SMTP Sécurisé Actif' : 'Messagerie Simulée'}
+                {effectiveSmtpSettings.isEnabled ? 'SMTP Sécurisé Actif' : 'Messagerie Simulée'}
               </span>
             </div>
-            <span className="text-[9px] text-slate-405 block font-mono">Hôte : {smtpSettings.host || 'localhost'}</span>
+            <span className="text-[9px] text-slate-405 block font-mono">Hôte : {effectiveSmtpSettings.host || 'Non configuré'}</span>
           </div>
           <div className="p-2.5 bg-indigo-50/70 rounded-xl text-indigo-600">
             <Settings className="w-4 h-4" />
@@ -829,7 +863,20 @@ export default function CommunicationHub({
 
       {/* Tabs list for communications */}
       <div className="bg-white rounded-2xl border border-slate-150 p-3 shadow-xs">
-        <div className="flex flex-wrap border-b border-slate-100 mb-4">
+        <div className="flex flex-wrap border-b border-slate-100 mb-4 gap-1">
+          <button
+            onClick={() => setActiveSubTab('internal_chat')}
+            className={`p-3 px-4 text-xs font-black flex items-center space-x-2 border-b-2 transition cursor-pointer ${
+              activeSubTab === 'internal_chat' ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40 rounded-t-xl' : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-indigo-600" />
+            <span>Messagerie & Canaux Internes</span>
+            <span className="bg-indigo-100 text-indigo-800 font-black text-[9px] px-1.5 py-0.2 rounded-full">
+              Équipes & Terrain
+            </span>
+          </button>
+
           <button
             onClick={() => setActiveSubTab('inbox')}
             className={`p-3 px-4 text-xs font-black flex items-center space-x-2 border-b-2 transition cursor-pointer ${
@@ -911,6 +958,17 @@ export default function CommunicationHub({
 
         <div className="p-2 sm:p-4">
           
+          {/* VIEW: Messagerie & Canaux Internes d'Entreprise */}
+          {activeSubTab === 'internal_chat' && (
+            <InternalChatHub
+              tenantId={currentEffectiveTenant}
+              currentUser={currentUser}
+              employees={employees}
+              isDemoTenant={Boolean(isDemo || currentEffectiveTenant === 'company_demo' || (activeCompanyName && activeCompanyName.toLowerCase().includes('démo') && !activeCompanyName.toLowerCase().includes('parent')))}
+              onNavigateToMobileTerrain={onNavigateToMobileTerrain}
+            />
+          )}
+
           {/* VIEW: Boîte de Réception (Inbox IMAP) */}
           {activeSubTab === 'inbox' && (
             <div className="space-y-4">
@@ -1426,7 +1484,7 @@ export default function CommunicationHub({
                       <input 
                         type="text"
                         disabled
-                        value={`${currentUser?.name || "Zied Ben Miled"} (${currentUser?.email || "contact@elyssa.pro"})`}
+                        value={`${currentUser?.name || (isParent ? "Zied Ben Miled" : (activeCompanyName || "Administrateur"))} (${currentUser?.email || (isParent ? "contact@elyssa.pro" : "contact@entreprise.tn")})`}
                         className="w-full p-2.5 bg-slate-100 text-slate-500 border border-slate-200 rounded-xl text-xs cursor-not-allowed font-medium"
                       />
                     </div>

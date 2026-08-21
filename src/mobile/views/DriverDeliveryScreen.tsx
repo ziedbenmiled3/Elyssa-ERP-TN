@@ -689,7 +689,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                           </div>
 
                           <span className="font-mono font-bold text-emerald-400 text-sm">
-                            {ord.amount_ttc.toLocaleString('fr-FR')} TND
+                            {(ord.amount_ttc ?? 0).toLocaleString('fr-FR')} TND
                           </span>
                         </div>
 
@@ -792,7 +792,7 @@ export const DriverDeliveryScreen: React.FC<DriverDeliveryScreenProps> = ({
                             {ord.pod_gps && (
                               <div className="text-[10px] text-slate-400 font-mono flex items-center space-x-1">
                                 <MapPin className="w-3 h-3 text-sky-400" />
-                                <span>GPS: {ord.pod_gps.lat}, {ord.pod_gps.lng} • {new Date(ord.pod_gps.timestamp).toLocaleTimeString()}</span>
+                                <span>GPS: {ord.pod_gps.lat}, {ord.pod_gps.lng} • {ord.pod_gps.timestamp ? new Date(ord.pod_gps.timestamp).toLocaleTimeString() : ''}</span>
                               </div>
                             )}
                           </div>

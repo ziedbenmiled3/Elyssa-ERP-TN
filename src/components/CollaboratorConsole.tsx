@@ -90,7 +90,109 @@ interface CollaboratorConsoleProps {
   activeCompanyName?: string;
   isModuleUnlocked?: (tabId: string) => boolean;
   smtpSettings?: SmtpSettings;
+  isTrial?: boolean;
+  isDemoTenant?: boolean;
 }
+
+// 6 Collaborateurs Démo Normalisés (Mode Essai)
+const TRIAL_DEMO_COLLABORATORS: Omit<CollaboratorAccount, 'company' | 'company_id' | 'companyId'>[] = [
+  {
+    id: 'demo-emp_2',
+    name: 'Khaled Ben Amor',
+    email: 'k.benamor@elyssa-erp.tn',
+    role: 'Director',
+    structureType: 'Direction',
+    structureName: 'Finance & Recouvrement',
+    status: 'Active',
+    assignedModules: ['dashboard', 'finance', 'billing', 'treasury', 'reports', 'tej', 'investment', 'clients'],
+    pinCode: '123456',
+    plainPassword: '123',
+    createdDate: '2026-01-15',
+    assignedTasks: [
+      { id: 'task_kba_1', title: 'Clôture mensuelle & Rapprochement bancaire', description: 'Valider les écritures comptables et le lettrage bancaire', dueDate: '2026-08-25', priority: 'High', status: 'In_Progress', createdDate: '2026-08-01' }
+    ]
+  },
+  {
+    id: 'demo-emp_3',
+    name: 'Ines Dridi',
+    email: 'i.dridi@elyssa-erp.tn',
+    role: 'Agent',
+    structureType: 'Service',
+    structureName: 'Comptabilité & Rapprochement',
+    status: 'Active',
+    assignedModules: ['dashboard', 'finance', 'treasury', 'billing'],
+    pinCode: '123456',
+    plainPassword: '123',
+    createdDate: '2026-03-10',
+    assignedTasks: [
+      { id: 'task_id_1', title: 'Pointage des relevés bancaires ATB & BIAT', description: 'Rapprochement des écritures du compte courant', dueDate: '2026-08-22', priority: 'Medium', status: 'In_Progress', createdDate: '2026-08-05' }
+    ]
+  },
+  {
+    id: 'demo-emp_4',
+    name: 'Mohamed Ali Gharbi',
+    email: 'm.gharbi@elyssa-erp.tn',
+    role: 'Agent',
+    structureType: 'Service',
+    structureName: 'Force de Vente & Clientèle',
+    status: 'Active',
+    assignedModules: ['dashboard', 'clients', 'caisse', 'reports', 'communication', 'complaints'],
+    pinCode: '123456',
+    plainPassword: '123',
+    createdDate: '2026-06-18',
+    assignedTasks: [
+      { id: 'task_mag_1', title: 'Prospection commerciale zone Sousse', description: 'Visite des clients grands comptes et saisie des bons de commande', dueDate: '2026-08-24', priority: 'High', status: 'In_Progress', createdDate: '2026-08-10' }
+    ]
+  },
+  {
+    id: 'demo-emp_5',
+    name: 'Amel Ben Soltane',
+    email: 'a.bensoltane@elyssa-erp.tn',
+    role: 'Manager',
+    structureType: 'Direction',
+    structureName: 'Ressources Humaines & Paie',
+    status: 'Active',
+    assignedModules: ['dashboard', 'payroll', 'attendance', 'collaborators', 'ged'],
+    pinCode: '123456',
+    plainPassword: '123',
+    createdDate: '2026-02-01',
+    assignedTasks: [
+      { id: 'task_abs_1', title: 'Préparation de la paie du mois & Déclaration CNSS', description: 'Vérification des fiches de paie et calcul des cotisations', dueDate: '2026-08-28', priority: 'High', status: 'Pending', createdDate: '2026-08-12' }
+    ]
+  },
+  {
+    id: 'demo-emp_6',
+    name: 'Sami Mansour',
+    email: 's.mansour@elyssa-erp.tn',
+    role: 'Agent',
+    structureType: 'Service',
+    structureName: 'Direction & IT / Systèmes',
+    status: 'Active',
+    assignedModules: ['dashboard', 'company_settings', 'ged', 'steering', 'production'],
+    pinCode: '123456',
+    plainPassword: '123',
+    createdDate: '2026-01-10',
+    assignedTasks: [
+      { id: 'task_sm_1', title: 'Maintenance et interconnexion API des terminaux mobiles', description: 'Vérification des logs de synchronisation et des accès', dueDate: '2026-08-26', priority: 'Medium', status: 'In_Progress', createdDate: '2026-08-08' }
+    ]
+  },
+  {
+    id: 'demo-emp_7',
+    name: 'Hamza Ben Salem',
+    email: 'h.bensalem@elyssa-erp.tn',
+    role: 'Agent',
+    structureType: 'Entrepôt',
+    structureName: 'Logistique, Dispatch & Flotte',
+    status: 'Active',
+    assignedModules: ['dashboard', 'mobile_fleet', 'stock', 'fleet'],
+    pinCode: '123456',
+    plainPassword: '123',
+    createdDate: '2026-02-15',
+    assignedTasks: [
+      { id: 'task_hbs_1', title: 'Tournée livraison Sud - Client Poulina (1 450 kg)', description: 'Livraison express GP1 Km 12 avec émargement du bon de livraison', dueDate: '2026-08-20', priority: 'High', status: 'In_Progress', createdDate: '2026-08-10' }
+    ]
+  }
+];
 
 export default function CollaboratorConsole({ 
   collaborators, 
@@ -99,7 +201,9 @@ export default function CollaboratorConsole({
   publisherClients = [],
   activeCompanyName,
   isModuleUnlocked,
-  smtpSettings
+  smtpSettings,
+  isTrial,
+  isDemoTenant
 }: CollaboratorConsoleProps) {
   // Determine logged-in user's company and admin permissions
   const isSuperAdmin = currentUser?.role === 'SuperAdmin';
@@ -115,6 +219,80 @@ export default function CollaboratorConsole({
     if (currentUser.role === 'SuperAdmin') return 'Inter-Affaires';
     return loggedInCollab?.company || 'Inter-Affaires';
   }, [currentUser, loggedInCollab, activeCompanyName]);
+
+  const isDemoTenantMode = React.useMemo(() => {
+    return Boolean(
+      isDemoTenant || 
+      currentUserCompany === 'company_demo' || 
+      currentUserCompany.toLowerCase().includes('démo') || 
+      currentUserCompany.toLowerCase().includes('demo')
+    );
+  }, [isDemoTenant, currentUserCompany]);
+
+  // Mode Démo : Forçage et injection automatique des 7 collaborateurs uniquement pour les tenants DÉMO
+  useEffect(() => {
+    if (isDemoTenantMode) {
+      const tenantCollabs = collaborators.filter(c => {
+        if (!c) return false;
+        const comp = (c.company || c.company_id || c.companyId || '').trim().toLowerCase();
+        return comp === currentUserCompany.toLowerCase() || comp === 'company_demo';
+      });
+
+      // Si le tenant démo ne contient que le créateur racine ou est vide (longueur <= 1)
+      if (tenantCollabs.length <= 1) {
+        const existingRoot = tenantCollabs[0] || collaborators.find(c => c.role === 'Manager' || c.role === 'DG') || collaborators[0];
+        
+        // 1. Compte Racine (Meriam Doudou / Créateur)
+        const rootAdmin: CollaboratorAccount = {
+          id: existingRoot?.id || 'demo-emp_1',
+          name: existingRoot?.name && existingRoot.name !== 'admin' && existingRoot.name !== 'Root Admin' ? existingRoot.name : 'Meriam Doudou',
+          email: existingRoot?.email || 'm.doudou@elyssa-erp.tn',
+          role: 'Manager',
+          structureType: existingRoot?.structureType || 'Direction',
+          structureName: existingRoot?.structureName || 'Direction Générale',
+          status: 'Active',
+          company: currentUserCompany,
+          company_id: currentUserCompany,
+          companyId: currentUserCompany,
+          assignedModules: AVAILABLE_MODULES.map(m => m.id),
+          pinCode: existingRoot?.pinCode || '123456',
+          plainPassword: existingRoot?.plainPassword || '123',
+          createdDate: existingRoot?.createdDate || '2026-01-01',
+          assignedTasks: (existingRoot?.assignedTasks && existingRoot.assignedTasks.length > 0) ? existingRoot.assignedTasks : [
+            { id: 'task_md_1', title: 'Revue stratégique trimestrielle', description: 'Validation des KPIs et du rapport de gestion', dueDate: '2026-08-30', priority: 'High', status: 'In_Progress', createdDate: '2026-08-01' }
+          ]
+        };
+
+        // 2. Les 6 Collaborateurs Démo
+        const demo6Collabs: CollaboratorAccount[] = TRIAL_DEMO_COLLABORATORS.map(dc => ({
+          ...dc,
+          company: currentUserCompany,
+          company_id: currentUserCompany,
+          companyId: currentUserCompany
+        }));
+
+        // Fusion des 7 collaborateurs
+        const complete7Collabs = [rootAdmin, ...demo6Collabs];
+
+        // Conserver les collaborateurs d'autres tenants si existants
+        const otherTenantsCollabs = collaborators.filter(c => {
+          if (!c) return false;
+          const comp = (c.company || c.company_id || c.companyId || '').trim().toLowerCase();
+          return comp && comp !== currentUserCompany.toLowerCase();
+        });
+
+        const mergedAll = [...complete7Collabs, ...otherTenantsCollabs];
+
+        onUpdateCollaborators(mergedAll);
+        try {
+          localStorage.setItem('carthage_collaborators', JSON.stringify(mergedAll));
+          localStorage.setItem('elyssa_collaborators', JSON.stringify(mergedAll));
+        } catch (e) {
+          console.warn('Erreur sauvegarde localStorage collaborateurs :', e);
+        }
+      }
+    }
+  }, [isDemoTenantMode, currentUserCompany, collaborators, onUpdateCollaborators, publisherClients]);
 
   const getAssignableModules = React.useCallback((moduleList: typeof AVAILABLE_MODULES) => {
     // SuperAdmin or DG (Manager) gets access to ALL available operational modules
@@ -146,12 +324,31 @@ export default function CollaboratorConsole({
       const isInterAffaires = currentUserCompany.toLowerCase() === 'inter-affaires' || currentUserCompany.toLowerCase() === 'elyssa entreprises s.a.';
       const emailLower = (c.email || '').toLowerCase().trim();
       const nameLower = (c.name || '').toLowerCase().trim();
+      const idLower = (c.id || '').toLowerCase().trim();
+
+      // En mode PROD (non-démo) : purge absolue de tout collaborateur démo
+      if (!isDemoTenantMode) {
+        if (
+          idLower.startsWith('demo-') ||
+          emailLower.endsWith('@elyssa-erp.tn') ||
+          emailLower === 'm.doudou@elyssa-erp.tn' ||
+          emailLower === 'k.benamor@elyssa-erp.tn' ||
+          emailLower === 'i.dridi@elyssa-erp.tn' ||
+          emailLower === 'm.gharbi@elyssa-erp.tn' ||
+          emailLower === 'a.bensoltane@elyssa-erp.tn' ||
+          emailLower === 's.mansour@elyssa-erp.tn' ||
+          emailLower === 'h.bensalem@elyssa-erp.tn'
+        ) {
+          return false;
+        }
+      }
+
       if (isInterAffaires) {
         if (emailLower === 'bb@gmail.com' || emailLower === 'mondhali@gmail.com' || emailLower === 'ws@gmail.com') return false;
         if (emailLower === 'amel.m@elyssa.pro' || nameLower.includes('amel marzouki')) return false;
         if (emailLower === 'bochra.b@elyssa.pro' || nameLower.includes('bochra belkadhi')) return false;
         if (nameLower.includes('mohamed ben ali') || nameLower.includes('rim oueslati') || emailLower.includes('mohamed.a') || emailLower.includes('rim.o')) return false;
-        if (emailLower === 'contact@elyssa.pro' && (c.status === 'Suspended' || c.status === 'SUSPENDU' || (c.id && c.id !== 'admin_root'))) return false;
+        if (emailLower === 'contact@elyssa.pro' && ((c.status as string) === 'Suspended' || (c.status as string) === 'SUSPENDU' || (c.id && c.id !== 'admin_root'))) return false;
         if (nameLower.includes('boch bej') || nameLower === 'gep' || nameLower.includes('wiem sahbani')) return false;
         if (c.id && c.id.includes('trial_owner')) return false;
       }
@@ -571,7 +768,7 @@ L'administration Elyssa ERP`;
           <div>
             <span className="text-[10px] uppercase font-extrabold text-amber-400 tracking-wider">Comptes Suspendus</span>
             <div className="text-2xl font-black text-white mt-1">
-              {displayedCollaborators.filter(c => c.status === 'Suspended' || c.status === 'SUSPENDU').length}
+              {displayedCollaborators.filter(c => (c.status as string) === 'Suspended' || (c.status as string) === 'SUSPENDU').length}
             </div>
           </div>
           <div className="w-10 h-10 bg-amber-950 border border-amber-900/50 rounded-lg flex items-center justify-center text-amber-400">
@@ -807,103 +1004,135 @@ L'administration Elyssa ERP`;
             </form>
           )}
 
-          {/* Collaborators List */}
-          <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
-            {displayedCollaborators.length === 0 ? (
-              <div className="text-center p-6 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-205">
-                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                <span>Aucun collaborateur trouvé pour ce filtre</span>
-              </div>
-            ) : (
-              displayedCollaborators.map(c => {
-                const isSelected = c.id === selectedCollabId;
-                const totalCollabTasks = c.assignedTasks.length;
-                const completedCollabTasks = c.assignedTasks.filter(t => t.status === 'Completed').length;
-                const isAccountActive = c.status === 'Active' || c.status === 'Invited';
-                
-                return (
-                  <div 
-                    key={c.id}
-                    onClick={() => setSelectedCollabId(c.id)}
-                    className={`p-3.5 rounded-xl border transition cursor-pointer flex flex-col justify-between gap-3 ${
-                      isSelected 
-                        ? 'bg-indigo-50/70 border-indigo-300 ring-2 ring-indigo-600/10 shadow-xs' 
-                        : 'bg-slate-50/60 border-slate-200 hover:bg-slate-100/70'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-0.5">
-                        <span className="font-extrabold text-slate-900 block text-sm">
-                          {c.name}
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-500 block truncate max-w-[200px]">
-                          {c.email}
-                        </span>
-                        
-                        {/* Structural Unit Badge */}
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <span className="inline-flex items-center text-[9.5px] font-extrabold text-indigo-700 bg-indigo-50 p-1 px-2 rounded-md border border-indigo-150 gap-1 uppercase tracking-wide">
-                            <Building2 className="w-3 h-3 text-indigo-500" />
-                            {c.structureType || 'Direction'} : {c.structureName || 'Principale'}
-                          </span>
-                        </div>
-                      </div>
+          {/* Collaborators Compact Datagrid (1 line = 1 collaborator) */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <span className="text-[11px] font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Registre du Personnel ({displayedCollaborators.length})</span>
+              </span>
+              <span className="text-[10px] font-mono text-slate-400 font-bold">1 ligne = 1 collaborateur</span>
+            </div>
 
-                      {/* Badges container */}
-                      <div className="flex flex-col items-end gap-1.5 shrink-0">
-                        {/* Role Badge */}
-                        <span className={`inline-flex items-center gap-1 p-0.5 px-2 rounded-full font-bold text-[9px] tracking-wider uppercase border ${
-                          c.role === 'Manager' 
-                            ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                            : c.role === 'Director'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : c.role === 'Agent' 
-                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
-                                : 'bg-slate-100 text-slate-600 border-slate-250'
-                        }`}>
-                          <Shield className="w-2.5 h-2.5" />
-                          {c.role === 'Manager' ? 'DG' : c.role === 'Director' ? 'Directeur' : c.role === 'Agent' ? 'Agent' : 'Consultant'}
-                        </span>
+            <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs" id="table-collaborators-datagrid">
+                <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs text-slate-600 uppercase text-[9.5px] font-black tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">Matricule / ID</th>
+                    <th className="py-2.5 px-3">Collaborateur (Nom & Fonction)</th>
+                    <th className="py-2.5 px-3">Pôle / Structure</th>
+                    <th className="py-2.5 px-3">Rôle / Profil</th>
+                    <th className="py-2.5 px-3">Statut</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-150 font-medium">
+                  {displayedCollaborators.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400 font-mono text-xs">
+                        <AlertCircle className="w-6 h-6 mx-auto mb-1 text-slate-300" />
+                        Aucun collaborateur trouvé pour cette recherche.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayedCollaborators.map(c => {
+                      const isSelected = c.id === selectedCollabId;
+                      const isAccountActive = c.status === 'Active' || c.status === 'Invited';
+                      const completedCollabTasks = c.assignedTasks.filter(t => t.status === 'Completed').length;
 
-                        {/* Status Badge (Actif / Suspendu - No Invité) */}
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); cycleStatus(c.id); }}
-                          title="Cliquez pour basculer entre Actif et Suspendu"
-                          className={`inline-flex items-center gap-1 p-0.5 px-2 rounded-md font-bold text-[9px] tracking-wider uppercase transition cursor-pointer hover:opacity-85 border ${
-                            isAccountActive
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-250' 
-                              : 'bg-red-50 text-red-700 border-red-250'
+                      return (
+                        <tr
+                          key={c.id}
+                          onClick={() => setSelectedCollabId(c.id)}
+                          className={`hover:bg-indigo-50/40 transition-colors cursor-pointer ${
+                            isSelected ? 'bg-indigo-50/80 font-semibold border-l-4 border-l-indigo-600' : ''
                           }`}
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full inline-block ${
-                            isAccountActive ? 'bg-emerald-500' : 'bg-red-500'
-                          }`} />
-                          {isAccountActive ? 'Actif' : 'Suspendu'}
-                        </button>
-                      </div>
-                    </div>
+                          {/* Matricule / ID */}
+                          <td className="py-2.5 px-3 font-mono font-bold text-slate-600 text-[11px] whitespace-nowrap">
+                            {c.id.substring(0, 10)}
+                          </td>
 
-                    {/* Footer Task Counter & Delete Action */}
-                    <div className="flex items-center justify-between border-t border-slate-200/60 pt-2 text-[10px]">
-                      <div className="flex items-center space-x-2 text-slate-500">
-                        <CheckSquare className="w-3.5 h-3.5 text-indigo-550" />
-                        <span>Tâches : <strong className="text-slate-800">{completedCollabTasks}/{totalCollabTasks}</strong></span>
-                      </div>
+                          {/* Collaborateur (Nom & Email/Fonction) */}
+                          <td className="py-2.5 px-3">
+                            <div className="flex flex-col">
+                              <span className="font-black text-slate-900 text-[12px]">{c.name}</span>
+                              <span className="text-[10px] font-mono text-slate-500 truncate max-w-[180px]">{c.email}</span>
+                            </div>
+                          </td>
 
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteCollaborator(c.id); }}
-                        className="p-1 hover:bg-red-50 hover:text-red-650 text-slate-455 transition rounded-md"
-                        title="Supprimer ce collaborateur"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+                          {/* Pôle / Structure */}
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 text-[9.5px] font-extrabold text-indigo-700 bg-indigo-50/90 px-2 py-0.5 rounded border border-indigo-150 uppercase tracking-tight">
+                              <Building2 className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                              <span className="truncate max-w-[120px]">{c.structureType || 'Pôle'} : {c.structureName || 'Principal'}</span>
+                            </span>
+                          </td>
+
+                          {/* Rôle / Profil */}
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider border ${
+                              c.role === 'Manager'
+                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                : c.role === 'Director'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : c.role === 'Agent'
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}>
+                              <Shield className="w-2.5 h-2.5" />
+                              {c.role === 'Manager' ? 'DG' : c.role === 'Director' ? 'Directeur' : c.role === 'Agent' ? 'Agent' : 'Consultant'}
+                            </span>
+                          </td>
+
+                          {/* Statut (Actif / Suspendu) */}
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); cycleStatus(c.id); }}
+                              title="Cliquer pour basculer le statut"
+                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-black text-[9.5px] uppercase tracking-wider transition cursor-pointer hover:opacity-85 border ${
+                                isAccountActive
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-250'
+                                  : 'bg-rose-50 text-rose-700 border-rose-250'
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${isAccountActive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                              {isAccountActive ? 'Actif' : 'Suspendu'}
+                            </button>
+                          </td>
+
+                          {/* Actions (Éditer / Supprimer / Accès) */}
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1">
+                              <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded" title={`${completedCollabTasks}/${c.assignedTasks.length} tâches terminées`}>
+                                {completedCollabTasks}/{c.assignedTasks.length} T
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setSelectedCollabId(c.id); }}
+                                className="p-1 hover:bg-indigo-100 text-indigo-600 rounded cursor-pointer transition"
+                                title="Voir la fiche et gérer les accès"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleDeleteCollaborator(c.id); }}
+                                className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded cursor-pointer transition"
+                                title="Supprimer ce collaborateur"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
         </div>

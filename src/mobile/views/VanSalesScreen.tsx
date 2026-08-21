@@ -915,7 +915,7 @@ export const VanSalesScreen: React.FC<VanSalesScreenProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span>Date:</span>
-                  <span>{new Date(lastSavedOrder.createdAt).toLocaleString('fr-FR')}</span>
+                  <span>{lastSavedOrder?.createdAt ? new Date(lastSavedOrder.createdAt).toLocaleString('fr-FR') : 'N/A'}</span>
                 </div>
               </div>
 

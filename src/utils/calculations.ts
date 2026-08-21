@@ -59,7 +59,7 @@ export function getCompanyLegalHeader(companyData: Partial<AdminSettings>): stri
   
   const name = companyData.companyName || "ELYSSA SOLUTIONS ENTREPRISES";
   const form = companyData.legalForm ? ` ${companyData.legalForm}` : "";
-  const capital = companyData.shareCapital ? ` au Capital de ${companyData.shareCapital.toLocaleString('fr-FR')} TND` : "";
+  const capital = companyData?.shareCapital ? ` au Capital de ${Number(companyData.shareCapital).toLocaleString('fr-FR')} TND` : "";
   parts.push(`${name}${form}${capital}`);
 
   const details: string[] = [];

@@ -51,8 +51,8 @@ export const MPOContractTemplate: React.FC<MPOContractTemplateProps> = ({
   contractRef,
   status = 'brouillon',
   signedAt,
-  managerName = 'MED ZIED BEN MILED',
-  managerRole = 'Fondateur & Super Admin MPO',
+  managerName = 'Direction Générale',
+  managerRole = 'Directeur Général / MPO',
   showPrintActions = false,
   onPrint
 }) => {

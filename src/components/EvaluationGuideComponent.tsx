@@ -76,7 +76,8 @@ export default function EvaluationGuideComponent({
           </div>
         </div>
 
-        {/* Simulation Quick Switcher Dashboard */}
+        {/* Simulation Quick Switcher Dashboard (Hidden on Parent / Inter-Affaires tenant) */}
+        {!activeCompanyName?.toLowerCase().includes('inter-affaires') && activeCompanyName !== 'company_parent' && (
         <div className="bg-indigo-950/40 p-4 rounded-2xl border border-indigo-900/40 space-y-3 font-sans">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -222,6 +223,7 @@ export default function EvaluationGuideComponent({
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

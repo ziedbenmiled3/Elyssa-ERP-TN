@@ -3,27 +3,58 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface CompanyTenant {
+  id: string;
+  tenantId?: string;
+  name: string;
+  type: 'PARENT_PROD' | 'DEMO_SANDBOX';
+  role: 'SuperAdmin';
+  description: string;
+}
+
+export const AUTHORIZED_COMPANIES: CompanyTenant[] = [
+  {
+    id: 'company_parent',
+    name: 'Inter-Affaires (Parent)',
+    type: 'PARENT_PROD',
+    role: 'SuperAdmin',
+    description: 'Console d\'exploitation SaaS & Siège Éditeur'
+  },
+  {
+    id: 'company_demo',
+    name: 'Inter-Affaires (Démo)',
+    type: 'DEMO_SANDBOX',
+    role: 'SuperAdmin',
+    description: 'Bac à sable commercial (Présentations clients)'
+  }
+];
+
 export interface CommercialEngagement {
   id: string;
+  tenantId?: string;
   title: string;
   description: string;
   dueDate: string;
   status: 'Pending' | 'Met' | 'Delayed';
+  is_demo?: boolean;
 }
 
 export interface Client {
   id: string;
+  tenantId?: string;
   name: string;
   email: string;
   phone: string;
   address: string;
-  category: 'Local' | 'Export';
+  category: 'Local' | 'Export' | string;
   sector: string;
   revenuePotential: number; // in TND
   engagements: CommercialEngagement[];
   status: 'Active' | 'Inactive';
   notes: string;
   createdDate: string;
+  matriculeFiscal?: string;
+  is_demo?: boolean;
 }
 
 export type ComplaintStatus = 'Received' | 'In_Investigation' | 'Resolved' | 'Declined';
@@ -31,6 +62,7 @@ export type Department = 'Quality' | 'Logistics' | 'Production' | 'Sales' | 'Fin
 
 export interface Complaint {
   id: string;
+  tenantId?: string;
   clientId: string;
   clientName: string;
   subject: string;
@@ -48,14 +80,18 @@ export type InvoiceStatus = 'Draft' | 'Unpaid' | 'Paid' | 'Debt_Collection';
 
 export interface RecouvrementStep {
   id: string;
+  tenantId?: string;
   date: string;
-  type: 'Email' | 'Call' | 'Letter' | 'Legal';
-  note: string;
+  type?: 'Email' | 'Call' | 'Letter' | 'Legal' | string;
+  actionType?: 'Email' | 'Call' | 'Letter' | 'Legal' | string;
+  note?: string;
+  notes?: string;
   performedBy: string;
 }
 
 export interface Invoice {
   id: string;
+  tenantId?: string;
   clientId: string;
   clientName: string;
   invoiceNumber: string;
@@ -93,6 +129,7 @@ export interface Invoice {
 
 export interface VisitReport {
   id: string;
+  tenantId?: string;
   clientId: string;
   clientName: string;
   date: string;
@@ -106,6 +143,7 @@ export interface VisitReport {
 
 export interface CompetitorReport {
   id: string;
+  tenantId?: string;
   competitorName: string;
   sectorName: string;
   strengths: string[];
@@ -150,6 +188,7 @@ export interface AdminSettings {
 
 export interface WeeklyReport {
   id: string;
+  tenantId?: string;
   weekNumber: number;
   year: number;
   startDate: string;
@@ -166,18 +205,23 @@ export interface WeeklyReport {
 
 export interface Supplier {
   id: string;
+  tenantId?: string;
   name: string;
   contactName: string;
   email: string;
   phone: string;
   address: string;
   category: string; // e.g. "Matériaux", "Chimie", "Emballage", "Logistique"
-  status: 'Active' | 'Inactive';
-  createdDate: string;
+  status?: 'Active' | 'Inactive';
+  createdDate?: string;
+  paymentTerms?: string;
+  rating?: number;
+  is_demo?: boolean;
 }
 
 export interface Product {
   id: string;
+  tenantId?: string;
   name: string;
   sku: string;
   category: string; // e.g. "Matières Premières", "Gros Œuvre", "Sanitaire", "Électricité", etc.
@@ -187,26 +231,33 @@ export interface Product {
   unitPrice: number; // TND (PV HT)
   costPrice: number; // TND (PA HT)
   marginPercentage?: number; // % Profit margin
-  supplierId: string; // Linked supplier
+  supplierId?: string; // Linked supplier
   supplierName: string;
   unit: string; // e.g. "Kg", "Sac", "Pièce", "Barre", "Pot", "Rouleau"
-  createdDate: string;
+  createdDate?: string;
   warehouseId?: string;
   warehouse_location?: string;
   aisle?: string; // Rayon
   shelf?: string; // Étagère
   bin?: string;   // Casier / Emplacement
+  is_demo?: boolean;
+  vatRate?: number;
+  stockQuantity?: number;
 }
 
 export interface StockMovement {
   id: string;
+  tenantId?: string;
   productId: string;
   productName: string;
-  type: 'In' | 'Out' | 'Correction';
+  type: 'In' | 'Out' | 'Correction' | 'IN' | 'OUT';
   quantity: number;
   date: string;
   reference: string; // Invoice ID, Supplier PO, physical check
-  operator: string;
+  operator?: string;
+  performedBy?: string;
+  reason?: string;
+  is_demo?: boolean;
 }
 
 export interface SmtpSettings {
@@ -233,6 +284,7 @@ export interface ImapSettings {
 
 export interface IncomingEmail {
   id: string;
+  tenantId?: string;
   senderName: string;
   senderEmail: string;
   subject: string;
@@ -244,6 +296,7 @@ export interface IncomingEmail {
 
 export interface EmailTemplate {
   id: string;
+  tenantId?: string;
   name: string;
   subject: string;
   body: string; // supports placeholders like {{clientName}}, {{invoiceNumber}}, {{amountTTC}}, {{dueDate}}
@@ -251,6 +304,7 @@ export interface EmailTemplate {
 
 export interface CommunicationLog {
   id: string;
+  tenantId?: string;
   recipientName: string;
   recipientEmail: string;
   templateType: string; // 'invoice' | 'collection_lvl1' | 'collection_lvl2' | 'manual'
@@ -264,6 +318,7 @@ export interface CommunicationLog {
 
 export interface CollaboratorTask {
   id: string;
+  tenantId?: string;
   title: string;
   description: string;
   dueDate: string;
@@ -274,6 +329,7 @@ export interface CollaboratorTask {
 
 export interface CollaboratorAccount {
   id: string;
+  tenantId?: string;
   name: string;
   email: string;
   password?: string;
@@ -302,12 +358,15 @@ export interface UserSession {
   name: string;
   role: 'SuperAdmin' | 'Manager' | 'Agent' | 'Viewer' | 'Director';
   id: string;
+  tenantId?: string;
   companyName?: string;
   companyId?: string;
 }
 
 export interface BankAccount {
   id: string;
+  tenantId?: string;
+  is_demo?: boolean;
   bankName: string; // e.g., "BIAT", "UIB", "Attijari Bank", "Caisse Principale (Espèces)"
   accountNumber: string; // e.g., "RIB IBAN" or "CAISSE-01"
   type: 'Checking' | 'Savings' | 'CashBox' | 'Other';
@@ -321,6 +380,8 @@ export type TransactionMethod = 'Cheque' | 'Traite' | 'Especes' | 'Virement' | '
 
 export interface BankTransaction {
   id: string;
+  tenantId?: string;
+  is_demo?: boolean;
   accountId: string; // Linked bank account
   accountName: string; // denormalized for view speed
   date: string; // "YYYY-MM-DD"
@@ -337,6 +398,7 @@ export interface BankTransaction {
 
 export interface TaxDeclaration {
   id: string;
+  tenantId?: string;
   year: number;
   period: 'M01'|'M02'|'M03'|'M04'|'M05'|'M06'|'M07'|'M08'|'M09'|'M10'|'M11'|'M12' | 'Q1'|'Q2'|'Q3'|'Q4' | 'Yearly';
   periodLabel: string; // e.g., "Janvier 2026", "T1 2026"
@@ -353,6 +415,7 @@ export interface TaxDeclaration {
 
 export interface YearEndClosing {
   id: string;
+  tenantId?: string;
   year: number;
   closingDate: string;
   closedBy: string;
@@ -368,6 +431,8 @@ export interface YearEndClosing {
 
 export interface Employee {
   id: string;
+  tenantId?: string;
+  is_demo?: boolean;
   matricule?: string;
   name: string;
   email: string;
@@ -401,6 +466,7 @@ export interface Employee {
 
 export interface CompanyLocation {
   id: string;
+  tenantId?: string;
   name: string;
   lat: number;
   lng: number;
@@ -433,6 +499,7 @@ export interface TripartiteBreakdown {
 
 export interface KPIItem {
   id: string;
+  tenantId?: string;
   title: string;
   weight_percent: number; // e.g. 40
   target_value: number; // Cible à atteindre
@@ -448,6 +515,7 @@ export interface PerformanceContract {
   employee_id: string;
   employee_name: string;
   department: string;
+  pole?: string;
   role: string;
   period: 'mensuel' | 'trimestriel' | 'annuel';
   year: number;
@@ -471,6 +539,7 @@ export interface PerformanceContract {
 
 export interface Payslip {
   id: string;
+  tenantId?: string;
   employeeId: string;
   employeeName: string;
   month: string; // "YYYY-MM"
@@ -499,6 +568,7 @@ export interface Payslip {
 
 export interface AbsenceRecord {
   id: string;
+  tenantId?: string;
   employeeId: string;
   employeeName: string;
   type: 'PaidLeave' | 'UnpaidAbsence' | 'SickLeave' | 'WorkAccident' | 'Maternity';
@@ -513,6 +583,7 @@ export interface AbsenceRecord {
 
 export interface WorkContract {
   id: string;
+  tenantId?: string;
   employeeId: string;
   employeeName: string;
   contractType: 'CDI' | 'CDD' | 'CIVP' | 'Karama';
@@ -528,6 +599,8 @@ export interface WorkContract {
 
 export interface GedDocument {
   id: string;
+  tenantId?: string;
+  is_demo?: boolean;
   name: string;
   type: 'Invoice' | 'Contract' | 'Report' | 'Other';
   fileSize: string;
@@ -544,6 +617,7 @@ export interface GedDocument {
 
 export interface Vehicle {
   id: string;
+  tenantId?: string;
   brand: string;
   model: string;
   registrationNumber: string; // matricule / carte grise
@@ -554,10 +628,12 @@ export interface Vehicle {
   salePrice?: number;
   assignedToEmployeeId?: string; // ID collaborateur affecté (MOD-03)
   assignedEmployeeName?: string; // Nom collaborateur affecté
+  is_demo?: boolean;
 }
 
 export interface MissionExpenseItem {
   id: string;
+  tenantId?: string;
   category: 'Hotel' | 'Food' | 'Visa' | 'Flight' | 'Train' | 'Louage' | 'Taxi' | 'Fuel' | 'Toll' | 'Other';
   description: string;
   amount: number;
@@ -567,6 +643,7 @@ export interface MissionExpenseItem {
 
 export interface MissionOrder {
   id: string;
+  tenantId?: string;
   employeeId: string;
   employeeName: string;
   vehicleId?: string; // empty if transportType is 'Other'
@@ -584,10 +661,12 @@ export interface MissionOrder {
   totalExpenses?: number;
   netBalanceToSettle?: number;
   closedAt?: string;
+  is_demo?: boolean;
 }
 
 export interface FleetExpense {
   id: string;
+  tenantId?: string;
   date: string;
   vehicleId: string;
   vehicleLabel: string;
@@ -596,10 +675,12 @@ export interface FleetExpense {
   invoiceNb?: string;
   providerName?: string;
   description?: string;
+  is_demo?: boolean;
 }
 
 export interface IncidentRecord {
   id: string;
+  tenantId?: string;
   date: string;
   vehicleId: string;
   vehicleLabel: string;
@@ -614,6 +695,7 @@ export interface IncidentRecord {
 
 export interface SupportTicketMessage {
   id: string;
+  tenantId?: string;
   senderName: string;
   senderRole: 'Client' | 'IT Support' | 'Admin' | 'Manager' | 'Agent';
   content: string;
@@ -622,6 +704,7 @@ export interface SupportTicketMessage {
 
 export interface SupportTicket {
   id: string;
+  tenantId?: string;
   subject: string;
   category: 'Technical' | 'Billing' | 'HR_Payroll' | 'Commercial' | 'Other';
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
@@ -635,6 +718,7 @@ export interface SupportTicket {
 
 export interface ImportFolderItem {
   id: string;
+  tenantId?: string;
   productName: string;
   quantity: number;
   fobUnitPrice: number; // in Foreign Currency
@@ -645,6 +729,8 @@ export interface ImportFolderItem {
 
 export interface ImportFolder {
   id: string;
+  tenantId?: string;
+  is_demo?: boolean;
   reference: string; // e.g., IMP-2026-001 or EXP-2026-001
   folderType?: 'Import' | 'Export'; // Default is 'Import'
   supplierName?: string; // For import
@@ -673,6 +759,8 @@ export interface ImportFolder {
 
 export interface LCRequest {
   id: string;
+  tenantId?: string;
+  is_demo?: boolean;
   importFolderId?: string;
   folderType?: 'Import' | 'Export'; // Whether LC is issued for import or received for export
   lcReference: string;
@@ -697,6 +785,7 @@ export interface LCRequest {
 
 export interface CessionEntry {
   id: string;
+  tenantId?: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
   title: string;
@@ -715,6 +804,7 @@ export interface CessionEntry {
 
 export interface RawMaterial {
   id: string;
+  tenantId?: string;
   name: string;
   quantityNeeded: number;
   unit: string;
@@ -724,6 +814,7 @@ export interface RawMaterial {
 
 export interface Nomenclature {
   id: string;
+  tenantId?: string;
   productName: string;
   category: string;
   materials: RawMaterial[];
@@ -733,6 +824,7 @@ export interface Nomenclature {
 
 export interface ManufacturingOrder {
   id: string;
+  tenantId?: string;
   nomenclatureId: string;
   productName: string;
   quantityToProduce: number;
@@ -752,7 +844,7 @@ export interface ManufacturingOrder {
 
 export type AssignedModule = 'standard' | 'chantier' | 'vente' | 'polyvalent';
 
-export type { MobileDevice, FleetInventoryItem, FleetDeviceStatus, DeliveryTour } from './types/mobileTerrain';
+export type { MobileDevice, FleetInventoryItem, FleetDeviceStatus, DeliveryTour, PickingOrder } from './types/mobileTerrain';
 
 
 

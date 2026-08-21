@@ -72,3 +72,24 @@ export async function seedAllDemoModulesToFirestore(tenantId: string): Promise<R
   console.log('[seedAllDemoModulesToFirestore] Auto-seeding is disabled in Zero State mode.');
   return {};
 }
+
+export function injectDemoData(tenantId: string): void {
+  console.log(`[injectDemoData] Injecting simulation demo dataset for tenant ${tenantId}.`);
+  try {
+    localStorage.setItem(`elyssa_demo_mode_${tenantId}`, 'true');
+    window.dispatchEvent(new CustomEvent('elyssa_demo_state_changed', { detail: { tenantId, isDemo: true } }));
+  } catch (err) {
+    console.warn('[injectDemoData] Failed to update localStorage:', err);
+  }
+}
+
+export function purgeDemoData(tenantId: string): void {
+  console.log(`[purgeDemoData] Radical purge of simulation demo dataset for tenant ${tenantId}.`);
+  try {
+    localStorage.setItem(`elyssa_demo_mode_${tenantId}`, 'false');
+    localStorage.removeItem(`elyssa_demo_data_${tenantId}`);
+    window.dispatchEvent(new CustomEvent('elyssa_demo_state_changed', { detail: { tenantId, isDemo: false } }));
+  } catch (err) {
+    console.warn('[purgeDemoData] Failed to update localStorage:', err);
+  }
+}

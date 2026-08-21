@@ -39,14 +39,14 @@ router.post('/test-key', async (req, res) => {
 
     const ai = new GoogleGenAI({ apiKey: keyToTest });
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: 'Test de réponse API. Réponds uniquement "OK".'
     });
 
     if (response && response.text) {
       return res.status(200).json({
         valid: true,
-        message: 'Clé API Gemini 2.5 Flash valide et opérationnelle ! ✅'
+        message: 'Clé API Gemini 3.6 Flash valide et opérationnelle ! ✅'
       });
     } else {
       throw new Error('Réponse vide obtenue de l\'API Gemini.');
@@ -196,14 +196,38 @@ router.get('/insights', enforceCompanyId, async (req, res) => {
  * POST /api/v1/ai/copilot-chat
  */
 router.post('/copilot-chat', enforceCompanyId, async (req, res) => {
-  const { message, context } = req.body;
+  const { message } = req.body;
+  const companyId = (req as any).companyId;
   if (!message) return res.status(400).json({ error: 'Message is required' });
 
   try {
-    // Simulate Gemini chat call
-    // const response = await ai.models.generateContent({...})
-    const mockReply = `Ceci est une réponse du Copilot (Mock). J'ai bien reçu : "${message}".`;
-    res.status(200).json({ reply: mockReply });
+    const docId = companyId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const docRef = doc(db, 'company_erp_data', docId);
+    const docSnap = await getDoc(docRef);
+    const erpData = docSnap.exists() ? docSnap.data() : {};
+
+    // Extract tenant custom Gemini Key (BYOK priority)
+    const tenantGeminiKey = (req.headers['x-gemini-key'] as string) || 
+      erpData?.geminiApiKey || 
+      erpData?.admin_settings?.geminiApiKey || 
+      erpData?.settings?.geminiApiKey || 
+      process.env.GEMINI_API_KEY;
+
+    // Extract real-time ERP context, forecasts, and anomalies
+    const lightweightContext = AIAnalyticsEngine.extractLightweightERPContext(erpData);
+    const forecast = AIAnalyticsEngine.calculateCashflowForecast(erpData);
+    const anomalies = AIAnalyticsEngine.detectLocalAnomalies(erpData);
+
+    const reply = await GeminiService.generateCopilotChatResponse({
+      message: message.trim(),
+      companyId,
+      lightweightContext,
+      forecast,
+      anomalies,
+      customApiKey: tenantGeminiKey
+    });
+
+    res.status(200).json({ reply });
   } catch (error) {
     console.warn('Copilot Chat error:', error);
     res.status(500).json({ error: 'Failed to process chat message' });

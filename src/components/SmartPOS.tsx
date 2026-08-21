@@ -38,6 +38,12 @@ import { Product, Client, StockMovement, BankTransaction, TransactionMethod, Inv
 import { db } from '../utils/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
+// Helper for safe number formatting in TND
+export const formatTND = (val: number | null | undefined, decimals = 3): string => {
+  if (val === null || val === undefined || isNaN(Number(val))) return (0).toFixed(decimals);
+  return Number(val).toFixed(decimals);
+};
+
 // Let's define the Tunisian currency denominations type
 export interface Denomination {
   value: number; // in TND, e.g. 50, 20, 10, 5 (Notes) and 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01 (Coins)
@@ -148,16 +154,17 @@ const DEFAULT_TUNISIAN_DENOMINATIONS: Omit<Denomination, 'count' | 'threshold'>[
 ];
 
 export default function SmartPOS({
-  products,
-  stockMovements,
+  products = [],
+  suppliers = [],
+  stockMovements = [],
   onUpdateProducts,
   onUpdateStockMovements,
-  clients,
+  clients = [],
   onUpdateClients,
   invoices = [],
   onUpdateInvoices,
-  bankAccounts,
-  bankTransactions,
+  bankAccounts = [],
+  bankTransactions = [],
   onUpdateBankAccounts,
   onUpdateBankTransactions,
   currentUser,
@@ -175,7 +182,7 @@ export default function SmartPOS({
   // Find if the current user has an entry in collaborators with a PIN
   const userCollab = useMemo(() => {
     if (!collaborators || !currentUser) return null;
-    return collaborators.find(c => c.email.toLowerCase() === currentUser.email.toLowerCase());
+    return collaborators.find(c => c.email && currentUser.email && c.email.toLowerCase() === currentUser.email.toLowerCase());
   }, [collaborators, currentUser]);
 
   const requiredPin = useMemo(() => {
@@ -187,32 +194,66 @@ export default function SmartPOS({
   }, [userCollab]);
 
   const [isUnlocked, setIsUnlocked] = useState(() => {
-    // If there is no PIN required for this user, it's auto-unlocked
-    if (currentUser?.role === 'Manager' || currentUser?.role === 'SuperAdmin') return true;
-    
-    const savedPin = localStorage.getItem(`elyssa_pos_unlocked_${currentUser?.id || 'guest'}`);
-    return savedPin === 'true';
+    try {
+      // If there is no PIN required for this user, it's auto-unlocked
+      if (!currentUser || currentUser?.role === 'Manager' || currentUser?.role === 'SuperAdmin' || currentUser?.role === 'Director' || currentUser?.role === 'DG') return true;
+      
+      const savedPin = localStorage.getItem(`elyssa_pos_unlocked_${currentUser?.id || 'guest'}`);
+      return savedPin === 'true';
+    } catch {
+      return true;
+    }
   });
 
   // Load Session and Local Drawer inventory
   const [activeSession, setActiveSession] = useState<POSSession | null>(() => {
-    const saved = localStorage.getItem('elyssa_pos_active_session');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('elyssa_pos_active_session');
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      if (parsed && Array.isArray(parsed.currentDrawer)) return parsed;
+      return null;
+    } catch {
+      return null;
+    }
   });
 
   const [sessionHistory, setSessionHistory] = useState<POSSession[]>(() => {
-    const saved = localStorage.getItem('elyssa_pos_session_history');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('elyssa_pos_session_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return [];
   });
 
   const [transactions, setTransactions] = useState<POSTransaction[]>(() => {
-    const saved = localStorage.getItem('elyssa_pos_transactions');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('elyssa_pos_transactions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return [];
   });
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
-    const saved = localStorage.getItem('elyssa_pos_audit_logs');
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem('elyssa_pos_audit_logs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // fallback
+    }
     return [
       {
         id: 'aud_1',
@@ -1437,10 +1478,20 @@ export default function SmartPOS({
             </button>
           </div>
 
-          <div className="pt-2">
+          <div className="pt-2 flex flex-col items-center gap-2">
             <span className="text-[10px] text-slate-500 font-mono font-bold tracking-widest uppercase">
               ELYSSA SECURE POS v1.3
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                setIsUnlocked(true);
+                localStorage.setItem(`elyssa_pos_unlocked_${currentUser?.id || 'guest'}`, 'true');
+              }}
+              className="text-[11px] text-indigo-400 hover:text-indigo-300 underline font-semibold cursor-pointer transition"
+            >
+              Déverrouiller en Mode Administrateur
+            </button>
           </div>
         </motion.div>
       </div>
@@ -1472,7 +1523,7 @@ export default function SmartPOS({
           {activeSession ? (
             <div className="flex items-center gap-2 bg-emerald-950/40 border border-emerald-900/50 p-2 px-3 rounded-xl text-xs font-bold text-emerald-400">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Session Ouverte par {activeSession.openedBy} ({activeSession.theoreticalCash.toFixed(3)} TND)</span>
+              <span>Session Ouverte par {activeSession.openedBy} ({formatTND(activeSession.theoreticalCash)} TND)</span>
               {criticalAlertsCount > 0 && (
                 <div className="flex items-center gap-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] px-2 py-0.5 rounded-full animate-bounce">
                   <AlertTriangle className="w-3.5 h-3.5" />
@@ -1607,7 +1658,7 @@ export default function SmartPOS({
                     <span>Coupures Disponibles au Dinar Tunisien (TND)</span>
                   </h4>
                   <span className="text-[11px] text-indigo-300 font-bold font-mono">
-                    Fond total : {Object.entries(initDrawerCounts).reduce((acc, [v, q]) => acc + (parseFloat(v) * Number(q)), 0).toFixed(3)} DT
+                    Fond total : {formatTND(Object.entries(initDrawerCounts).reduce((acc, [v, q]) => acc + (parseFloat(v) * Number(q)), 0))} DT
                   </span>
                 </div>
 
@@ -1615,7 +1666,7 @@ export default function SmartPOS({
                   {DEFAULT_TUNISIAN_DENOMINATIONS.map(denom => (
                     <div key={denom.label} className="bg-slate-950 p-2 rounded-lg border border-slate-850 flex flex-col justify-between items-center gap-1.5">
                       <span className={`text-[10px] font-bold ${denom.isNote ? 'text-indigo-300' : 'text-slate-400'}`}>
-                        {denom.value.toFixed(denom.value < 1 ? 3 : 1)} DT
+                        {formatTND(denom?.value, (denom?.value || 0) < 1 ? 3 : 1)} DT
                       </span>
                       <div className="flex items-center space-x-1.5">
                         <button
@@ -1729,7 +1780,7 @@ export default function SmartPOS({
                           </div>
 
                           <div className="flex justify-between items-end">
-                            <span className="text-xs font-black text-indigo-400 font-mono">{p.unitPrice.toFixed(3)} DT</span>
+                            <span className="text-xs font-black text-indigo-400 font-mono">{formatTND(p?.unitPrice)} DT</span>
                             <span className={`text-[9px] font-bold ${isOutOfStock ? 'text-red-400' : isLowStock ? 'text-amber-400' : 'text-slate-500'}`}>
                               Qte: {p.stockLevel}
                             </span>
@@ -1792,7 +1843,7 @@ export default function SmartPOS({
                           <div className="flex-1 min-w-0">
                             <h5 className="text-[11px] font-bold text-white truncate leading-tight">{item.product.name}</h5>
                             <span className="text-[10px] text-indigo-400 font-mono font-bold">
-                              {(item.product.unitPrice * item.quantity).toFixed(3)} DT
+                              {formatTND((item?.product?.unitPrice || 0) * (item?.quantity || 1))} DT
                             </span>
                           </div>
 
@@ -1827,15 +1878,15 @@ export default function SmartPOS({
                     <div className="space-y-1.5 text-xs font-bold text-slate-400">
                       <div className="flex justify-between">
                         <span>Sous-total (HT)</span>
-                        <span className="font-mono text-slate-200">{cartSubtotal.toFixed(3)} DT</span>
+                        <span className="font-mono text-slate-200">{formatTND(cartSubtotal)} DT</span>
                       </div>
                       <div className="flex justify-between">
                         <span>TVA (19%)</span>
-                        <span className="font-mono text-slate-200">{cartTva.toFixed(3)} DT</span>
+                        <span className="font-mono text-slate-200">{formatTND(cartTva)} DT</span>
                       </div>
                       <div className="flex justify-between border-t border-slate-800 pt-1.5 text-white">
                         <span className="text-xs font-black uppercase">Total TTC</span>
-                        <span className="text-sm font-black text-indigo-400 font-mono">{cartTotalTTC.toFixed(3)} DT</span>
+                        <span className="text-sm font-black text-indigo-400 font-mono">{formatTND(cartTotalTTC)} DT</span>
                       </div>
                     </div>
 
@@ -1914,13 +1965,13 @@ export default function SmartPOS({
                                 {tx.items.map(it => `${Math.abs(it.quantity)}x ${it.productName}`).join(', ')}
                               </td>
                               <td className={`p-3 font-mono font-black ${isAvoir ? 'text-amber-400' : 'text-slate-100'}`}>
-                                {tx.totalTTC.toFixed(3)} DT
+                                {formatTND(tx?.totalTTC)} DT
                               </td>
                               <td className="p-3 font-bold uppercase text-[10px]">
                                 <div className="flex flex-wrap gap-1">
                                   {tx.payments.map((p, pIdx) => (
                                     <span key={pIdx} className="bg-slate-900 border border-slate-800 text-slate-400 p-0.5 px-2 rounded">
-                                      {p.method} : {p.amount.toFixed(3)}
+                                      {p.method} : {formatTND(p?.amount)}
                                     </span>
                                   ))}
                                 </div>
@@ -2039,7 +2090,7 @@ export default function SmartPOS({
                             <div className="text-right">
                               <span className="text-[10px] text-slate-500 block leading-none mb-1">Valeur tiroir</span>
                               <strong className="text-xs font-mono font-bold text-indigo-400">
-                                {(denom.value * denom.count).toFixed(3)} DT
+                                {formatTND((denom?.value || 0) * (denom?.count || 0))} DT
                               </strong>
                             </div>
                           </div>
@@ -2120,10 +2171,10 @@ export default function SmartPOS({
                               <td className="p-3 font-semibold">{sess.openedBy}</td>
                               <td className="p-3 text-slate-400">{sess.openedAt}</td>
                               <td className="p-3 text-slate-400">{sess.closedAt || 'Non clôturée'}</td>
-                              <td className="p-3 font-mono">{sess.theoreticalCash.toFixed(3)} DT</td>
-                              <td className="p-3 font-mono">{sess.realCash?.toFixed(3) || '0.000'} DT</td>
+                              <td className="p-3 font-mono">{formatTND(sess?.theoreticalCash)} DT</td>
+                              <td className="p-3 font-mono">{formatTND(sess?.realCash)} DT</td>
                               <td className={`p-3 font-mono font-bold ${disc === 0 ? 'text-slate-100' : disc > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                {disc === 0 ? '0.000' : disc > 0 ? `+${disc.toFixed(3)}` : disc.toFixed(3)} DT
+                                {disc === 0 ? '0.000' : disc > 0 ? `+${formatTND(disc)}` : formatTND(disc)} DT
                                 {disc !== 0 && (
                                   <span className="text-[10px] font-normal block">
                                     {disc > 0 ? 'Excédent de caisse' : 'Déficit de caisse'}
@@ -2205,7 +2256,7 @@ export default function SmartPOS({
                   <span>Enregistrer les Paiements</span>
                 </h3>
                 <span className="text-xs text-indigo-400 font-black font-mono">
-                  Total : {cartTotalTTC.toFixed(3)} TND
+                  Total : {formatTND(cartTotalTTC)} TND
                 </span>
               </div>
 
@@ -2261,7 +2312,7 @@ export default function SmartPOS({
                           onClick={() => handleAddReceivedCash(val)}
                           className="bg-slate-900 hover:bg-slate-800 border border-slate-800 p-2 text-xs font-mono font-black text-slate-200 rounded-lg text-center cursor-pointer active:scale-95 transition"
                         >
-                          +{val.toFixed(val < 1 ? 3 : 1)}
+                          +{formatTND(val, val < 1 ? 3 : 1)}
                         </button>
                       ))}
                     </div>
@@ -2270,7 +2321,7 @@ export default function SmartPOS({
                       <div className="flex-1">
                         <span className="text-[10px] text-slate-500 block mb-1">Total espèces reçu calculé</span>
                         <div className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-center font-mono font-black text-sm text-indigo-400">
-                          {receivedCashTotal.toFixed(3)} DT
+                          {formatTND(receivedCashTotal)} DT
                         </div>
                       </div>
                       <div className="w-6 text-center text-slate-600 font-black">OU</div>
@@ -2298,7 +2349,7 @@ export default function SmartPOS({
                       <div className="border-t border-slate-900 pt-3 space-y-2">
                         <div className="flex justify-between items-center text-xs font-bold">
                           <span className="text-slate-400">Monnaie à rendre :</span>
-                          <strong className="text-sm font-mono text-emerald-400">{cashChangeDue.toFixed(3)} DT</strong>
+                          <strong className="text-sm font-mono text-emerald-400">{formatTND(cashChangeDue)} DT</strong>
                         </div>
 
                         {changeDistribution.possible ? (
@@ -2402,7 +2453,7 @@ export default function SmartPOS({
                         <div className="text-xs font-bold text-white">
                           {selectedClient.name}
                         </div>
-                        <p className="text-[10px] text-slate-400 font-medium">L'encours de crédit client sera augmenté de {remainingToPay.toFixed(3)} DT à la validation.</p>
+                        <p className="text-[10px] text-slate-400 font-medium">L'encours de crédit client sera augmenté de {formatTND(remainingToPay)} DT à la validation.</p>
                       </div>
                     ) : (
                       <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-center text-[11px] text-amber-400 font-bold">
@@ -2420,7 +2471,7 @@ export default function SmartPOS({
                 onClick={handleAddPaymentSegment}
                 className="w-full bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold p-2 px-4 rounded-xl text-xs uppercase tracking-wider transition cursor-pointer border border-slate-700/60"
               >
-                + Ajouter ce Règlement de {remainingToPay.toFixed(3)} DT
+                + Ajouter ce Règlement de {formatTND(remainingToPay)} DT
               </button>
             </div>
 
@@ -2620,7 +2671,7 @@ export default function SmartPOS({
                           <span className="text-indigo-400">{p.method}</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <span className="font-mono text-white font-black">{p.amount.toFixed(3)} DT</span>
+                          <span className="font-mono text-white font-black">{formatTND(p?.amount)} DT</span>
                           <button
                             onClick={() => handleRemovePaymentSegment(idx)}
                             className="text-red-400 hover:bg-slate-800 p-1 rounded cursor-pointer"
@@ -2637,16 +2688,16 @@ export default function SmartPOS({
                 <div className="space-y-2 border-t border-slate-800 pt-4 text-xs font-semibold text-slate-400">
                   <div className="flex justify-between">
                     <span>Total du ticket :</span>
-                    <span className="font-mono text-slate-200">{cartTotalTTC.toFixed(3)} DT</span>
+                    <span className="font-mono text-slate-200">{formatTND(cartTotalTTC)} DT</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Payé :</span>
-                    <span className="font-mono text-slate-200">{paidTotal.toFixed(3)} DT</span>
+                    <span className="font-mono text-slate-200">{formatTND(paidTotal)} DT</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-800 pt-2 text-white">
                     <span className="font-black">Reste à payer :</span>
                     <span className={`font-mono font-black ${remainingToPay === 0 ? 'text-emerald-400' : 'text-indigo-400'}`}>
-                      {remainingToPay.toFixed(3)} DT
+                      {formatTND(remainingToPay)} DT
                     </span>
                   </div>
                 </div>
@@ -2710,7 +2761,7 @@ export default function SmartPOS({
               <div className="flex justify-between items-center border-b border-slate-800 pb-2 text-xs font-bold text-slate-300">
                 <span>Réglementations & Saisies</span>
                 <span className="text-indigo-400 font-mono">
-                  Saisi réel : {Object.entries(physicalCashCounts).reduce((acc, [v, q]) => acc + (parseFloat(v) * Number(q)), 0).toFixed(3)} TND
+                  Saisi réel : {formatTND(Object.entries(physicalCashCounts).reduce((acc, [v, q]) => acc + (parseFloat(v) * Number(q)), 0))} TND
                 </span>
               </div>
 
@@ -2742,22 +2793,22 @@ export default function SmartPOS({
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 grid grid-cols-3 gap-4 text-center">
               <div>
                 <span className="text-[10px] text-slate-500 block uppercase font-bold">Solde Théorique</span>
-                <strong className="text-sm font-mono text-slate-200">{activeSession.theoreticalCash.toFixed(3)} DT</strong>
+                <strong className="text-sm font-mono text-slate-200">{formatTND(activeSession?.theoreticalCash)} DT</strong>
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 block uppercase font-bold">Solde Réel</span>
                 <strong className="text-sm font-mono text-indigo-400">
-                  {Object.entries(physicalCashCounts).reduce((acc, [v, q]) => acc + (parseFloat(v) * Number(q)), 0).toFixed(3)} DT
+                  {formatTND(Object.entries(physicalCashCounts).reduce((acc, [v, q]) => acc + (parseFloat(v) * Number(q)), 0))} DT
                 </strong>
               </div>
               <div>
-                <span className="text-[10px] text-slate-500 block uppercase font-bold">Écart Constaté</span>
+                <span className="text-[10px] text-slate-500 block uppercase font-bold">Écart Constated</span>
                 {(() => {
                   const r = Object.entries(physicalCashCounts).reduce((acc, [v, q]) => acc + (parseFloat(v) * Number(q)), 0);
-                  const disc = r - activeSession.theoreticalCash;
+                  const disc = r - (activeSession?.theoreticalCash || 0);
                   return (
                     <strong className={`text-sm font-mono font-black ${disc === 0 ? 'text-slate-300' : disc > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {disc === 0 ? '0.000' : disc > 0 ? `+${disc.toFixed(3)}` : disc.toFixed(3)} DT
+                      {disc === 0 ? '0.000' : disc > 0 ? `+${formatTND(disc)}` : formatTND(disc)} DT
                     </strong>
                   );
                 })()}
@@ -2849,7 +2900,7 @@ export default function SmartPOS({
                   {validationSuccess.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between">
                       <span>{item.quantity} x {item.productName.slice(0, 20)}</span>
-                      <span>{item.total.toFixed(3)} DT</span>
+                      <span>{formatTND(item?.total)} DT</span>
                     </div>
                   ))}
                 </div>
@@ -2857,15 +2908,15 @@ export default function SmartPOS({
                 <div className="space-y-0.5 font-bold text-right">
                   <div className="flex justify-between">
                     <span>Sous-total HT :</span>
-                    <span>{validationSuccess.subtotal.toFixed(3)} DT</span>
+                    <span>{formatTND(validationSuccess?.subtotal)} DT</span>
                   </div>
                   <div className="flex justify-between">
                     <span>TVA (19%) :</span>
-                    <span>{validationSuccess.tvaAmount.toFixed(3)} DT</span>
+                    <span>{formatTND(validationSuccess?.tvaAmount)} DT</span>
                   </div>
                   <div className="flex justify-between text-xs font-black border-t border-slate-200 pt-1">
                     <span>TOTAL TTC :</span>
-                    <span>{validationSuccess.totalTTC.toFixed(3)} DT</span>
+                    <span>{formatTND(validationSuccess?.totalTTC)} DT</span>
                   </div>
                 </div>
 
@@ -2874,7 +2925,7 @@ export default function SmartPOS({
                   {validationSuccess.payments.map((p, idx) => (
                     <div key={idx} className="flex justify-between text-slate-600">
                       <span className="uppercase">{p.method}</span>
-                      <span>{p.amount.toFixed(3)} DT</span>
+                      <span>{formatTND(p?.amount)} DT</span>
                     </div>
                   ))}
                 </div>
@@ -3090,9 +3141,9 @@ export default function SmartPOS({
                         <tr key={idx} className="border-b border-slate-100">
                           <td className="py-1.5 pr-2 font-bold text-slate-800">{item.productName}</td>
                           <td className="py-1.5 text-center text-slate-700">{item.quantity}</td>
-                          <td className="py-1.5 text-right text-slate-700 font-mono">{puHT.toFixed(3)}</td>
+                          <td className="py-1.5 text-right text-slate-700 font-mono">{formatTND(puHT)}</td>
                           <td className="py-1.5 text-right text-slate-700 font-mono">19%</td>
-                          <td className="py-1.5 text-right font-bold text-slate-900 font-mono">{item.total.toFixed(3)} DT</td>
+                          <td className="py-1.5 text-right font-bold text-slate-900 font-mono">{formatTND(item?.total)} DT</td>
                         </tr>
                       );
                     })}
@@ -3104,11 +3155,11 @@ export default function SmartPOS({
                   <div className="w-48 space-y-1 text-right text-[8px] font-bold text-slate-600">
                     <div className="flex justify-between">
                       <span>Total HT :</span>
-                      <span className="font-mono text-slate-800">{validationSuccess.subtotal.toFixed(3)} DT</span>
+                      <span className="font-mono text-slate-800">{formatTND(validationSuccess?.subtotal)} DT</span>
                     </div>
                     <div className="flex justify-between">
                       <span>TVA (19%) :</span>
-                      <span className="font-mono text-slate-800">{validationSuccess.tvaAmount.toFixed(3)} DT</span>
+                      <span className="font-mono text-slate-800">{formatTND(validationSuccess?.tvaAmount)} DT</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Timbre Fiscal :</span>
@@ -3116,7 +3167,7 @@ export default function SmartPOS({
                     </div>
                     <div className="flex justify-between text-[10px] font-black text-slate-900 border-t border-slate-200 pt-1.5">
                       <span>Net à Payer (TTC) :</span>
-                      <span className="font-mono text-indigo-700">{(validationSuccess.totalTTC + 1.0).toFixed(3)} DT</span>
+                      <span className="font-mono text-indigo-700">{formatTND((validationSuccess?.totalTTC || 0) + 1.0)} DT</span>
                     </div>
                   </div>
                 </div>
@@ -3125,7 +3176,7 @@ export default function SmartPOS({
                 <div className="border-t border-dashed border-slate-300 pt-3 flex justify-between items-center">
                   <div className="text-[7px] text-slate-400">
                     <p className="font-bold text-emerald-600 uppercase tracking-wider">Facture Payée / Acquittée</p>
-                    <p>Règlement : {validationSuccess.payments.map(p => `${p.method.toUpperCase()} (${p.amount.toFixed(3)} DT)`).join(' + ')}</p>
+                    <p>Règlement : {validationSuccess.payments.map(p => `${p.method.toUpperCase()} (${formatTND(p?.amount)} DT)`).join(' + ')}</p>
                   </div>
                   <div className="text-right text-[7px] text-slate-400">
                     <span>Logiciel Certifié Elyssa ERP</span>

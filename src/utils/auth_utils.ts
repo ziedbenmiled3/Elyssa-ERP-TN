@@ -13,9 +13,14 @@ export const canAccess = (moduleId: string, pack: string, customModules: string[
   const modId = moduleId.toLowerCase().trim();
   const packId = pack ? pack.toLowerCase().trim() : 'standard';
 
-  // Core modules (Paramètres de l'entreprise, Intégration TEJ, Admin) are always free and accessible by all companies
-  const coreModules = ['saas_config', 'admin', 'company_settings', 'tej'];
+  // Core modules (Paramètres de l'entreprise, Intégration TEJ, Admin, Copilot, Dashboard) are always free and accessible by all companies
+  const coreModules = ['saas_config', 'admin', 'company_settings', 'tej', 'copilot', 'dashboard', 'executive_dashboard'];
   if (coreModules.includes(modId)) {
+    return true;
+  }
+
+  // Full, Custom, Enterprise and Industrial packs provide full complete access to all modules without exception
+  if (packId === 'full' || packId === 'custom' || packId === 'enterprise' || packId === 'industrial' || packId === 'industriel' || packId === 'full_industrial' || packId === 'premium') {
     return true;
   }
 

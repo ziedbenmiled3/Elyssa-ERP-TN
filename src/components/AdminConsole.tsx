@@ -8,7 +8,7 @@ import corporateLogo from '../assets/images/elyssa_corporate_logo_1782209702209.
 import faviconLogo from '../assets/images/elyssa_favicon_icon_1782209720262.jpg';
 import { AdminSettings, Client, Complaint, Invoice, VisitReport, CompetitorReport, CollaboratorAccount, UserSession } from '../types';
 import CollaboratorConsole from './CollaboratorConsole';
-import { saveCompanyERPState, loadCompanyERPState, deleteCompanyFromDb, db } from '../utils/firebase';
+import { saveCompanyERPState, loadCompanyERPState, deleteCompanyFromDb, db, cleanFirestoreData } from '../utils/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import SecurityDashboard from './SecurityDashboard';
 import RadarDashboard from './RadarDashboard';
@@ -76,6 +76,8 @@ interface AdminConsoleProps {
   publisherClients?: any[];
   onUpdatePublisherClients?: (clients: any[]) => void;
   mode?: 'company_settings' | 'admin';
+  isTrial?: boolean;
+  isDemoTenant?: boolean;
 }
 
 export default function AdminConsole({ 
@@ -83,13 +85,20 @@ export default function AdminConsole({
   onUpdateSettings, 
   collaborators,
   onUpdateCollaborators,
-  allData, 
+  allData,
   onImportAllData,
   currentUser,
   publisherClients = [],
   onUpdatePublisherClients,
-  mode = 'admin'
+  mode = 'admin',
+  isTrial = true,
+  isDemoTenant
 }: AdminConsoleProps) {
+  const isDemoTenantMode = isDemoTenant || 
+    settings.companyName === 'company_demo' || 
+    settings.companyName?.toLowerCase().includes('démo') ||
+    settings.companyName?.toLowerCase().includes('demo');
+
   const [publisherClientsList, setPublisherClientsList] = useState<any[]>(publisherClients);
 
   React.useEffect(() => {
@@ -221,11 +230,11 @@ export default function AdminConsole({
       // Save directly to Firestore tenant document
       const docId = activeCompName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
       const docRef = doc(db, 'company_erp_data', docId);
-      await setDoc(docRef, {
+      await setDoc(docRef, cleanFirestoreData({
         geminiApiKey: geminiApiKey,
         admin_settings: updatedSettings,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      }), { merge: true });
 
       setGeminiSaveFeedback({
         success: true,
@@ -1124,13 +1133,18 @@ export default function AdminConsole({
 
       {activeSubTab === 'module_store' ? (
         <ModuleStore 
-          tenantId={settings.companyName || 'GEP'} 
+          tenantId={settings.companyName || 'Inter-Affaires'} 
           onNavigateToLicenseManager={() => setActiveSubTab('licenses')} 
+          isTrial={isTrial}
         />
       ) : activeSubTab === 'licenses' ? (
         <LicenseManager 
-          tenantId={settings.companyName || 'GEP'} 
+          tenantId={settings.companyName || 'Inter-Affaires'} 
+          activeCompanyName={settings.companyName}
+          collaborators={collaborators}
           onNavigateToStore={() => setActiveSubTab('module_store')} 
+          isTrial={isTrial}
+          isDemoTenant={isDemoTenantMode}
         />
       ) : mode === 'admin' && activeSubTab === 'collaborators' ? (
         <CollaboratorConsole 
@@ -1139,6 +1153,8 @@ export default function AdminConsole({
           currentUser={currentUser}
           publisherClients={publisherClients}
           activeCompanyName={settings.companyName}
+          isTrial={isTrial}
+          isDemoTenant={isDemoTenantMode}
         />
       ) : mode === 'admin' && activeSubTab === 'security' ? (
         <SecurityDashboard 
@@ -2200,7 +2216,7 @@ export default function AdminConsole({
 
                 <p className="text-xs text-slate-600 leading-relaxed">
                   Saisissez la clé API Gemini propre à l'entreprise <strong className="text-indigo-900">{compName || settings.companyName}</strong>. 
-                  Cette clé est enregistrée directement dans le document tenant (<code className="bg-indigo-100 text-indigo-800 px-1 py-0.5 rounded font-mono text-[11px]">company_erp_data</code>) et utilisée en priorité par le backend pour l'analyse financière autonome et le Copilot (modèle <code className="bg-indigo-100 text-indigo-800 px-1 py-0.5 rounded font-mono text-[11px]">gemini-2.5-flash</code>).
+                  Cette clé est enregistrée directement dans le document tenant (<code className="bg-indigo-100 text-indigo-800 px-1 py-0.5 rounded font-mono text-[11px]">company_erp_data</code>) et utilisée en priorité par le backend pour l'analyse financière autonome et le Copilot (modèle <code className="bg-indigo-100 text-indigo-800 px-1 py-0.5 rounded font-mono text-[11px]">gemini-3.6-flash</code>).
                 </p>
 
                 <div className="space-y-2">

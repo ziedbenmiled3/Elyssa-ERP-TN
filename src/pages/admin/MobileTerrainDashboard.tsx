@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Smartphone, 
   MapPin, 
@@ -43,6 +43,7 @@ interface MobileTerrainDashboardProps {
   vehicles?: any[];
   missions?: any[];
   onNavigateToInvoice?: (order: MobileOrder) => void;
+  isDemoTenant?: boolean;
 }
 
 const DEFAULT_EMPLOYEES_LIST = [
@@ -65,7 +66,9 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
   tenantId = 'Inter-Affaires',
   employees = [],
   vehicles = [],
-  missions = []
+  missions = [],
+  onNavigateToInvoice,
+  isDemoTenant = false
 }) => {
   const { 
     devices, 
@@ -82,7 +85,51 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
     updateFleetItemStatus,
     validateOrder, 
     approveReport 
-  } = useMobileAdmin(tenantId);
+  } = useMobileAdmin(tenantId, isDemoTenant);
+
+  // Sync / Inject Demo mobile devices into localStorage if empty in Demo mode
+  useEffect(() => {
+    if (isDemoTenant) {
+      try {
+        const rawLocal = localStorage.getItem('carthage_mobile_devices');
+        const localList = rawLocal ? JSON.parse(rawLocal) : [];
+        if (!Array.isArray(localList) || localList.length === 0) {
+          const todayDateStr = new Date().toISOString().split('T')[0];
+          const demoTerminals = [
+            {
+              id: 'trial-fleet-dev-1',
+              type: 'Tablette',
+              brand: 'Samsung',
+              model: 'Samsung Galaxy Tab Active 4 Pro',
+              serialNumber: 'SAM-TAB4-TN-00345',
+              assignedToId: 'demo-emp_4',
+              assignedToName: 'Mohamed Ali Gharbi',
+              pole: 'Commercial & Vente',
+              status: 'Actif',
+              lastSync: `${todayDateStr} 09:15`,
+              batteryLevel: 94
+            },
+            {
+              id: 'trial-fleet-dev-2',
+              type: 'Terminal Durci PDA',
+              brand: 'Zebra',
+              model: 'Zebra TC57 Touch Computer',
+              serialNumber: 'ZEB-TC57-TN-00812',
+              assignedToId: 'demo-emp_7',
+              assignedToName: 'Hamza Ben Salem',
+              pole: 'Logistique & Livraisons',
+              status: 'Actif',
+              lastSync: `${todayDateStr} 08:30`,
+              batteryLevel: 88
+            }
+          ];
+          localStorage.setItem('carthage_mobile_devices', JSON.stringify(demoTerminals));
+        }
+      } catch (e) {
+        console.error('Error seeding demo mobile devices:', e);
+      }
+    }
+  }, [isDemoTenant]);
 
   // Active Tab state: 'fleet' | 'sessions' | 'validation'
   const [activeTab, setActiveTab] = useState<'fleet' | 'sessions' | 'validation'>('fleet');
@@ -344,7 +391,7 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sessions Terrain Actives</span>
               <div className="flex items-baseline space-x-2">
                 <span className="text-lg font-black text-white">{openSessions.length}</span>
-                <span className="text-[10px] font-bold text-slate-400 font-mono">({vanSalesCount} Sales / {chantierCount} Chantier)</span>
+                <span className="text-[10px] font-bold text-slate-400 font-mono">({vanSalesCount} Sales / {chantierCount} Logistique)</span>
               </div>
             </div>
           </div>
@@ -367,10 +414,10 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
               <FileCheck2 className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Rapports de Chantier</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Rapports Reçus</span>
               <div className="flex items-baseline space-x-2">
                 <span className="text-lg font-black text-white">{reports.length}</span>
-                <span className="text-[10px] font-bold text-slate-400">reçus</span>
+                <span className="text-[10px] font-bold text-slate-400">reçu(s)</span>
               </div>
             </div>
           </div>
@@ -574,9 +621,11 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
                             <div className="flex items-center space-x-1.5">
                               <Clock className="w-3.5 h-3.5 text-slate-400" />
                               <span>
-                                {typeof device.lastSync === 'string' 
-                                  ? new Date(device.lastSync).toLocaleString('fr-FR')
-                                  : device.lastSync.toLocaleString('fr-FR')}
+                                {device.lastSync
+                                  ? (typeof device.lastSync === 'string'
+                                    ? new Date(device.lastSync).toLocaleString('fr-FR')
+                                    : (device.lastSync instanceof Date ? device.lastSync.toLocaleString('fr-FR') : new Date(device.lastSync).toLocaleString('fr-FR')))
+                                  : 'Jamais'}
                               </span>
                             </div>
                           </td>
@@ -781,12 +830,14 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
                             <span className="truncate">{session.checkIn.address || `${session.checkIn.lat}, ${session.checkIn.lng}`}</span>
                           </div>
                           <div className="flex items-center justify-between text-slate-500 text-[10px]">
-                            <span>Lat: {session.checkIn.lat.toFixed(4)}</span>
-                            <span>Lng: {session.checkIn.lng.toFixed(4)}</span>
+                            <span>Lat: {session.checkIn?.lat != null ? session.checkIn.lat.toFixed(4) : '0'}</span>
+                            <span>Lng: {session.checkIn?.lng != null ? session.checkIn.lng.toFixed(4) : '0'}</span>
                             <span>
-                              {typeof session.checkIn.timestamp === 'string'
-                                ? new Date(session.checkIn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                : session.checkIn.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {session.checkIn?.timestamp
+                                ? (typeof session.checkIn.timestamp === 'string'
+                                  ? new Date(session.checkIn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                  : (session.checkIn.timestamp instanceof Date ? session.checkIn.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(session.checkIn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })))
+                                : '--:--'}
                             </span>
                           </div>
                         </div>
@@ -917,7 +968,7 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
                   </p>
                 </div>
                 <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
-                  Total HT: {totalOrdersHT.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                  Total HT: {(totalOrdersHT ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                 </span>
               </div>
 
@@ -951,9 +1002,11 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
                             <td className="px-6 py-4 font-mono">
                               <span className="font-bold text-slate-900 block">{order.id}</span>
                               <span className="text-[10px] text-slate-400 block">
-                                {typeof order.createdAt === 'string'
-                                  ? new Date(order.createdAt).toLocaleDateString('fr-FR')
-                                  : order.createdAt.toLocaleDateString('fr-FR')}
+                                {order.createdAt
+                                  ? (typeof order.createdAt === 'string'
+                                    ? new Date(order.createdAt).toLocaleDateString('fr-FR')
+                                    : (order.createdAt instanceof Date ? order.createdAt.toLocaleDateString('fr-FR') : new Date(order.createdAt).toLocaleDateString('fr-FR')))
+                                  : 'N/A'}
                               </span>
                             </td>
 
@@ -971,10 +1024,10 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
                             <td className="px-6 py-4">
                               <div className="space-y-0.5">
                                 <span className="font-black text-slate-900 text-sm block font-mono">
-                                  {order.totalTTC.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                                  {(order.totalTTC ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                                 </span>
                                 <span className="text-[10px] text-slate-500 block">
-                                  {order.items.length} article(s) • HT: {order.totalHT.toLocaleString('fr-FR')} TND
+                                  {order.items?.length || 0} article(s) • HT: {(order.totalHT ?? 0).toLocaleString('fr-FR')} TND
                                 </span>
                               </div>
                             </td>
@@ -1115,7 +1168,7 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
 
                     <div className="pt-2 border-t border-slate-150 flex justify-between items-center">
                       <span className="text-[10px] font-mono text-slate-400">
-                        Date: {typeof report.date === 'string' ? new Date(report.date).toLocaleDateString('fr-FR') : report.date.toLocaleDateString('fr-FR')}
+                        Date: {report.date ? (typeof report.date === 'string' ? new Date(report.date).toLocaleDateString('fr-FR') : (report.date instanceof Date ? report.date.toLocaleDateString('fr-FR') : new Date(report.date).toLocaleDateString('fr-FR'))) : 'N/A'}
                       </span>
 
                       <div className="flex items-center space-x-2">
@@ -1520,11 +1573,11 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
             <div className="bg-indigo-900 text-white p-4 rounded-2xl flex justify-between items-center font-mono">
               <div>
                 <span className="text-[10px] uppercase text-indigo-300 font-sans block">Total Hors Taxe</span>
-                <strong className="text-base">{selectedOrder.totalHT.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</strong>
+                <strong className="text-base">{(selectedOrder.totalHT ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</strong>
               </div>
               <div className="text-right">
                 <span className="text-[10px] uppercase text-indigo-300 font-sans block">Montant Net TTC à Régler</span>
-                <strong className="text-xl font-black text-emerald-400">{selectedOrder.totalTTC.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</strong>
+                <strong className="text-xl font-black text-emerald-400">{(selectedOrder.totalTTC ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND</strong>
               </div>
             </div>
 
@@ -1604,7 +1657,7 @@ export const MobileTerrainDashboard: React.FC<MobileTerrainDashboardProps> = ({
                 <span className="text-[10px] text-slate-400 uppercase font-sans font-bold block">Chef de Chantier</span>
                 <strong className="text-indigo-700 text-sm block font-sans">{selectedReport.chefChantierName || selectedReport.chefChantierId}</strong>
                 <span className="text-slate-500 text-[10px]">
-                  Date: {typeof selectedReport.date === 'string' ? new Date(selectedReport.date).toLocaleDateString('fr-FR') : selectedReport.date.toLocaleDateString('fr-FR')}
+                  Date: {selectedReport.date ? (typeof selectedReport.date === 'string' ? new Date(selectedReport.date).toLocaleDateString('fr-FR') : (selectedReport.date instanceof Date ? selectedReport.date.toLocaleDateString('fr-FR') : new Date(selectedReport.date).toLocaleDateString('fr-FR'))) : 'N/A'}
                 </span>
               </div>
             </div>

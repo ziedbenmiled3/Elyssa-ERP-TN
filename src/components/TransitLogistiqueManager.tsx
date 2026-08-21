@@ -175,7 +175,7 @@ export default function TransitLogistiqueManager({
   const [folderTypeFilter, setFolderTypeFilter] = useState<'All' | 'Import' | 'Export'>('All');
 
   // Selected folder for detail views / modification / landed cost calc
-  const [selectedFolderId, setSelectedFolderId] = useState<string>('demo-imp_1');
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(() => folders[0]?.id || null);
 
   // Modal / Input State for creating a folder
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -2504,7 +2504,7 @@ export default function TransitLogistiqueManager({
                             </tr>
                             <tr>
                               <td className="border border-slate-200 p-2 font-black text-slate-900">Montant Global</td>
-                              <td className="border border-slate-200 p-2 font-bold text-slate-900">{selectedLC.amount.toLocaleString()} {selectedLC.currency}</td>
+                              <td className="border border-slate-200 p-2 font-bold text-slate-900">{(selectedLC?.amount ?? 0).toLocaleString()} {selectedLC?.currency || ''}</td>
                             </tr>
                             <tr className="bg-slate-50">
                               <td className="border border-slate-200 p-2 font-black text-slate-900">Banque Notificatrice</td>
@@ -2810,13 +2810,13 @@ export default function TransitLogistiqueManager({
                   <div className="p-3 bg-[#0d152a] rounded-lg border border-slate-850">
                     <span className="text-slate-500 text-[9px] uppercase font-bold block">Conteneur Standard (EUR) :</span>
                     <span className="text-xs font-black text-slate-300 font-mono">
-                      {(defaultFreightFee / eurToTndRate).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} €
+                      {(defaultFreightFee / (eurToTndRate || 1)).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} €
                     </span>
                   </div>
                   <div className="p-3 bg-[#0d152a] rounded-lg border border-slate-850">
                     <span className="text-slate-500 text-[9px] uppercase font-bold block">Conteneur Standard (USD) :</span>
                     <span className="text-xs font-black text-slate-300 font-mono">
-                      {(defaultFreightFee / usdToTndRate).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} $
+                      {(defaultFreightFee / (usdToTndRate || 1)).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} $
                     </span>
                   </div>
                 </div>

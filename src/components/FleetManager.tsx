@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Vehicle, MissionOrder, FleetExpense, IncidentRecord, Employee } from '../types';
 import { db } from '../utils/firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { useTenant } from '../context/TenantContext';
 import { 
   Car, 
   MapPin, 
@@ -28,11 +29,95 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
-const DEMO_VEHICLES: Vehicle[] = [];
+export const DEMO_VEHICLES: Vehicle[] = [
+  { 
+    id: 'demo-v_1', 
+    brand: 'Peugeot', 
+    model: 'Partner', 
+    registrationNumber: '228 TUN 4091', 
+    purchaseDate: '2024-03-12', 
+    purchasePrice: 62000.000, 
+    status: 'Active', 
+    assignedToEmployeeId: 'demo-emp_6', 
+    assignedEmployeeName: 'Hamza Ben Salem',
+    is_demo: true
+  },
+  { 
+    id: 'demo-v_2', 
+    brand: 'Isuzu', 
+    model: 'D-Max', 
+    registrationNumber: '240 TN 8812', 
+    purchaseDate: '2024-02-10', 
+    purchasePrice: 72000.000, 
+    status: 'Active', 
+    assignedToEmployeeId: 'demo-emp_6', 
+    assignedEmployeeName: 'Hamza Ben Salem',
+    is_demo: true
+  },
+  { 
+    id: 'demo-v_3', 
+    brand: 'Citroën', 
+    model: 'C-Élysée', 
+    registrationNumber: '215 TUN 9811', 
+    purchaseDate: '2023-01-15', 
+    purchasePrice: 48000.000, 
+    status: 'Active', 
+    assignedToEmployeeId: 'demo-emp_3', 
+    assignedEmployeeName: 'Mohamed Ali Gharbi',
+    is_demo: true
+  }
+];
 
-const DEMO_MISSIONS: MissionOrder[] = [];
+export const DEFAULT_DEMO_VEHICLES = DEMO_VEHICLES;
 
-const DEMO_EXPENSES: FleetExpense[] = [];
+export const DEMO_MISSIONS: MissionOrder[] = [
+  { 
+    id: 'demo-mo_1', 
+    employeeId: 'demo-emp_6', 
+    employeeName: 'Hamza Ben Salem', 
+    vehicleId: 'demo-v_2', 
+    vehicleLabel: 'Isuzu D-Max (240 TN 8812)', 
+    transportType: 'CompanyCar',
+    destination: 'Tunis / Sfax', 
+    purpose: 'Livraison Client Poulina - Tunis/Sfax', 
+    departureDateTime: '2026-08-10T07:30', 
+    returnDateTime: '2026-08-10T19:00', 
+    status: 'Approved',
+    allowancesGranted: 60.000,
+    is_demo: true,
+    expenses: [
+      { id: 'demo-me_mo1_1', category: 'Food', description: 'Repas et frais déplacement livraison Poulina', amount: 35.000, invoiceNumber: 'RE_SFAX_88', date: '2026-08-10' }
+    ]
+  },
+  { 
+    id: 'demo-mo_2', 
+    employeeId: 'demo-emp_3', 
+    employeeName: 'Mohamed Ali Gharbi', 
+    vehicleId: 'demo-v_3', 
+    vehicleLabel: 'Citroën C-Élysée (215 TUN 9811)', 
+    transportType: 'CompanyCar',
+    destination: 'Sousse', 
+    purpose: 'Prospection Sousse', 
+    departureDateTime: '2026-08-10T08:00', 
+    returnDateTime: '2026-08-10T18:00', 
+    status: 'Approved',
+    allowancesGranted: 50.000,
+    is_demo: true,
+    expenses: [
+      { id: 'demo-me_mo2_1', category: 'Food', description: 'Déjeuner client prospection commerciale Sousse', amount: 30.000, invoiceNumber: 'RE_SOUSSE_12', date: '2026-08-10' }
+    ]
+  }
+];
+
+export const DEFAULT_DEMO_MISSIONS = DEMO_MISSIONS;
+
+export const DEMO_EXPENSES: FleetExpense[] = [
+  { id: 'demo-exp_1', date: '2026-08-01', vehicleId: 'demo-v_2', vehicleLabel: 'Isuzu D-Max (240 TN 8812)', category: 'GasolineBonus', amount: 450.000, invoiceNb: 'BON_TOT_450', providerName: 'TotalEnergies', description: 'Carburant TotalEnergies - Tournée livraison Sud' },
+  { id: 'demo-exp_2', date: '2026-08-03', vehicleId: 'demo-v_1', vehicleLabel: 'Peugeot Partner (228 TUN 4091)', category: 'MechanicLabor', amount: 280.000, invoiceNb: 'FACT_VID_280', providerName: 'Atelier Central Service', description: 'Entretien vidange complète et remplacement filtres' },
+  { id: 'demo-exp_3', date: '2026-08-05', vehicleId: 'demo-v_3', vehicleLabel: 'Citroën C-Élysée (215 TUN 9811)', category: 'Insurance', amount: 650.000, invoiceNb: 'VIG_ASSUR_650', providerName: 'Assurances STAR / Recette Finances', description: 'Vignette fiscale & Assurance flotte annuelle' }
+];
+
+export const DEFAULT_DEMO_EXPENSES = DEMO_EXPENSES;
 
 const DEMO_INCIDENTS: IncidentRecord[] = [];
 
@@ -46,7 +131,10 @@ export default function FleetManager({
   onUpdateExpenses,
   incidents: propIncidents,
   onUpdateIncidents,
-  employees: propEmployees
+  employees: propEmployees,
+  activeTenantId,
+  tenantId,
+  isDemoCompany = false
 }: { 
   isSimulationActive?: boolean;
   vehicles?: Vehicle[];
@@ -58,7 +146,30 @@ export default function FleetManager({
   incidents?: IncidentRecord[];
   onUpdateIncidents?: (i: any[]) => void;
   employees?: Employee[];
+  activeTenantId?: string;
+  tenantId?: string;
+  isDemoCompany?: boolean;
 }) {
+  let contextTenantId = 'Inter-Affaires';
+  try {
+    const tenantCtx = useTenant();
+    if (tenantCtx?.currentTenant?.id) {
+      contextTenantId = tenantCtx.currentTenant.id;
+    }
+  } catch (_) {
+    // fallback if outside context
+  }
+  const effectiveTenant = activeTenantId || tenantId || contextTenantId || 'Inter-Affaires';
+
+  const isDemoTenant = useMemo(() => {
+    if (isDemoCompany) return true;
+    const tid = String(effectiveTenant || localStorage.getItem('carthage_active_company') || '').toLowerCase().trim();
+    if (tid.includes('parent') || tid.includes('prod') || tid === 'inter-affaires' || tid === 'company_parent' || tid === 'elyssa entreprises s.a.') {
+      return false;
+    }
+    return tid === 'inter-affaires-demo' || tid === 'demo' || tid === 'company_demo' || tid.includes('démo') || tid.includes('demo') || tid.includes('sandbox');
+  }, [effectiveTenant, isDemoCompany]);
+
   const SkeletonLoader = () => (
     <div className="p-6 space-y-4 animate-pulse">
       <div className="h-10 bg-slate-200 rounded-xl w-1/3"></div>
@@ -89,52 +200,89 @@ export default function FleetManager({
 
   const employees = propEmployees || [];
 
-  const vehicles = useMemo(() => {
-    const base = propVehicles && propVehicles.length > 0 ? propVehicles : DEMO_VEHICLES;
-    const baseIds = new Set(base.map(v => v.id || v.registrationNumber));
-    const missing = DEMO_VEHICLES.filter(dv => !baseIds.has(dv.id) && !baseIds.has(dv.registrationNumber));
-    return missing.length > 0 ? [...base, ...missing] : base;
-  }, [propVehicles]);
-
-  const setVehicles = useMemo(() => (newVehiclesOrUpdater: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])) => {
-    if (onUpdateVehicles) {
-      if (typeof newVehiclesOrUpdater === 'function') {
-        onUpdateVehicles(newVehiclesOrUpdater(vehicles));
-      } else {
-        onUpdateVehicles(newVehiclesOrUpdater);
-      }
+  // Direct state initialization with STRICT PROD isolation
+  const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
+    if (!isDemoTenant) {
+      return Array.isArray(propVehicles) 
+        ? propVehicles.filter(v => !v.is_demo && !String(v.id || '').startsWith('demo-')) 
+        : [];
     }
-  }, [vehicles, onUpdateVehicles]);
+    if (Array.isArray(propVehicles) && propVehicles.length > 0) return propVehicles;
+    return DEMO_VEHICLES;
+  });
 
-  const missions = useMemo(() => {
-    const base = propMissions && propMissions.length > 0 ? propMissions : DEMO_MISSIONS;
-    const baseIds = new Set(base.map(m => m.id));
-    const missing = DEMO_MISSIONS.filter(dm => !baseIds.has(dm.id));
-    return missing.length > 0 ? [...base, ...missing] : base;
-  }, [propMissions]);
-
-  const setMissions = useMemo(() => (newMissionsOrUpdater: MissionOrder[] | ((prev: MissionOrder[]) => MissionOrder[])) => {
-    if (onUpdateMissions) {
-      if (typeof newMissionsOrUpdater === 'function') {
-        onUpdateMissions(newMissionsOrUpdater(missions));
-      } else {
-        onUpdateMissions(newMissionsOrUpdater);
-      }
+  const [missions, setMissions] = useState<MissionOrder[]>(() => {
+    if (!isDemoTenant) {
+      return Array.isArray(propMissions) 
+        ? propMissions.filter(m => !m.is_demo && !String(m.id || '').startsWith('demo-')) 
+        : [];
     }
-  }, [missions, onUpdateMissions]);
+    if (Array.isArray(propMissions) && propMissions.length > 0) return propMissions;
+    return DEMO_MISSIONS;
+  });
 
-  const expenses = propExpenses && propExpenses.length > 0 ? propExpenses : DEMO_EXPENSES;
-  const setExpenses = useMemo(() => (newExpensesOrUpdater: any[] | ((prev: any[]) => any[])) => {
-    if (onUpdateExpenses) {
-      if (typeof newExpensesOrUpdater === 'function') {
-        onUpdateExpenses(newExpensesOrUpdater(expenses));
-      } else {
-        onUpdateExpenses(newExpensesOrUpdater);
-      }
+  const [expenses, setExpenses] = useState<FleetExpense[]>(() => {
+    if (!isDemoTenant) {
+      return Array.isArray(propExpenses) 
+        ? propExpenses.filter(e => !e.is_demo && !String(e.id || '').startsWith('demo-')) 
+        : [];
     }
-  }, [expenses, onUpdateExpenses]);
+    if (Array.isArray(propExpenses) && propExpenses.length > 0) return propExpenses;
+    return DEMO_EXPENSES;
+  });
 
-  const incidents = propIncidents && propIncidents.length > 0 ? propIncidents : DEMO_INCIDENTS;
+  useEffect(() => {
+    if (!isDemoTenant) {
+      const sanitized = Array.isArray(propVehicles) 
+        ? propVehicles.filter(v => !v.is_demo && !String(v.id || '').startsWith('demo-')) 
+        : [];
+      setVehicles(sanitized);
+    } else if (Array.isArray(propVehicles) && propVehicles.length > 0) {
+      setVehicles(propVehicles);
+    }
+  }, [propVehicles, isDemoTenant]);
+
+  useEffect(() => {
+    if (!isDemoTenant) {
+      const sanitized = Array.isArray(propMissions) 
+        ? propMissions.filter(m => !m.is_demo && !String(m.id || '').startsWith('demo-')) 
+        : [];
+      setMissions(sanitized);
+    } else if (Array.isArray(propMissions) && propMissions.length > 0) {
+      setMissions(propMissions);
+    }
+  }, [propMissions, isDemoTenant]);
+
+  useEffect(() => {
+    if (!isDemoTenant) {
+      const sanitized = Array.isArray(propExpenses) 
+        ? propExpenses.filter(e => !e.is_demo && !String(e.id || '').startsWith('demo-')) 
+        : [];
+      setExpenses(sanitized);
+    } else if (Array.isArray(propExpenses) && propExpenses.length > 0) {
+      setExpenses(propExpenses);
+    }
+  }, [propExpenses, isDemoTenant]);
+
+  const incidents = useMemo(() => {
+    const source = propIncidents !== undefined ? propIncidents : DEMO_INCIDENTS;
+    return source.filter(i => {
+      if (i.tenantId && i.tenantId !== effectiveTenant) return false;
+      const isMDDriver = 
+        i.driverName?.toLowerCase().includes('hamza') || 
+        i.driverName?.toLowerCase().includes('gharbi') || 
+        i.employeeId === 'demo-emp_6' || 
+        i.employeeId === 'demo-emp_3';
+
+      if (effectiveTenant === 'Inter-Affaires') {
+        if (isMDDriver) return false;
+      } else if (effectiveTenant === 'MD') {
+        if (isMDDriver) return true;
+      }
+      return true;
+    });
+  }, [propIncidents, effectiveTenant]);
+
   const setIncidents = useMemo(() => (newIncidentsOrUpdater: any[] | ((prev: any[]) => any[])) => {
     if (onUpdateIncidents) {
       if (typeof newIncidentsOrUpdater === 'function') {
@@ -1106,11 +1254,11 @@ export default function FleetManager({
               <div>
                 <span className="block text-[10px] font-black uppercase text-slate-400">Frais Flotte & Missions</span>
                 <span className="text-xl font-black text-slate-850 block mt-1 font-mono">
-                  {(stats.totalSpent + stats.totalMissionSpent).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} DT
+                  {((stats?.totalSpent ?? 0) + (stats?.totalMissionSpent ?? 0)).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} DT
                 </span>
                 <span className="text-[9px] font-semibold text-slate-400 mt-1 block leading-tight">
-                  🚘 Flotte : {stats.totalSpent.toFixed(3)} DT<br/>
-                  💼 Missions : {stats.totalMissionSpent.toFixed(3)} DT
+                  🚘 Flotte : {(stats?.totalSpent ?? 0).toFixed(3)} DT<br/>
+                  💼 Missions : {(stats?.totalMissionSpent ?? 0).toFixed(3)} DT
                 </span>
               </div>
               <div className="p-3 bg-indigo-50 text-indigo-650 rounded-xl">
@@ -1172,7 +1320,7 @@ export default function FleetManager({
                               <Cell key={`cell-f-${index}`} fill={entry.color} />
                             ))}
                           </Pie>
-                          <Tooltip formatter={(value: any) => `${Number(value).toFixed(3)} DT`} />
+                          <Tooltip formatter={(value: any) => `${(Number(value) || 0).toFixed(3)} DT`} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -1184,7 +1332,7 @@ export default function FleetManager({
                             <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: item.color }}></span>
                             <span className="text-slate-650 truncate max-w-[110px]">{item.name}</span>
                           </div>
-                          <span className="font-mono text-slate-800 font-bold shrink-0">{item.value.toFixed(3)} DT</span>
+                          <span className="font-mono text-slate-800 font-bold shrink-0">{(item?.value ?? 0).toFixed(3)} DT</span>
                         </div>
                       ))}
                     </div>
@@ -1221,7 +1369,7 @@ export default function FleetManager({
                               <Cell key={`cell-m-${index}`} fill={entry.color} />
                             ))}
                           </Pie>
-                          <Tooltip formatter={(value: any) => `${Number(value).toFixed(3)} DT`} />
+                          <Tooltip formatter={(value: any) => `${(Number(value) || 0).toFixed(3)} DT`} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -1233,7 +1381,7 @@ export default function FleetManager({
                             <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: item.color }}></span>
                             <span className="text-slate-650 truncate max-w-[110px]">{item.name}</span>
                           </div>
-                          <span className="font-mono text-slate-850 font-black shrink-0">{item.value.toFixed(3)} DT</span>
+                          <span className="font-mono text-slate-850 font-black shrink-0">{(item?.value ?? 0).toFixed(3)} DT</span>
                         </div>
                       ))}
                     </div>
@@ -1254,7 +1402,7 @@ export default function FleetManager({
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="vehicle" tick={{ fontSize: 10, fontWeight: 'bold' }} />
                       <YAxis tick={{ fontSize: 9, fontWeight: 'bold' }} />
-                      <Tooltip formatter={(v: any) => `${Number(v).toFixed(3)} DT`} />
+                      <Tooltip formatter={(v: any) => `${(Number(v) || 0).toFixed(3)} DT`} />
                       <Bar dataKey="spent" fill="#6366f1" radius={[4, 4, 0, 0]}>
                         {stats.vehicleDataChart.map((entry, i) => (
                           <Cell key={i} fill={i === 0 ? '#4f46e5' : i === 1 ? '#6366f1' : '#818cf8'} />
@@ -1313,7 +1461,7 @@ export default function FleetManager({
                     </td>
                     <td className="p-3 font-mono font-bold text-slate-700">{v.registrationNumber}</td>
                     <td className="p-3 text-slate-500">{v.purchaseDate}</td>
-                    <td className="p-3 text-right font-mono text-slate-800 font-semibold">{v.purchasePrice.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} DT</td>
+                    <td className="p-3 text-right font-mono text-slate-800 font-semibold">{(Number(v.purchasePrice) || 0).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} DT</td>
                     <td className="p-3 text-center">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-extrabold shrink-0 ${
                         v.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' :
@@ -1331,7 +1479,7 @@ export default function FleetManager({
                             onClick={() => {
                               setSellingVehicleId(v.id);
                               setSaleDate(new Date().toISOString().split('T')[0]);
-                              setSalePrice(Math.round(v.purchasePrice * 0.7));
+                              setSalePrice(Math.round((Number(v.purchasePrice) || 0) * 0.7));
                             }}
                             className="p-1 px-2 border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded text-[10px] font-bold cursor-pointer"
                             title="Déclarer la vente de ce véhicule"
@@ -1367,7 +1515,7 @@ export default function FleetManager({
                       <span className="text-[10px] text-slate-400 font-mono block">Cédé le {v.saleDate}</span>
                     </div>
                     <div className="text-right">
-                      <span className="font-mono text-indigo-700 font-black">{v.salePrice?.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} DT</span>
+                      <span className="font-mono text-indigo-700 font-black">{(Number(v.salePrice) || 0).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} DT</span>
                       <span className="text-[9.5px] font-bold block text-emerald-600">Plus-value / Moins-value enregistrée</span>
                     </div>
                   </div>
@@ -1507,7 +1655,7 @@ export default function FleetManager({
                         className="text-slate-500 hover:text-indigo-650 font-extrabold flex items-center gap-1.5 cursor-pointer p-1 rounded-md hover:bg-slate-50"
                       >
                         <Receipt className="w-4 h-4 text-indigo-500" />
-                        <span className="underline">Détails des frais de cette mission ({(m.expenses || []).reduce((sum, item) => sum + item.amount, 0).toFixed(3)} DT)</span>
+                        <span className="underline">Détails des frais de cette mission ({(m.expenses || []).reduce((sum, item) => sum + (Number(item?.amount) || 0), 0).toFixed(3)} DT)</span>
                         <span className="text-[10px] font-normal text-slate-450 bg-slate-100 px-1.5 py-0.5 rounded">
                           {(m.expenses || []).length} justificatifs
                         </span>
@@ -1519,7 +1667,7 @@ export default function FleetManager({
                         {/* Dynamic Financial Summary Block (Avance vs Justificatifs vs Reliquat) */}
                         {(() => {
                           const A = Number(m.allowancesGranted) || 0;
-                          const J = (m.expenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                          const J = (m.expenses || []).reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
                           const R = J - A;
 
                           return (
@@ -1537,12 +1685,12 @@ export default function FleetManager({
                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                                 <div className="p-2.5 bg-blue-50/80 border border-blue-150 rounded-lg">
                                   <span className="block text-[9.5px] font-bold uppercase text-blue-800">Total Avance versée (A)</span>
-                                  <strong className="text-blue-950 text-sm font-mono">{A.toFixed(3)} DT</strong>
+                                  <strong className="text-blue-950 text-sm font-mono">{(A ?? 0).toFixed(3)} DT</strong>
                                 </div>
 
                                 <div className="p-2.5 bg-purple-50/80 border border-purple-150 rounded-lg">
                                   <span className="block text-[9.5px] font-bold uppercase text-purple-800">Total Justificatifs saisis (J)</span>
-                                  <strong className="text-purple-950 text-sm font-mono">{J.toFixed(3)} DT</strong>
+                                  <strong className="text-purple-950 text-sm font-mono">{(J ?? 0).toFixed(3)} DT</strong>
                                 </div>
 
                                 <div className={`p-2.5 border rounded-lg ${
@@ -1556,7 +1704,7 @@ export default function FleetManager({
                                     R < 0 ? 'text-amber-800' :
                                     'text-slate-800'
                                   }`}>
-                                    {R > 0 ? `+${R.toFixed(3)} DT` : `${R.toFixed(3)} DT`}
+                                    {R > 0 ? `+${(R ?? 0).toFixed(3)} DT` : `${(R ?? 0).toFixed(3)} DT`}
                                   </strong>
                                 </div>
                               </div>
@@ -1582,7 +1730,7 @@ export default function FleetManager({
                                   </span>
                                 </div>
                                 <span className="font-mono font-black text-xs px-2.5 py-0.5 rounded bg-white border border-slate-200 shadow-5xs shrink-0">
-                                  {R > 0 ? `+${R.toFixed(3)} DT` : R < 0 ? `-${Math.abs(R).toFixed(3)} DT` : '0.000 DT'}
+                                  {R > 0 ? `+${(R ?? 0).toFixed(3)} DT` : R < 0 ? `-${Math.abs(R ?? 0).toFixed(3)} DT` : '0.000 DT'}
                                 </span>
                               </div>
                             </div>
@@ -1611,7 +1759,7 @@ export default function FleetManager({
                                   <span className="text-[9px] text-slate-400 ml-1.5 font-mono">({item.date})</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 pl-2 shrink-0">
-                                  <span className="font-mono font-black text-slate-800">{item.amount.toFixed(3)} DT</span>
+                                  <span className="font-mono font-black text-slate-800">{(Number(item?.amount) || 0).toFixed(3)} DT</span>
                                   <button
                                     onClick={() => removeMissionExpenseItem(m.id, item.id)}
                                     className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer"
@@ -1772,7 +1920,7 @@ export default function FleetManager({
                         <span className="text-slate-700 block font-medium">{e.providerName || 'N/A'}</span>
                         <span className="text-[9.5px] text-slate-400 font-mono italic block">{e.invoiceNb ? `N° ${e.invoiceNb}` : 'Sans pièce'}</span>
                       </td>
-                      <td className="p-3 text-right font-mono text-slate-800 font-extrabold">{e.amount.toFixed(3)} DT</td>
+                      <td className="p-3 text-right font-mono text-slate-800 font-extrabold">{(Number(e?.amount) || 0).toFixed(3)} DT</td>
                       <td className="p-3 text-right pr-4">
                         <button
                           onClick={() => deleteExpense(e.id)}
@@ -2613,13 +2761,13 @@ export default function FleetManager({
                            item.category === 'Louage' ? '🚐 Louage inter-villes' :
                            item.category === 'Taxi' ? '🚖 Taxi / Bus / Transport urbain' : '💼 Autre charge'} — {item.description}
                         </span>
-                        <span className="font-extrabold text-slate-800">{item.amount.toFixed(3)} DT</span>
+                        <span className="font-extrabold text-slate-800">{(Number(item?.amount) || 0).toFixed(3)} DT</span>
                       </div>
                     ))}
                     <div className="border-t border-slate-300 pt-2 mt-2 flex justify-between items-center text-xs font-black">
                       <span className="uppercase">TOTAL DES CHARGES ATRIBUÉES À LA MISSION :</span>
                       <span className="text-indigo-750 font-mono font-black text-sm bg-indigo-50 p-1 px-2.5 rounded border border-indigo-150">
-                        {(printedMission.expenses || []).reduce((sum, item) => sum + item.amount, 0).toFixed(3)} DT
+                        {(printedMission.expenses || []).reduce((sum, item) => sum + (Number(item?.amount) || 0), 0).toFixed(3)} DT
                       </span>
                     </div>
                   </div>

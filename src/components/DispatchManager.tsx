@@ -49,22 +49,240 @@ import DocumentPrintModal, { PrintModalData } from './DocumentPrintModal';
 interface DispatchManagerProps {
   tenantId: string;
   employees?: Employee[];
+  isDemoTenant?: boolean;
 }
 
-export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, employees = [] }) => {
+const DEFAULT_DISPATCH_INVOICES: (Invoice & { tenantId?: string; estimatedWeightKg?: number; dockNumber?: string })[] = [
+  {
+    id: 'CMD-2026-101',
+    tenantId: 'MD',
+    clientId: 'CLI-001',
+    clientName: 'SOCIÉTÉ TUNISIENNE DE CONSTRUCTION (STC)',
+    invoiceNumber: 'CMD-2026-101',
+    sales_channel: 'web',
+    warehouse_location: 'Dépôt Central - Radès (Tunis)',
+    amountHT: 4200,
+    vatRate: 19,
+    vatAmount: 798,
+    withholdingTaxRate: 0,
+    withholdingAmount: 0,
+    amountNetToPay: 4998,
+    amountTTC: 4998,
+    status: 'Unpaid',
+    delivery_status: 'en_attente',
+    delivery_address: 'Z.I. Ben Arous, Rue 8600, Tunis',
+    issuedDate: new Date().toISOString(),
+    dueDate: new Date(Date.now() + 15 * 86400000).toISOString(),
+    recouvrementSteps: [],
+    withholdingCertificateReceived: false,
+    estimatedWeightKg: 450,
+    dockNumber: 'Quai 2 - Dépôt Central Radès',
+    items: [
+      {
+        productId: 'MAT-01',
+        productName: 'Ciment Portland & Adjuvants BTP (12 articles - 450 kg)',
+        quantity: 12,
+        unit: 'sacs',
+        unitPrice: 350,
+        priceHT: 4200
+      }
+    ]
+  },
+  {
+    id: 'FAC-2026-POULINA',
+    tenantId: 'MD',
+    clientId: 'CLI-005',
+    clientName: 'POULINA GROUP HOLDING',
+    invoiceNumber: 'FAC-2026-0880',
+    sales_channel: 'field_sales',
+    warehouse_location: 'Dépôt Central - Radès (Tunis)',
+    amountHT: 12184,
+    vatRate: 19,
+    vatAmount: 2316,
+    withholdingTaxRate: 0,
+    withholdingAmount: 0,
+    amountNetToPay: 14500,
+    amountTTC: 14500,
+    status: 'Unpaid',
+    delivery_status: 'en_transit',
+    delivery_address: 'Site Industriel GP1 Km 12, Ezzahra / Sfax',
+    issuedDate: new Date().toISOString(),
+    dueDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+    recouvrementSteps: [],
+    withholdingCertificateReceived: false,
+    estimatedWeightKg: 1450,
+    dockNumber: 'Quai 1 - Dépôt Central Radès',
+    items: [
+      {
+        productId: 'PGH-FEED-01',
+        productName: 'Lots Nutrition Animale & Minéraux Poulina (1 450 kg)',
+        quantity: 1450,
+        unit: 'kg',
+        unitPrice: 8.402,
+        priceHT: 12184
+      }
+    ]
+  }
+];
+
+const DEFAULT_DISPATCH_PICKING_ORDERS: PickingOrder[] = [
+  {
+    id: 'PICK-CMD-2026-101',
+    tenantId: 'MD',
+    orderId: 'CMD-2026-101',
+    clientName: 'SOCIÉTÉ TUNISIENNE DE CONSTRUCTION (STC)',
+    deliveryAddress: 'Z.I. Ben Arous, Rue 8600, Tunis',
+    warehouseId: 'wh_central',
+    warehouseName: 'Dépôt Central Radès',
+    dockNumber: 'Quai 2 - Dépôt Central Radès',
+    status: 'pret_chargement',
+    createdAt: new Date().toISOString(),
+    preparedAt: new Date().toISOString(),
+    preparedBy: 'Mounir Sfaxi (Chef Dépôt Radès)',
+    totalAmountTTC: 4998,
+    items: [
+      {
+        productId: 'MAT-01',
+        productName: 'Ciment Portland & Adjuvants BTP (12 articles - 450 kg)',
+        quantity: 12,
+        warehouseName: 'Dépôt Central Radès'
+      }
+    ]
+  },
+  {
+    id: 'PICK-FAC-2026-0880',
+    tenantId: 'MD',
+    orderId: 'FAC-2026-POULINA',
+    clientName: 'POULINA GROUP HOLDING',
+    deliveryAddress: 'Site Industriel GP1 Km 12, Ezzahra / Sfax',
+    warehouseId: 'wh_central',
+    warehouseName: 'Dépôt Central Radès',
+    dockNumber: 'Quai 1 - Dépôt Central Radès',
+    status: 'pret_chargement',
+    createdAt: new Date().toISOString(),
+    preparedAt: new Date().toISOString(),
+    preparedBy: 'Mounir Sfaxi (Chef Dépôt Radès)',
+    totalAmountTTC: 14500,
+    items: [{ productId: 'PGH-FEED-01', productName: 'Produits Agro-Industriels Poulina (1 450 kg)', quantity: 1450, warehouseName: 'Dépôt Central Radès' }]
+  }
+];
+
+const DEFAULT_DISPATCH_TOURS: DeliveryTour[] = [
+  {
+    id: 'TRN-2026-042',
+    tenantId: 'MD',
+    tour_number: 'TRN-2026-042',
+    driver_id: 'demo-emp_7',
+    driver_name: 'Hamza Ben Salem',
+    vehicle_id: 'demo-v_2',
+    vehicle_name: 'Isuzu D-Max 240 TN 8812',
+    pickup_warehouse: 'Dépôt Central Radès',
+    warehouse_location: 'Dépôt Central Radès',
+    status: 'en_cours',
+    total_weight_kg: 450,
+    vehicle_max_payload_kg: 1285,
+    payload_ratio_percent: 35.0,
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+    notes: 'Tournée Express Tunis -> Sousse -> Sfax (Charge: 35% / 450 kg)',
+    orders: [
+      {
+        order_id: 'CMD-2026-101',
+        client_name: 'SOCIÉTÉ TUNISIENNE DE CONSTRUCTION (STC)',
+        address: 'Tunis -> Sousse -> Sfax',
+        amount_ttc: 4998,
+        amount_ht: 4200,
+        delivery_status: 'en_transit',
+        sales_channel: 'web',
+        warehouse_location: 'Dépôt Central Radès (Quai 2)',
+        dock_number: 'Quai 2',
+        estimatedWeightKg: 450
+      }
+    ]
+  }
+];
+
+const DEFAULT_DISPATCH_VEHICLES: FleetInventoryItem[] = [
+  {
+    id: 'demo-v_2',
+    tenantId: 'MD',
+    fleet_park: 'Flotte Logistique & Transport',
+    device_name: 'Isuzu D-Max 240 TN 8812',
+    serial_reference: '240 TN 8812',
+    category: 'Véhicule Utilitaire',
+    status: 'Available',
+    registeredAt: new Date().toISOString(),
+    maxPayloadKg: 1285,
+    assignedTo: 'Hamza Ben Salem'
+  },
+  {
+    id: 'demo-v_1',
+    tenantId: 'MD',
+    fleet_park: 'Flotte Commerciale & Livraison',
+    device_name: 'Peugeot Partner Fourgonnette (228 TUN 4091)',
+    serial_reference: '228 TUN 4091',
+    category: 'Véhicule Utilitaire',
+    status: 'Available',
+    registeredAt: new Date().toISOString(),
+    maxPayloadKg: 1200,
+    assignedTo: 'Hamza Ben Salem'
+  },
+  {
+    id: 'demo-v_3',
+    tenantId: 'MD',
+    fleet_park: 'Flotte Commerciale',
+    device_name: 'Citroën C-Élysée Berline (215 TUN 9811)',
+    serial_reference: '215 TUN 9811',
+    category: 'Véhicule de Tourisme',
+    status: 'Available',
+    registeredAt: new Date().toISOString(),
+    maxPayloadKg: 600,
+    assignedTo: 'Mohamed Ali Gharbi'
+  },
+  {
+    id: 'demo-v_ia1',
+    tenantId: 'Inter-Affaires',
+    fleet_park: 'Flotte Siège & Transport',
+    device_name: 'Renault Express Fourgon (235 TUN 1204)',
+    serial_reference: '235 TUN 1204',
+    category: 'Véhicule Utilitaire',
+    status: 'Available',
+    registeredAt: new Date().toISOString(),
+    maxPayloadKg: 1000,
+    assignedTo: 'Chauffeur Siège Central'
+  }
+];
+
+export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, employees = [], isDemoTenant = false }) => {
+  const isDemo = Boolean(
+    isDemoTenant || 
+    tenantId === 'MD' || 
+    tenantId === 'company_demo' || 
+    tenantId === 'DEMO_STORE' || 
+    tenantId === 'Mode Simulation (Démo Multi-Sociétés)' || 
+    tenantId.toLowerCase().includes('demo')
+  );
+
   // Pending Invoices / Orders
-  const [pendingInvoices, setPendingInvoices] = useState<Invoice[]>([]);
-  const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [pendingInvoices, setPendingInvoices] = useState<Invoice[]>(() => 
+    isDemo ? DEFAULT_DISPATCH_INVOICES : []
+  );
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
 
   // Picking Orders for multi-warehouse readiness check
-  const [pickingOrders, setPickingOrders] = useState<PickingOrder[]>([]);
+  const [pickingOrders, setPickingOrders] = useState<PickingOrder[]>(() => 
+    isDemo ? DEFAULT_DISPATCH_PICKING_ORDERS : []
+  );
 
   // Vehicles from fleet_inventory
-  const [availableVehicles, setAvailableVehicles] = useState<FleetInventoryItem[]>([]);
+  const [availableVehicles, setAvailableVehicles] = useState<FleetInventoryItem[]>(() => 
+    isDemo ? DEFAULT_DISPATCH_VEHICLES : []
+  );
 
   // Delivery Tours
-  const [deliveryTours, setDeliveryTours] = useState<DeliveryTour[]>([]);
-  const [loadingTours, setLoadingTours] = useState(true);
+  const [deliveryTours, setDeliveryTours] = useState<DeliveryTour[]>(() => 
+    isDemo ? DEFAULT_DISPATCH_TOURS : []
+  );
+  const [loadingTours, setLoadingTours] = useState(false);
 
   // Form & Selection State
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
@@ -291,27 +509,35 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
   // 1. Listen to Invoices awaiting delivery
   useEffect(() => {
     if (!tenantId) return;
-    setLoadingInvoices(true);
 
+    setLoadingInvoices(true);
     const invoicesCol = collection(db, 'company_erp_data', tenantId, 'invoices');
     const unsub = onSnapshot(invoicesCol, (snap) => {
       const items: Invoice[] = [];
       snap.forEach((docSnap) => {
         const data = docSnap.data() as Invoice;
-        const id = docSnap.id;
-        if (!id.startsWith('FAC-2026-08') && !id.includes('demo') && !data.invoiceNumber?.startsWith('FAC-2026-08')) {
-          items.push({ ...data, id });
+        // Strict tenant check: Ignore demo invoices if tenant is not demo
+        if (!isDemo && (docSnap.id.startsWith('FAC-2026-0801') || docSnap.id.startsWith('FAC-2026-POULINA') || docSnap.id.startsWith('CMD-2026-101'))) {
+          return;
+        }
+        if (!data.tenantId || data.tenantId === tenantId) {
+          items.push({ ...data, id: docSnap.id });
         }
       });
-      setPendingInvoices(items);
+      // Merge with default dispatch invoices ONLY for demo tenants when empty
+      const ids = new Set(items.map(i => i.id));
+      const missingDefaults = isDemo ? DEFAULT_DISPATCH_INVOICES.filter(d => !ids.has(d.id)) : [];
+      setPendingInvoices([...items, ...missingDefaults]);
       setLoadingInvoices(false);
     }, (err) => {
       console.warn('Firestore invoices sub error:', err);
+      const defaults = isDemo ? DEFAULT_DISPATCH_INVOICES : [];
+      setPendingInvoices(defaults);
       setLoadingInvoices(false);
     });
 
     return () => unsub();
-  }, [tenantId]);
+  }, [tenantId, isDemo]);
 
   // 1b. Listen to Picking Orders
   useEffect(() => {
@@ -321,18 +547,25 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
     const unsub = onSnapshot(pickingCol, (snap) => {
       const list: PickingOrder[] = [];
       snap.forEach((docSnap) => {
-        const id = docSnap.id;
-        if (!id.startsWith('PICK-FAC-2026-08') && !id.includes('demo')) {
-          list.push({ id, ...docSnap.data() } as PickingOrder);
+        const data = docSnap.data() as PickingOrder;
+        if (!isDemo && (docSnap.id.startsWith('PICK-FAC-2026-08') || docSnap.id.includes('demo') || docSnap.id.startsWith('PICK-CMD-2026-101'))) {
+          return;
+        }
+        if (!data.tenantId || data.tenantId === tenantId) {
+          list.push({ id: docSnap.id, ...data });
         }
       });
-      setPickingOrders(list);
+      const ids = new Set(list.map(p => p.id));
+      const missingDefaults = isDemo ? DEFAULT_DISPATCH_PICKING_ORDERS.filter(d => !ids.has(d.id)) : [];
+      setPickingOrders([...list, ...missingDefaults]);
     }, (err) => {
       console.warn('Firestore picking_orders sub error:', err);
+      const defaults = isDemo ? DEFAULT_DISPATCH_PICKING_ORDERS : [];
+      setPickingOrders(defaults);
     });
 
     return () => unsub();
-  }, [tenantId]);
+  }, [tenantId, isDemo]);
 
   // Helper to resolve picking readiness & loading dock assignment
   const getInvoicePickingInfo = (inv: Invoice) => {
@@ -390,205 +623,41 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
           vehicles.push(item);
         }
       });
-      setAvailableVehicles(vehicles);
+      const ids = new Set(vehicles.map(v => v.id));
+      const missingDefaults = isDemo ? DEFAULT_DISPATCH_VEHICLES.filter(d => !ids.has(d.id)) : [];
+      setAvailableVehicles([...vehicles, ...missingDefaults]);
     }, (err) => {
       console.warn('Firestore fleet_inventory sub error:', err);
     });
 
     return () => unsub();
-  }, [tenantId]);
+  }, [tenantId, isDemo]);
 
   // 3. Listen to Delivery Tours
   useEffect(() => {
     if (!tenantId) return;
-    setLoadingTours(true);
 
+    setLoadingTours(true);
     const toursCol = collection(db, 'company_erp_data', tenantId, 'delivery_tours');
     const unsub = onSnapshot(toursCol, (snap) => {
       const tours: DeliveryTour[] = [];
       snap.forEach((docSnap) => {
-        const id = docSnap.id;
-        const data = docSnap.data() as any;
-        const driver = (data?.driver_name || '').toLowerCase();
-        if (
-          !id.startsWith('TR-2026') &&
-          !id.includes('demo') &&
-          !driver.includes('hamza ben salem') &&
-          !driver.includes('kamel trad')
-        ) {
-          tours.push({ id, ...data } as DeliveryTour);
-        }
+        tours.push({ id: docSnap.id, ...docSnap.data() } as DeliveryTour);
       });
-      tours.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setDeliveryTours(tours);
+      const ids = new Set(tours.map(t => t.id));
+      const missingDefaults = isDemo ? DEFAULT_DISPATCH_TOURS.filter(d => !ids.has(d.id)) : [];
+      const allTours = [...tours, ...missingDefaults];
+      allTours.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setDeliveryTours(allTours);
       setLoadingTours(false);
     }, (err) => {
       console.warn('Firestore delivery_tours sub error:', err);
+      setDeliveryTours(isDemo ? DEFAULT_DISPATCH_TOURS : []);
       setLoadingTours(false);
     });
 
     return () => unsub();
-  }, [tenantId]);
-
-  // Seed Demo Data
-  const handleSeedDemoInvoices = async () => {
-    const demoInvoices: Partial<Invoice>[] = [
-      {
-        id: 'FAC-2026-0801',
-        clientId: 'CLI-001',
-        clientName: 'SOCIÉTÉ TUNISIENNE DE CONSTRUCTION (STC)',
-        invoiceNumber: 'FAC-2026-0801',
-        sales_channel: 'web',
-        warehouse_location: 'Dépôt Central - Radès (Tunis)',
-        amountHT: 4200,
-        vatRate: 19,
-        vatAmount: 798,
-        withholdingTaxRate: 1.5,
-        withholdingAmount: 63,
-        amountNetToPay: 4935,
-        amountTTC: 4998,
-        status: 'Unpaid',
-        delivery_status: 'en_attente',
-        delivery_address: 'Z.I. Ben Arous, Rue 8600, Tunis',
-        issuedDate: new Date().toISOString(),
-        dueDate: new Date(Date.now() + 15 * 86400000).toISOString(),
-        recouvrementSteps: [],
-        withholdingCertificateReceived: false
-      },
-      {
-        id: 'FAC-2026-0802',
-        clientId: 'CLI-002',
-        clientName: 'COMPTOIR INDUSTRIEL BTP',
-        invoiceNumber: 'FAC-2026-0802',
-        sales_channel: 'pos',
-        warehouse_location: 'Magasin & Showroom Sfax - Poudrière',
-        amountHT: 8500,
-        vatRate: 19,
-        vatAmount: 1615,
-        withholdingTaxRate: 1.5,
-        withholdingAmount: 127.5,
-        amountNetToPay: 9987.5,
-        amountTTC: 10115,
-        status: 'Unpaid',
-        delivery_status: 'en_attente',
-        delivery_address: 'Chantier Rocade Sud, km 12, Sfax',
-        issuedDate: new Date().toISOString(),
-        dueDate: new Date(Date.now() + 30 * 86400000).toISOString(),
-        recouvrementSteps: [],
-        withholdingCertificateReceived: false
-      },
-      {
-        id: 'FAC-2026-0803',
-        clientId: 'CLI-003',
-        clientName: 'BEN AHMED MATÉRIAUX',
-        invoiceNumber: 'FAC-2026-0803',
-        sales_channel: 'field_sales',
-        warehouse_location: 'Stock Logistique Sousse - Kantaoui',
-        amountHT: 3100,
-        vatRate: 19,
-        vatAmount: 589,
-        withholdingTaxRate: 1.5,
-        withholdingAmount: 46.5,
-        amountNetToPay: 3642.5,
-        amountTTC: 3689,
-        status: 'Paid',
-        delivery_status: 'en_attente',
-        delivery_address: 'Avenue Habib Bourguiba, Nabeul',
-        issuedDate: new Date().toISOString(),
-        dueDate: new Date().toISOString(),
-        recouvrementSteps: [],
-        withholdingCertificateReceived: true
-      }
-    ];
-
-    for (const inv of demoInvoices) {
-      await setDoc(doc(db, 'company_erp_data', tenantId, 'invoices', inv.id!), inv, { merge: true });
-    }
-
-    // Seed matching picking orders with various readiness statuses (Ready vs In Progress / Pending)
-    const demoPickingOrders: PickingOrder[] = [
-      {
-        id: 'PICK-FAC-2026-0801',
-        tenantId,
-        orderId: 'FAC-2026-0801',
-        clientName: 'SOCIÉTÉ TUNISIENNE DE CONSTRUCTION (STC)',
-        deliveryAddress: 'Z.I. Ben Arous, Rue 8600, Tunis',
-        warehouseId: 'wh_central',
-        warehouseName: 'Dépôt Central Radès',
-        dockNumber: 'Quai 1 - Dépôt Central Radès',
-        status: 'pret_chargement',
-        createdAt: new Date().toISOString(),
-        preparedAt: new Date().toISOString(),
-        preparedBy: 'Mounir Sfaxi (Chef Dépôt)',
-        totalAmountTTC: 4998,
-        items: [{ productId: 'MAT-01', productName: 'Ciment Portland 50kg', quantity: 50, warehouseName: 'Dépôt Central Radès' }]
-      },
-      {
-        id: 'PICK-FAC-2026-0802',
-        tenantId,
-        orderId: 'FAC-2026-0802',
-        clientName: 'COMPTOIR INDUSTRIEL BTP',
-        deliveryAddress: 'Chantier Rocade Sud, km 12, Sfax',
-        warehouseId: 'wh_sfax',
-        warehouseName: 'Magasin & Showroom Sfax',
-        dockNumber: 'Quai Non Attribué',
-        status: 'en_cours',
-        createdAt: new Date().toISOString(),
-        totalAmountTTC: 10115,
-        items: [{ productId: 'MAT-02', productName: 'Briques Creuses 12 Trous', quantity: 20, warehouseName: 'Magasin & Showroom Sfax' }]
-      },
-      {
-        id: 'PICK-FAC-2026-0803',
-        tenantId,
-        orderId: 'FAC-2026-0803',
-        clientName: 'BEN AHMED MATÉRIAUX',
-        deliveryAddress: 'Avenue Habib Bourguiba, Nabeul',
-        warehouseId: 'wh_sousse',
-        warehouseName: 'Stock Logistique Sousse',
-        dockNumber: 'Quai Non Attribué',
-        status: 'en_attente',
-        createdAt: new Date().toISOString(),
-        totalAmountTTC: 3689,
-        items: [{ productId: 'MAT-03', productName: 'Peinture Mat Satiné 20L', quantity: 10, warehouseName: 'Stock Logistique Sousse' }]
-      }
-    ];
-
-    for (const po of demoPickingOrders) {
-      await setDoc(doc(db, 'company_erp_data', tenantId, 'picking_orders', po.id), po, { merge: true });
-    }
-
-    if (availableVehicles.length === 0) {
-      const demoVehicles: FleetInventoryItem[] = [
-        {
-          id: 'v_camion_12t',
-          tenantId: tenantId,
-          fleet_park: 'Flotte Logistique',
-          device_name: 'Camion Isuzu 12 Tonnes',
-          serial_reference: 'TN-9021',
-          category: 'Véhicule Poids Lourd',
-          status: 'Available',
-          registeredAt: new Date().toISOString(),
-          maxPayloadKg: 12000
-        },
-        {
-          id: 'v_utilitaire_van',
-          tenantId: tenantId,
-          fleet_park: 'Flotte Logistique',
-          device_name: 'Utilitaire Peugeot Partner',
-          serial_reference: 'TN-8840',
-          category: 'Véhicule Utilitaire',
-          status: 'Available',
-          registeredAt: new Date().toISOString(),
-          maxPayloadKg: 1200
-        }
-      ];
-      for (const veh of demoVehicles) {
-        await setDoc(doc(db, 'company_erp_data', tenantId, 'fleet_inventory', veh.id), veh, { merge: true });
-      }
-    }
-
-    showToast('Commandes, Bons de Préparation et Véhicules générés avec succès.', 'success');
-  };
+  }, [tenantId, isDemo]);
 
   // Toggle Selection (Blocked if picking status is not PRÊT AU QUAI / PRÉPARÉ)
   const toggleSelectInvoice = (id: string) => {
@@ -612,11 +681,18 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
   // Filter awaiting invoices
   const awaitingInvoices = useMemo(() => {
     return pendingInvoices.filter(i => {
+      // Strict tenant isolation filter: ignore demo invoices for non-demo tenant
+      if (tenantId !== 'MD' && (i.id === 'FAC-2026-0801' || i.id === 'FAC-2026-POULINA')) {
+        return false;
+      }
+      if ((i as any).tenantId && (i as any).tenantId !== tenantId) {
+        return false;
+      }
       const isPending = (i.delivery_status || 'en_attente') === 'en_attente';
       const matchChannel = channelFilter === 'ALL' || (i.sales_channel || 'web') === channelFilter;
       return isPending && matchChannel;
     });
-  }, [pendingInvoices, channelFilter]);
+  }, [pendingInvoices, channelFilter, tenantId]);
 
   // Computed readiness lists
   const unreadyInvoices = useMemo(() => {
@@ -1037,14 +1113,12 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
           </div>
         </div>
 
-        <button
-          onClick={handleSeedDemoInvoices}
-          className="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center space-x-2 shadow-md transition cursor-pointer shrink-0 border-0"
-          id="btn-seed-demo-invoices"
-        >
-          <Sparkles className="w-4 h-4 text-sky-200" />
-          <span>Générer Factures & Flotte Démo</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3.5 py-1.5 rounded-2xl text-xs font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Flotte & Expéditions Synchronisées</span>
+          </div>
+        </div>
       </div>
 
       {/* Grid Zone 1 & Zone 2 */}
@@ -1141,7 +1215,7 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
               <div className="py-12 text-center text-slate-400 font-sans space-y-3">
                 <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
                 <p className="text-xs font-bold text-slate-600">
-                  Aucune commande en attente dans ce canal.
+                  Aucune commande en attente d'expédition pour ce tenant.
                 </p>
               </div>
             ) : (

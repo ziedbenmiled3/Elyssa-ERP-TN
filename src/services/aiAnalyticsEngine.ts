@@ -7,6 +7,13 @@ export interface LightweightERPContext {
   totalReceivables: number;
   totalPayables: number;
   inventoryValue: number;
+  outOfStockAlerts?: number;
+  employeeCount?: number;
+  todayPresentCount?: number;
+  totalPayroll?: number;
+  activeMissionsCount?: number;
+  availableVehiclesCount?: number;
+  totalVehiclesCount?: number;
   lastUpdate: string;
 }
 
@@ -73,12 +80,45 @@ export class AIAnalyticsEngine {
     }
 
     // 4. Stocks
+    let outOfStockAlerts = 0;
     if (erpData?.inventory_module?.items) {
-      inventoryValue = Object.values(erpData.inventory_module.items).reduce(
-        (acc: number, item: any) => acc + ((item.quantity || 0) * (item.unitPrice || 0)),
+      const items = Array.isArray(erpData.inventory_module.items) ? erpData.inventory_module.items : Object.values(erpData.inventory_module.items);
+      inventoryValue = items.reduce(
+        (acc: number, item: any) => acc + ((item.quantity || 0) * (item.unitPrice || item.price || 0)),
         0
       ) as number;
+      outOfStockAlerts = items.filter((item: any) => (item.quantity ?? 0) <= (item.minThreshold ?? item.min_stock ?? 0)).length;
+    } else if (erpData?.products) {
+      const items = Array.isArray(erpData.products) ? erpData.products : Object.values(erpData.products);
+      inventoryValue = items.reduce(
+        (acc: number, item: any) => acc + ((item.stock || item.quantity || 0) * (item.selling_price || item.unitPrice || 0)),
+        0
+      ) as number;
+      outOfStockAlerts = items.filter((item: any) => (item.stock ?? item.quantity ?? 0) <= (item.minStock ?? item.min_stock ?? 0)).length;
     }
+
+    // 5. RH, Collaborateurs & Pointage
+    let employeeCount = 0;
+    let todayPresentCount = 0;
+    let totalPayroll = 0;
+    const employeesList = erpData?.employees ? (Array.isArray(erpData.employees) ? erpData.employees : Object.values(erpData.employees)) : [];
+    employeeCount = employeesList.length;
+    totalPayroll = employeesList.reduce((acc: number, e: any) => acc + (Number(e.baseSalary || e.salary || 0)), 0);
+
+    const attendances = erpData?.attendance_logs ? (Array.isArray(erpData.attendance_logs) ? erpData.attendance_logs : Object.values(erpData.attendance_logs)) : [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    todayPresentCount = attendances.filter((a: any) => (a.date === todayStr || (a.checkIn && a.checkIn.startsWith(todayStr))) && a.status !== 'Absent').length;
+
+    // 6. Flotte & Missions
+    let activeMissionsCount = 0;
+    let availableVehiclesCount = 0;
+    let totalVehiclesCount = 0;
+    const vehicles = erpData?.fleet_inventory ? (Array.isArray(erpData.fleet_inventory) ? erpData.fleet_inventory : Object.values(erpData.fleet_inventory)) : [];
+    totalVehiclesCount = vehicles.length;
+    availableVehiclesCount = vehicles.filter((v: any) => v.status === 'Available' || v.status === 'disponible' || v.status === 'Actif').length;
+
+    const missions = erpData?.fleet_missions ? (Array.isArray(erpData.fleet_missions) ? erpData.fleet_missions : Object.values(erpData.fleet_missions)) : [];
+    activeMissionsCount = missions.filter((m: any) => m.status === 'IN_PROGRESS' || m.status === 'EN_ROUTE' || m.status === 'en_cours').length;
 
     return {
       cashBalance,
@@ -87,6 +127,13 @@ export class AIAnalyticsEngine {
       totalReceivables,
       totalPayables,
       inventoryValue,
+      outOfStockAlerts,
+      employeeCount,
+      todayPresentCount,
+      totalPayroll,
+      activeMissionsCount,
+      availableVehiclesCount,
+      totalVehiclesCount,
       lastUpdate: new Date().toISOString()
     };
   }

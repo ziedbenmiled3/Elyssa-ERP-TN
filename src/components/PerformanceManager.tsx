@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Target, Award, TrendingUp, Users, CheckCircle2, AlertCircle, Clock, 
   DollarSign, FileText, Plus, Trash2, RefreshCw, Send, ShieldCheck, 
   Sparkles, Check, ChevronRight, BarChart3, Lock, Unlock, Building2, Truck, Calculator,
-  Settings, Sliders, Info, ShieldAlert, UserCheck, Key, Smartphone, Printer
+  Settings, Sliders, Info, ShieldAlert, UserCheck, Key, Smartphone, Printer, Search
 } from 'lucide-react';
 import { PerformanceContract, KPIItem, Employee, Invoice, DeliveryTour, Payslip, TripartiteWeightingConfig } from '../types';
 import { MPOContractTemplate } from './MPOContractTemplate';
@@ -14,25 +14,27 @@ import {
   injectPrimeIntoPayroll,
   computeTripartiteBreakdown,
   DEFAULT_TRIPARTITE_CONFIG,
-  DEFAULT_DEMO_PERFORMANCE_CONTRACTS,
-  DEMO_MPO_MANAGERS,
+  getTenantMpoManagers,
+  generateTenantDemoPerformanceContracts,
   MPOManager
 } from '../services/performanceContractService';
 
 interface PerformanceManagerProps {
   tenantId?: string;
+  isTrial?: boolean;
   employees: Employee[];
   invoices?: Invoice[];
   deliveryTours?: DeliveryTour[];
   payslips: Payslip[];
   onUpdatePayslips: (payslips: Payslip[]) => void;
-  currentUser?: { email: string; name?: string; role?: string };
+  currentUser?: { email?: string; name?: string; role?: string; department?: string; structure?: string; companyName?: string; id?: string } | null;
   performanceContracts: PerformanceContract[];
   onUpdateContracts: (contracts: PerformanceContract[]) => void;
 }
 
 export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
-  tenantId = 'Inter-Affaires',
+  tenantId = 'MD',
+  isTrial = false,
   employees = [],
   invoices = [],
   deliveryTours = [],
@@ -73,7 +75,7 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
               background-color: white !important; 
               color: #0f172a !important; 
               -webkit-print-color-adjust: exact !important; 
-              print-color-adjust: exact !important;
+              print-color-adjust: exact !important; 
               margin: 0;
               padding: 20px;
             }
@@ -110,11 +112,83 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
   };
 
   // Manager Authentication & Security PIN State
-  const [activeManager, setActiveManager] = useState<MPOManager | null>(DEMO_MPO_MANAGERS[0]); // Default to Super Admin on initial demo
+  const availableManagers = useMemo(() => {
+    return getTenantMpoManagers(tenantId, currentUser, employees);
+  }, [tenantId, currentUser, employees]);
+
+  const [activeManager, setActiveManager] = useState<MPOManager | null>(() => availableManagers[0] || null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [selectedManagerId, setSelectedManagerId] = useState<string>(DEMO_MPO_MANAGERS[0].id);
+  const [selectedManagerId, setSelectedManagerId] = useState<string>(availableManagers[0]?.id || 'MGR-ACTIVE-USER');
   const [inputPin, setInputPin] = useState<string>('');
   const [pinError, setPinError] = useState<string | null>(null);
+
+  // Sync active manager with available managers list on profile/tenant update
+  useEffect(() => {
+    if (availableManagers.length > 0) {
+      setActiveManager(prev => {
+        if (!prev) return availableManagers[0];
+        const match = availableManagers.find(m => m.id === prev.id || m.name === prev.name);
+        return match || availableManagers[0];
+      });
+      setSelectedManagerId(prev => {
+        const match = availableManagers.find(m => m.id === prev);
+        return match ? prev : availableManagers[0].id;
+      });
+    }
+  }, [availableManagers]);
+
+  // Automatic Seed in Trial Mode or healing missing poles
+  useEffect(() => {
+    if (isTrial && (!performanceContracts || performanceContracts.length === 0)) {
+      const managerName = activeManager?.name || currentUser?.name || (tenantId === 'MD' ? 'Meriam Doudou' : 'Direction Générale');
+      const demoContracts = generateTenantDemoPerformanceContracts(tenantId, employees, managerName);
+      demoContracts.forEach(c => savePerformanceContract(tenantId, c));
+      onUpdateContracts(demoContracts);
+    } else if (performanceContracts && performanceContracts.length > 0) {
+      let needsHeal = false;
+      const healed = performanceContracts.map(c => {
+        let assignedPole = c.pole;
+        let assignedDept = c.department;
+        const nameLower = (c.employee_name || '').toLowerCase();
+        
+        if (!assignedPole || assignedPole === 'Finance & Comptabilité' || assignedPole === 'Ressources Humaines' || assignedPole === 'Ventes & Commercial Terrain' || assignedPole === 'Logistique & Expéditions') {
+          if (nameLower.includes('khaled') || nameLower.includes('amor') || nameLower.includes('ines') || nameLower.includes('dridi')) {
+            assignedPole = 'Finance';
+            assignedDept = 'Finance';
+            needsHeal = true;
+          } else if (nameLower.includes('amel') || nameLower.includes('soltane')) {
+            assignedPole = 'RH';
+            assignedDept = 'RH';
+            needsHeal = true;
+          } else if (nameLower.includes('gharbi') || nameLower.includes('cherif') || nameLower.includes('mohamed')) {
+            assignedPole = 'Ventes';
+            assignedDept = 'Ventes';
+            needsHeal = true;
+          } else if (nameLower.includes('mansour') || nameLower.includes('sami')) {
+            assignedPole = 'Direction & IT';
+            assignedDept = 'Direction & IT';
+            needsHeal = true;
+          } else if (nameLower.includes('salem') || nameLower.includes('hamza') || nameLower.includes('trad')) {
+            assignedPole = 'Logistique';
+            assignedDept = 'Logistique';
+            needsHeal = true;
+          } else if (!assignedPole) {
+            assignedPole = assignedDept || 'Direction & IT';
+            needsHeal = true;
+          }
+        }
+        return {
+          ...c,
+          pole: assignedPole,
+          department: assignedDept
+        };
+      });
+
+      if (needsHeal) {
+        onUpdateContracts(healed);
+      }
+    }
+  }, [isTrial, tenantId, employees, activeManager, currentUser, performanceContracts, onUpdateContracts]);
 
   // Tripartite Weighting Settings State
   const [tripartiteConfig, setTripartiteConfig] = useState<TripartiteWeightingConfig>({
@@ -124,8 +198,18 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
     company_achievement_rate: 90.0
   });
 
+  // MPO Table Search query
+  const [searchMpoQuery, setSearchMpoQuery] = useState<string>('');
+
   // Department Achievement Rates
   const [deptRates, setDeptRates] = useState<{ [key: string]: number }>({
+    'Finance': 95.0,
+    'RH': 98.0,
+    'Ventes': 93.6,
+    'Logistique': 91.0,
+    'Direction & IT': 99.0,
+    'Achats': 90.0,
+    'Magasin': 92.0,
     'Finance & Comptabilité': 95.0,
     'Ressources Humaines': 98.0,
     'Achats & Production': 90.0,
@@ -169,7 +253,7 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
   // Handle Manager Authentication by PIN
   const handleAuthenticateManager = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const mgr = DEMO_MPO_MANAGERS.find(m => m.id === selectedManagerId);
+    const mgr = availableManagers.find(m => m.id === selectedManagerId);
     if (!mgr) {
       setPinError('Veuillez sélectionner un responsable.');
       return;
@@ -201,6 +285,81 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
     return activeManager.department;
   }, [activeManager]);
 
+  // Dynamically extract departments and poles from RH repository & contracts
+  const dynamicDepartments = useMemo(() => {
+    const deptsFromStorage: string[] = [];
+    try {
+      const raw = localStorage.getItem(`carthage_${tenantId}_departments`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((d: any) => {
+            const name = typeof d === 'string' ? d : d?.name || d?.label;
+            if (name && typeof name === 'string' && name.trim()) {
+              deptsFromStorage.push(name.trim());
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Error reading tenant departments:', e);
+    }
+
+    // Extract from contracts (both pole and department)
+    const fromContracts: string[] = [];
+    (performanceContracts || []).forEach(c => {
+      if (c.pole && c.pole.trim()) fromContracts.push(c.pole.trim());
+      if (c.department && c.department.trim()) fromContracts.push(c.department.trim());
+    });
+
+    // Extract from employees
+    const fromEmployees: string[] = [];
+    (employees || []).forEach(e => {
+      const empPole = (e as any).pole;
+      if (empPole && typeof empPole === 'string' && empPole.trim()) fromEmployees.push(empPole.trim());
+      if (e.department && typeof e.department === 'string' && e.department.trim()) fromEmployees.push(e.department.trim());
+    });
+
+    // Combine uniquely while keeping clean display
+    const set = new Set<string>();
+    [...deptsFromStorage, ...fromContracts, ...fromEmployees].forEach(item => {
+      if (item && item !== 'ALL' && item !== 'Tous pôles' && item !== 'Direction Générale') {
+        set.add(item);
+      }
+    });
+
+    // Fallback if empty
+    if (set.size === 0) {
+      return ['Finance', 'RH', 'Ventes', 'Logistique', 'Direction & IT'];
+    }
+
+    return Array.from(set);
+  }, [tenantId, performanceContracts, employees]);
+
+  // Helper for pole badge visual identity
+  const getPoleBadgeStyle = (pole?: string) => {
+    const p = (pole || '').toLowerCase();
+    if (p.includes('finan')) {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-300';
+    }
+    if (p.includes('rh') || p.includes('ressour')) {
+      return 'bg-purple-50 text-purple-700 border-purple-300';
+    }
+    if (p.includes('vent') || p.includes('commer')) {
+      return 'bg-sky-50 text-sky-700 border-sky-300';
+    }
+    if (p.includes('direct') || p.includes('it') || p.includes('tech')) {
+      return 'bg-rose-50 text-rose-700 border-rose-300';
+    }
+    if (p.includes('logis') || p.includes('exped') || p.includes('trans')) {
+      return 'bg-amber-50 text-amber-700 border-amber-300';
+    }
+    if (p.includes('achat') || p.includes('appro')) {
+      return 'bg-indigo-50 text-indigo-700 border-indigo-300';
+    }
+    return 'bg-slate-100 text-slate-700 border-slate-300';
+  };
+
   // All contracts currently stored
   const allContracts = useMemo(() => {
     return performanceContracts;
@@ -212,21 +371,42 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
 
     // 1. Strict Isolation by Active Manager Scope
     if (activeScope !== 'ALL' && activeScope !== 'NONE') {
-      const scopeLower = (activeScope || '').toLowerCase();
+      const scopeLower = (activeScope || '').toLowerCase().trim();
       list = list.filter(c => {
-        const deptLower = (c.department || '').toLowerCase();
-        return deptLower.includes(scopeLower) || (!!deptLower && scopeLower.includes(deptLower));
+        const deptLower = (c.department || '').toLowerCase().trim();
+        const poleLower = (c.pole || '').toLowerCase().trim();
+        return deptLower === scopeLower || poleLower === scopeLower ||
+               deptLower.includes(scopeLower) || scopeLower.includes(deptLower) ||
+               poleLower.includes(scopeLower) || scopeLower.includes(poleLower);
       });
     }
 
-    // 2. Secondary UI filter for Super Admin
+    // 2. Secondary UI filter for Super Admin / All scope
     if (activeScope === 'ALL' && filterDepartment !== 'ALL') {
-      const filterLower = (filterDepartment || '').toLowerCase();
-      list = list.filter(c => (c.department || '').toLowerCase().includes(filterLower));
+      const filterLower = (filterDepartment || '').toLowerCase().trim();
+      list = list.filter(c => {
+        const deptLower = (c.department || '').toLowerCase().trim();
+        const poleLower = (c.pole || '').toLowerCase().trim();
+        return deptLower === filterLower || poleLower === filterLower ||
+               deptLower.includes(filterLower) || filterLower.includes(deptLower) ||
+               poleLower.includes(filterLower) || filterLower.includes(poleLower);
+      });
+    }
+
+    // 3. Search Query Filter (multi-column)
+    if (searchMpoQuery.trim()) {
+      const query = searchMpoQuery.toLowerCase().trim();
+      list = list.filter(c => {
+        const name = (c.employee_name || '').toLowerCase();
+        const role = (c.role || '').toLowerCase();
+        const pole = (c.pole || '').toLowerCase();
+        const dept = (c.department || '').toLowerCase();
+        return name.includes(query) || role.includes(query) || pole.includes(query) || dept.includes(query);
+      });
     }
 
     return list;
-  }, [allContracts, activeScope, filterDepartment]);
+  }, [allContracts, activeScope, filterDepartment, searchMpoQuery]);
 
   // Filtered employees list for contract creation form based on active manager's perimeter
   const allowedEmployeesForForm = useMemo(() => {
@@ -435,7 +615,7 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
     });
 
     const individualRate = totalWeight > 0 ? Math.round(totalWeightedScore * 100) / 100 : 0;
-    const empDept = selectedEmployeeObj?.department || activeScope !== 'ALL' ? activeScope : 'Finance & Comptabilité';
+    const empDept = (selectedEmployeeObj as any)?.pole || selectedEmployeeObj?.department || (activeScope !== 'ALL' ? activeScope : 'Finance');
 
     const tripartite = computeTripartiteBreakdown(
       formPrimeTarget,
@@ -457,14 +637,11 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
 
   // Load Cross-Module Demo Data ("CHARGER DÉMOS")
   const handleLoadDemos = () => {
-    const demoContracts = DEFAULT_DEMO_PERFORMANCE_CONTRACTS.map(c => ({
-      ...c,
-      is_demo: true,
-      is_demo_data: true
-    }));
+    const managerName = activeManager?.name || currentUser?.name || (tenantId === 'MD' ? 'Meriam Doudou' : 'Direction Générale');
+    const demoContracts = generateTenantDemoPerformanceContracts(tenantId, employees, managerName);
     demoContracts.forEach(c => savePerformanceContract(tenantId, c));
     onUpdateContracts(demoContracts);
-    showToast('⚡ Panel complet de responsables & contrats démo chargés avec succès sur tous les pôles !');
+    showToast(`⚡ Contrats d'objectifs MPO assignés avec succès aux collaborateurs (${demoContracts.length} contrats) !`);
   };
 
   // Purge Demo Data ("PURGER")
@@ -577,7 +754,8 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
       tenantId,
       employee_id: formEmployeeId,
       employee_name: emp ? emp.name : 'Collaborateur',
-      department: emp?.department || (activeScope !== 'ALL' ? activeScope : 'Finance & Comptabilité'),
+      department: emp?.department || (emp as any)?.pole || (activeScope !== 'ALL' ? activeScope : 'Finance'),
+      pole: (emp as any)?.pole || emp?.department || (activeScope !== 'ALL' ? activeScope : 'Finance'),
       role: emp?.jobTitle || 'Collaborateur Elyssa ERP',
       period: formPeriod,
       year: formYear,
@@ -589,7 +767,7 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
       tripartite_config: formPreviewCalculations.tripartite.tripartite_config,
       tripartite_breakdown: formPreviewCalculations.tripartite.tripartite_breakdown,
       status: statusToSet,
-      signed_at: statusToSet === 'valide_signe' ? new Date().toISOString() : undefined,
+      ...(statusToSet === 'valide_signe' ? { signed_at: new Date().toISOString() } : {}),
       kpis: formKpis,
       created_at: new Date().toISOString()
     };
@@ -668,7 +846,7 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
                   }}
                   className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-3.5 py-3 text-xs font-extrabold text-white focus:outline-hidden focus:ring-2 focus:ring-rose-500 cursor-pointer"
                 >
-                  {DEMO_MPO_MANAGERS.map(m => (
+                  {availableManagers.map(m => (
                     <option key={m.id} value={m.id}>
                       {m.name} ({m.role} - {m.department})
                     </option>
@@ -715,12 +893,9 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
                 💡 Codes PIN d'Accès Démo :
               </span>
               <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-mono text-[10.5px]">
-                <div>• Super Admin : <strong className="text-white">123456</strong></div>
-                <div>• Ines Dridi (Fin) : <strong className="text-white">222333</strong></div>
-                <div>• Sami Mansour (RH) : <strong className="text-white">555111</strong></div>
-                <div>• Nizar Trabelsi (Ach) : <strong className="text-white">666111</strong></div>
-                <div>• Kamel Trad (Log) : <strong className="text-white">444444</strong></div>
-                <div>• Sami Cherif (Com) : <strong className="text-white">333333</strong></div>
+                {availableManagers.slice(0, 6).map(m => (
+                  <div key={m.id}>• {m.name.split(' ')[0]} ({m.department.substring(0, 3)}) : <strong className="text-white">{m.pin_code}</strong></div>
+                ))}
               </div>
             </div>
           </div>
@@ -786,25 +961,8 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
             </p>
           </div>
 
-          {/* Action Buttons: Demos & Settings */}
+          {/* Action Buttons: Settings & New Contract */}
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={handleLoadDemos}
-              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black px-4 py-2.5 rounded-2xl text-xs shadow-md transition flex items-center space-x-2 cursor-pointer"
-              title="Charger un panel complet de responsables et contrats démo sur tous les pôles"
-            >
-              <Sparkles className="w-4 h-4 text-slate-950" />
-              <span>CHARGER DÉMOS</span>
-            </button>
-
-            <button
-              onClick={handlePurgeDemos}
-              className="bg-slate-800 hover:bg-rose-900/80 text-rose-300 border border-rose-500/30 px-3 py-2.5 rounded-2xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              <span>PURGER</span>
-            </button>
-
             <button
               onClick={() => setShowSettingsPanel(!showSettingsPanel)}
               className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center space-x-2 border cursor-pointer ${
@@ -1103,250 +1261,249 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
             </div>
           </div>
 
-          {/* Active Contracts Grid with Tripartite Breakdown */}
+          {/* Active Contracts Compact Datagrid with Toolbar and Tripartite Breakdown */}
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-3">
-              <h3 className="text-base font-black text-slate-900 font-display flex items-center space-x-2">
-                <Award className="w-5 h-5 text-rose-500" />
-                <span>Cartes de Contrats d'Objectifs (Périmètre : {activeScope})</span>
-              </h3>
+            {/* Toolbar: Search, Filters and Counter */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un collaborateur, pôle, rôle..."
+                    value={searchMpoQuery}
+                    onChange={(e) => setSearchMpoQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium"
+                    id="input-mpo-search"
+                  />
+                </div>
 
-              {activeScope === 'ALL' && (
-                <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs">
-                  {['ALL', 'Finance', 'RH', 'Achats', 'Logistique', 'Ventes', 'Magasin'].map(dept => (
+                {activeScope === 'ALL' && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-1">
                     <button
-                      key={dept}
-                      onClick={() => setFilterDepartment(dept)}
-                      className={`px-3 py-1.5 rounded-xl font-extrabold transition cursor-pointer ${
-                        filterDepartment === dept
-                          ? 'bg-white text-slate-900 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
+                      key="ALL"
+                      onClick={() => setFilterDepartment('ALL')}
+                      className={`px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shrink-0 ${
+                        filterDepartment === 'ALL'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
-                      {dept === 'ALL' ? 'Tous pôles' : dept}
+                      Tous pôles
                     </button>
-                  ))}
-                </div>
-              )}
+                    {dynamicDepartments.map(dept => (
+                      <button
+                        key={dept}
+                        onClick={() => setFilterDepartment(dept)}
+                        className={`px-3 py-1.5 rounded-xl font-black text-xs transition cursor-pointer shrink-0 ${
+                          filterDepartment === dept || filterDepartment.toLowerCase() === dept.toLowerCase()
+                            ? 'bg-rose-600 text-white shadow-xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {dept}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between md:justify-end gap-2 text-xs font-mono shrink-0">
+                <span className="text-slate-500 font-bold bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                  {activeContractsList.length} contrat(s) affiché(s)
+                </span>
+              </div>
             </div>
 
-            {activeContractsList.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-3">
-                <ShieldAlert className="w-12 h-12 text-slate-300 mx-auto" />
-                <h4 className="text-base font-black text-slate-800">Aucun contrat trouvé pour ce périmètre</h4>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Cliquez sur <strong className="text-amber-600">"CHARGER DÉMOS"</strong> pour alimenter l'ensemble des pôles avec des contrats d'objectifs de démonstration.
-                </p>
+            {/* Compact Datagrid Table (max-height 480px) */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider font-display flex items-center space-x-2">
+                  <Award className="w-4 h-4 text-rose-500" />
+                  <span>Tableau de Suivi des Contrats d'Objectifs MPO/OKR (Périmètre : {activeScope})</span>
+                </h3>
+                <span className="text-[10px] font-mono text-slate-400 font-bold">
+                  1 ligne = 1 contrat
+                </span>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {activeContractsList.map(contract => {
-                  const breakdown = contract.tripartite_breakdown || {
-                    weight_entreprise: 70,
-                    rate_entreprise: 90.0,
-                    prime_entreprise: contract.prime_target_tnd * 0.70 * 0.90,
-                    weight_direction: 20,
-                    rate_direction: 91.0,
-                    prime_direction: contract.prime_target_tnd * 0.20 * 0.91,
-                    weight_personnel: 10,
-                    rate_personnel: contract.achievement_rate,
-                    prime_personnel: contract.prime_target_tnd * 0.10 * (contract.achievement_rate / 100),
-                    formula_string: `(${contract.prime_target_tnd} TND × 70% × 90%) + (${contract.prime_target_tnd} TND × 20% × 91%) + (${contract.prime_target_tnd} TND × 10% × ${contract.achievement_rate}%)`
-                  };
 
-                  const isLocked = contract.status === 'valide_signe' || contract.status === 'evalue' || contract.status === 'injecte_paie';
+              <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs" id="table-mpo-contracts-datagrid">
+                  <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs text-slate-600 uppercase text-[9.5px] font-black tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Collaborateur</th>
+                      <th className="py-3 px-4">Pôle / Département</th>
+                      <th className="py-3 px-4 text-center">Pondération Tripartite (Ent./Dir./Ind.)</th>
+                      <th className="py-3 px-4 text-right">Prime Cible (TND)</th>
+                      <th className="py-3 px-4 text-center">% Atteinte</th>
+                      <th className="py-3 px-4 text-right">Prime Calculée (TND)</th>
+                      <th className="py-3 px-4 text-center">Statut Signature</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-150 font-medium">
+                    {activeContractsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-slate-400 font-mono text-xs">
+                          <ShieldAlert className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          Aucun contrat d'objectifs trouvé pour cette recherche ou ce périmètre.
+                        </td>
+                      </tr>
+                    ) : (
+                      activeContractsList.map(contract => {
+                        const breakdown = contract.tripartite_breakdown || {
+                          weight_entreprise: 70,
+                          rate_entreprise: 90.0,
+                          prime_entreprise: contract.prime_target_tnd * 0.70 * 0.90,
+                          weight_direction: 20,
+                          rate_direction: 91.0,
+                          prime_direction: contract.prime_target_tnd * 0.20 * 0.91,
+                          weight_personnel: 10,
+                          rate_personnel: contract.achievement_rate,
+                          prime_personnel: contract.prime_target_tnd * 0.10 * (contract.achievement_rate / 100),
+                          formula_string: `(${contract.prime_target_tnd} TND × 70% × 90%) + (${contract.prime_target_tnd} TND × 20% × 91%) + (${contract.prime_target_tnd} TND × 10% × ${contract.achievement_rate}%)`
+                        };
 
-                  return (
-                    <div
-                      key={contract.id}
-                      className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4 relative"
-                    >
-                      {/* Top status header */}
-                      <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-rose-600 font-mono tracking-wider">
-                            {contract.department}
-                          </span>
-                          <h4 className="text-base font-black text-slate-900">
-                            {contract.employee_name}
-                          </h4>
-                          <p className="text-xs text-slate-500 font-medium">{contract.role}</p>
-                        </div>
+                        const isLocked = contract.status === 'valide_signe' || contract.status === 'evalue' || contract.status === 'injecte_paie';
 
-                        <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border shrink-0 flex items-center space-x-1 ${
-                          contract.status === 'injecte_paie'
-                            ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50'
-                            : contract.status === 'valide_signe'
-                            ? 'bg-sky-950 text-sky-300 border-sky-500/50'
-                            : contract.status === 'en_attente_signature'
-                            ? 'bg-amber-950 text-amber-300 border-amber-500/50'
-                            : 'bg-slate-900 text-slate-300 border-slate-700'
-                        }`}>
-                          {contract.status === 'injecte_paie' ? (
-                            <span>💰 Paie Injectée</span>
-                          ) : contract.status === 'valide_signe' ? (
-                            <>
-                              <Lock className="w-3 h-3 text-sky-400" />
-                              <span>🔒 Contrat Cadre Validé</span>
-                            </>
-                          ) : contract.status === 'en_attente_signature' ? (
-                            <>
-                              <Smartphone className="w-3 h-3 text-amber-400" />
-                              <span>📱 En Attente Sign. Pocket</span>
-                            </>
-                          ) : (
-                            <span>📝 Brouillon</span>
-                          )}
-                        </span>
-                      </div>
+                        return (
+                          <tr key={contract.id} className="hover:bg-rose-50/30 transition-colors">
+                            {/* Collaborateur */}
+                            <td className="py-3 px-4">
+                              <div className="flex flex-col">
+                                <span className="font-black text-slate-900 text-[12px]">{contract.employee_name}</span>
+                                <span className="text-[10px] text-slate-500 font-mono">{contract.role}</span>
+                              </div>
+                            </td>
 
-                      {/* Overall Score */}
-                      <div className="bg-slate-900 text-white rounded-2xl p-4 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-mono">
-                          <span className="text-slate-400 font-bold">Total Prime Tripartite :</span>
-                          <span className="text-lg font-black text-amber-400">{contract.calculated_prime_tnd.toFixed(2)} TND</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                          <span>Prime Cible (100%) : {contract.prime_target_tnd} TND</span>
-                          <span>Atteinte : {contract.achievement_rate}%</span>
-                        </div>
-                      </div>
+                            {/* Pôle / Département */}
+                            <td className="py-3 px-4 whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase font-mono tracking-tight px-2 py-0.5 rounded-lg border ${getPoleBadgeStyle(contract.pole || contract.department)}`}>
+                                {contract.pole || contract.department}
+                              </span>
+                            </td>
 
-                      {/* Tripartite 3 Axes Breakdown Badges */}
-                      <div className="space-y-2.5 bg-slate-950 border border-slate-800 p-3.5 rounded-2xl text-xs">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono block">
-                          Pondération Tripartite Décomposée :
-                        </span>
+                            {/* Pondération Tripartite */}
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1 font-mono text-[10px] bg-slate-900 text-slate-200 px-2.5 py-1 rounded-lg">
+                                <span className="text-rose-400 font-black" title={`Entreprise : ${breakdown.weight_entreprise}% (${breakdown.rate_entreprise}%)`}>
+                                  {breakdown.weight_entreprise}%
+                                </span>
+                                <span className="text-slate-500">/</span>
+                                <span className="text-sky-400 font-black" title={`Direction : ${breakdown.weight_direction}% (${breakdown.rate_direction}%)`}>
+                                  {breakdown.weight_direction}%
+                                </span>
+                                <span className="text-slate-500">/</span>
+                                <span className="text-amber-400 font-black" title={`Individuel : ${breakdown.weight_personnel}% (${breakdown.rate_personnel}%)`}>
+                                  {breakdown.weight_personnel}%
+                                </span>
+                              </div>
+                            </td>
 
-                        {/* Axe 1 : Entreprise */}
-                        <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl space-y-1">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-bold text-slate-200 flex items-center space-x-1">
-                              <Building2 className="w-3.5 h-3.5 text-rose-400" />
-                              <span>Entreprise ({breakdown.weight_entreprise}%)</span>
-                            </span>
-                            <span className="font-black font-mono text-white">
-                              {breakdown.rate_entreprise}% ➔ <span className="text-rose-400">{breakdown.prime_entreprise.toFixed(2)} TND</span>
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-rose-500 h-full rounded-full" style={{ width: `${Math.min(breakdown.rate_entreprise, 100)}%` }}></div>
-                          </div>
-                        </div>
+                            {/* Prime Cible (TND) */}
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-700 whitespace-nowrap">
+                              {contract.prime_target_tnd.toFixed(2)} <span className="text-[10px] text-slate-400">TND</span>
+                            </td>
 
-                        {/* Axe 2 : Direction */}
-                        <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl space-y-1">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-bold text-slate-200 flex items-center space-x-1">
-                              <Truck className="w-3.5 h-3.5 text-sky-400" />
-                              <span>Direction ({breakdown.weight_direction}%)</span>
-                            </span>
-                            <span className="font-black font-mono text-white">
-                              {breakdown.rate_direction}% ➔ <span className="text-sky-400">{breakdown.prime_direction.toFixed(2)} TND</span>
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-sky-500 h-full rounded-full" style={{ width: `${Math.min(breakdown.rate_direction, 100)}%` }}></div>
-                          </div>
-                        </div>
+                            {/* % Atteinte */}
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black font-mono ${
+                                contract.achievement_rate >= 90
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : contract.achievement_rate >= 75
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}>
+                                {contract.achievement_rate}%
+                              </span>
+                            </td>
 
-                        {/* Axe 3 : Personnel */}
-                        <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl space-y-1">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-bold text-slate-200 flex items-center space-x-1">
-                              <Users className="w-3.5 h-3.5 text-amber-400" />
-                              <span>Individuel ({breakdown.weight_personnel}%)</span>
-                            </span>
-                            <span className="font-black font-mono text-white">
-                              {breakdown.rate_personnel}% ➔ <span className="text-amber-400">{breakdown.prime_personnel.toFixed(2)} TND</span>
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-amber-500 h-full rounded-full" style={{ width: `${Math.min(breakdown.rate_personnel, 100)}%` }}></div>
-                          </div>
-                        </div>
-                      </div>
+                            {/* Prime Calculée (TND) */}
+                            <td className="py-3 px-4 text-right font-mono font-black text-amber-600 whitespace-nowrap text-[12px]">
+                              {contract.calculated_prime_tnd.toFixed(2)} <span className="text-[10px] text-slate-400">TND</span>
+                            </td>
 
-                      {/* KPI Items Mini List */}
-                      <div className="space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 font-mono">
-                            KPIs Individuels ({contract.month_name || `${contract.month}/${contract.year}`}) :
-                          </span>
-                          {isLocked && (
-                            <span className="text-[10px] text-amber-600 font-extrabold flex items-center space-x-1">
-                              <Lock className="w-3 h-3" />
-                              <span>Cibles Verrouillées</span>
-                            </span>
-                          )}
-                        </div>
-                        {contract.kpis.map(kpi => (
-                          <div key={kpi.id} className="flex items-center justify-between bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-[11px]">
-                            <span className="truncate max-w-[170px] text-slate-300 font-medium" title={kpi.title}>
-                              • {kpi.title} ({kpi.weight_percent}%)
-                            </span>
-                            <span className="font-black text-amber-300 font-mono shrink-0 ml-1">
-                              {kpi.current_value} / {kpi.target_value} {kpi.unit || ''}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                            {/* Statut Signature */}
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-black uppercase border ${
+                                contract.status === 'injecte_paie'
+                                  ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50'
+                                  : contract.status === 'valide_signe'
+                                  ? 'bg-sky-950 text-sky-300 border-sky-500/50'
+                                  : contract.status === 'en_attente_signature'
+                                  ? 'bg-amber-950 text-amber-300 border-amber-500/50'
+                                  : 'bg-slate-900 text-slate-300 border-slate-700'
+                              }`}>
+                                {contract.status === 'injecte_paie' ? (
+                                  <span>💰 Paie Injectée</span>
+                                ) : contract.status === 'valide_signe' ? (
+                                  <>
+                                    <Lock className="w-2.5 h-2.5 text-sky-400" />
+                                    <span>🔒 Validé Cadre</span>
+                                  </>
+                                ) : contract.status === 'en_attente_signature' ? (
+                                  <>
+                                    <Smartphone className="w-2.5 h-2.5 text-amber-400" />
+                                    <span>📱 Sign. Pocket</span>
+                                  </>
+                                ) : (
+                                  <span>📝 Brouillon</span>
+                                )}
+                              </span>
+                            </td>
 
-                      {/* Bottom Workflow Action Buttons */}
-                      <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100">
-                        <button
-                          onClick={() => setViewingContractForPrint(contract)}
-                          className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-xl text-[11px] transition flex items-center space-x-1 cursor-pointer"
-                          title="Aperçu A4 & Imprimer le Contrat MPO"
-                        >
-                          <Printer className="w-3.5 h-3.5 text-rose-400" />
-                          <span>Imprimer A4</span>
-                        </button>
+                            {/* Actions */}
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  onClick={() => setViewingContractForPrint(contract)}
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition cursor-pointer"
+                                  title="Imprimer A4"
+                                >
+                                  <Printer className="w-3.5 h-3.5 text-rose-500" />
+                                </button>
 
-                        {contract.status === 'brouillon' && (
-                          <button
-                            onClick={() => handleRequestPocketSignature(contract)}
-                            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3 py-1.5 rounded-xl text-[11px] transition flex items-center space-x-1 cursor-pointer"
-                          >
-                            <Smartphone className="w-3.5 h-3.5" />
-                            <span>Demander Sign. Pocket</span>
-                          </button>
-                        )}
+                                {contract.status === 'brouillon' && (
+                                  <button
+                                    onClick={() => handleRequestPocketSignature(contract)}
+                                    className="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-lg text-[10px] transition cursor-pointer"
+                                    title="Demander Sign. Pocket"
+                                  >
+                                    Sign. Pocket
+                                  </button>
+                                )}
 
-                        {contract.status === 'en_attente_signature' && (
-                          <button
-                            onClick={() => handleSignAndLockContract(contract)}
-                            className="bg-sky-600 hover:bg-sky-500 text-white font-black px-3 py-1.5 rounded-xl text-[11px] transition flex items-center space-x-1 cursor-pointer"
-                          >
-                            <Lock className="w-3.5 h-3.5" />
-                            <span>Valider & Verrouiller</span>
-                          </button>
-                        )}
+                                {contract.status === 'en_attente_signature' && (
+                                  <button
+                                    onClick={() => handleSignAndLockContract(contract)}
+                                    className="px-2 py-1 bg-sky-600 hover:bg-sky-500 text-white font-black rounded-lg text-[10px] transition cursor-pointer"
+                                    title="Valider & Verrouiller"
+                                  >
+                                    Valider
+                                  </button>
+                                )}
 
-                        {isLocked && (
-                          <span className="text-[11px] text-sky-700 font-black flex items-center space-x-1 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-xl">
-                            <Lock className="w-3.5 h-3.5 text-sky-600" />
-                            <span>🔒 Contrat Cadre Validé</span>
-                          </span>
-                        )}
-
-                        {contract.status !== 'injecte_paie' ? (
-                          <button
-                            onClick={() => handleInjectPayroll(contract)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3 py-1.5 rounded-xl text-[11px] shadow-xs transition flex items-center space-x-1 cursor-pointer ml-auto"
-                          >
-                            <DollarSign className="w-3.5 h-3.5" />
-                            <span>Transmettre Paie</span>
-                          </button>
-                        ) : (
-                          <span className="text-[11px] text-emerald-600 font-black ml-auto">✓ Paie Injectée</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                                {contract.status !== 'injecte_paie' ? (
+                                  <button
+                                    onClick={() => handleInjectPayroll(contract)}
+                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-lg text-[10px] transition cursor-pointer shadow-xs"
+                                    title="Transmettre Paie"
+                                  >
+                                    + Paie
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-emerald-600 font-black">✓ Transmis</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}
@@ -1627,10 +1784,10 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
               <div className="bg-slate-950 p-2 sm:p-4 rounded-2xl border border-slate-800 max-h-[600px] overflow-y-auto">
                 <MPOContractTemplate
                   id="mpo-contract-document"
-                  tenantName="SOCIÉTÉ TUNISIENNE ELYSSA S.A."
+                  tenantName={tenantId === 'MD' || tenantId?.toLowerCase().includes('md') ? 'MD DISTRIB S.A.' : (currentUser?.companyName || 'SOCIÉTÉ TUNISIENNE ELYSSA S.A.')}
                   employeeName={selectedEmployeeObj ? selectedEmployeeObj.name : ''}
                   employeePost={selectedEmployeeObj?.jobTitle || 'Collaborateur / Agent'}
-                  department={selectedEmployeeObj?.department || (activeScope !== 'ALL' ? activeScope : 'Finance & Comptabilité')}
+                  department={(selectedEmployeeObj as any)?.pole || selectedEmployeeObj?.department || (activeScope !== 'ALL' ? activeScope : 'Finance')}
                   period={formPeriod}
                   year={formYear}
                   monthName={`${['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'][formMonth - 1]} ${formYear}`}
@@ -1640,8 +1797,8 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
                   tripartiteConfig={formPreviewCalculations.tripartite.tripartite_config}
                   tripartiteBreakdown={formPreviewCalculations.tripartite.tripartite_breakdown}
                   kpis={formKpis}
-                  managerName={activeManager?.name || 'MED ZIED BEN MILED'}
-                  managerRole={activeManager?.role || 'Fondateur & Super Admin MPO'}
+                  managerName={activeManager?.name || currentUser?.name || (tenantId === 'MD' || tenantId?.toLowerCase().includes('md') ? 'Meriam Doudou' : 'Direction Générale')}
+                  managerRole={activeManager?.role || (currentUser?.role === 'SuperAdmin' ? 'Directeur Général / Super Admin' : (currentUser?.role || 'Directeur Général'))}
                   showPrintActions={true}
                   onPrint={() => handlePrintMPOContract('mpo-contract-document', selectedEmployeeObj?.name)}
                 />
@@ -1724,7 +1881,9 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
                       <span className="block text-[10px] text-slate-400 font-mono">{contract.employee_id}</span>
                     </td>
                     <td className="p-3.5">
-                      <span className="font-bold text-slate-800">{contract.department}</span>
+                      <span className={`inline-block text-[10px] font-black uppercase font-mono px-2 py-0.5 rounded border mb-0.5 ${getPoleBadgeStyle(contract.pole || contract.department)}`}>
+                        {contract.pole || contract.department}
+                      </span>
                       <span className="block text-[10px] text-slate-500">{contract.role}</span>
                     </td>
                     <td className="p-3.5 font-bold text-slate-700">
@@ -1804,10 +1963,10 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
             <div className="bg-slate-950 p-4 rounded-2xl flex justify-center border border-slate-800">
               <MPOContractTemplate
                 id={`mpo-contract-${viewingContractForPrint.id}`}
-                tenantName="SOCIÉTÉ TUNISIENNE ELYSSA S.A."
+                tenantName={tenantId === 'MD' || tenantId?.toLowerCase().includes('md') ? 'MD DISTRIB S.A.' : (currentUser?.companyName || 'SOCIÉTÉ TUNISIENNE ELYSSA S.A.')}
                 employeeName={viewingContractForPrint.employee_name}
                 employeePost={viewingContractForPrint.role}
-                department={viewingContractForPrint.department}
+                department={viewingContractForPrint.pole || viewingContractForPrint.department}
                 period={viewingContractForPrint.period}
                 year={viewingContractForPrint.year}
                 monthName={viewingContractForPrint.month_name}
@@ -1819,8 +1978,8 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
                 kpis={viewingContractForPrint.kpis}
                 status={viewingContractForPrint.status}
                 signedAt={viewingContractForPrint.signed_at}
-                managerName={activeManager?.name || 'MED ZIED BEN MILED'}
-                managerRole={activeManager?.role || 'Fondateur & Super Admin MPO'}
+                managerName={activeManager?.name || currentUser?.name || (tenantId === 'MD' || tenantId?.toLowerCase().includes('md') ? 'Meriam Doudou' : 'Direction Générale')}
+                managerRole={activeManager?.role || (currentUser?.role === 'SuperAdmin' ? 'Directeur Général / Super Admin' : (currentUser?.role || 'Directeur Général'))}
                 showPrintActions={true}
                 onPrint={() => handlePrintMPOContract(`mpo-contract-${viewingContractForPrint.id}`, viewingContractForPrint.employee_name)}
               />

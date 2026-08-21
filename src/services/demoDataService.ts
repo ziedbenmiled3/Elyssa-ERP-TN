@@ -254,7 +254,7 @@ export async function clearDemoData(tenantId: string): Promise<PurgeReport> {
     'carthage_year_end_closings', 'carthage_accounting_entries', 'carthage_documents',
     'carthage_employees', 'carthage_contracts', 'carthage_absences', 'carthage_payslips',
     'carthage_collaborators', 'carthage_attendance_logs', 'carthage_attendance_records',
-    'carthage_biometric_alerts', 'carthage_timesheets', 'carthage_mpo_contracts', 'elyssa_mpo_contracts', 'carthage_employee_objectives',
+    'carthage_biometric_alerts', 'carthage_timesheets', 'carthage_mpo_contracts', 'elyssa_mpo_contracts', 'carthage_performance_contracts', 'carthage_employee_objectives',
     `elyssa_attendance_records_${companyId}`, 'elyssa_pocket_punches',
     'carthage_assets_immobilisations', 'carthage_cession_entries', 'carthage_company_transfer_audits', 'carthage_dataroom',
     'carthage_audit_logs', 'carthage_cession_events', 'carthage_system_actions',

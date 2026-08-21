@@ -50,13 +50,13 @@ export function useAiCopilot(companyId: string) {
       if (res.ok) {
         const json = await res.json();
         setData(json);
-      } else if (res.status === 404) {
-        setData(null);
       } else {
-        throw new Error('Erreur lors de la récupération des insights');
+        // Silently fallback if 404 or unhandled endpoint
+        setData(null);
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (_err) {
+      // Catch network or parse errors silently
+      setData(null);
     } finally {
       setIsLoading(false);
     }

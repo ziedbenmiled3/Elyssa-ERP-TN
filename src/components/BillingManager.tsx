@@ -3,13 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Invoice, Client, InvoiceStatus, RecouvrementStep, AdminSettings, SmtpSettings, EmailTemplate, CommunicationLog } from '../types';
 import { calculateInvoiceAmounts, formatTND, getCompanyLegalHeader } from '../utils/calculations';
+import { computeInvoiceTaxes } from '../services/taxCalculations';
 import IframePrintHelper from './IframePrintHelper';
 import DocumentPrintModal, { PrintModalData } from './DocumentPrintModal';
 import { ElyssaLogo } from './ElyssaLogo';
 import { INITIAL_EMAIL_TEMPLATES } from '../data/mockData';
+import { DEFAULT_DEMO_CLIENTS } from './ClientManager';
 import { 
   Plus, 
   Calendar, 
@@ -125,19 +127,189 @@ interface BillingManagerProps {
   emailTemplates?: EmailTemplate[];
   communicationLogs?: CommunicationLog[];
   onUpdateCommunicationLogs?: (logs: CommunicationLog[]) => void;
+  activeTenantId?: string;
+  isDemoCompany?: boolean;
 }
 
+export const DEFAULT_DEMO_INVOICES: Invoice[] = [
+  {
+    id: "demo-inv_1",
+    invoiceNumber: "FAC-2026-001",
+    clientId: "demo-cli_1",
+    clientName: "Société Tunisienne de Construction (STC)",
+    amountHT: 10000.000,
+    vatRate: 19,
+    vatAmount: 1900.000,
+    withholdingTaxRate: 1.5,
+    withholdingAmount: 150.000,
+    amountNetToPay: 11750.000,
+    amountTTC: 11900.000,
+    status: "Paid",
+    issuedDate: "2026-07-15",
+    dueDate: "2026-07-15",
+    collectedAmount: 11750.000,
+    withholdingCertificateReceived: true,
+    delivery_status: "livre",
+    delivery_address: "Zone Industrielle Charguia II, Tunis",
+    sales_channel: "web",
+    warehouse_location: "Dépôt Central Radès",
+    items: [
+      { code: "CIM-CPJ45", description: "Ciment CPJ 45 (Sac 50kg)", quantity: 400, unitPrice: 14.500, totalTTC: 6902.000 },
+      { code: "FER-BETON-12", description: "Rond à béton Ø12mm", quantity: 150, unitPrice: 28.000, totalTTC: 4998.000 }
+    ],
+    recouvrementSteps: [],
+    is_demo: true
+  },
+  {
+    id: "demo-inv_2",
+    invoiceNumber: "FAC-2026-002",
+    clientId: "demo-cli_2",
+    clientName: "Comptoir du Centre",
+    amountHT: 8500.000,
+    vatRate: 19,
+    vatAmount: 1615.000,
+    withholdingTaxRate: 1.5,
+    withholdingAmount: 127.500,
+    amountNetToPay: 9987.500,
+    amountTTC: 10115.000,
+    status: "Unpaid",
+    issuedDate: "2026-08-10",
+    dueDate: "2026-09-10",
+    collectedAmount: 0,
+    withholdingCertificateReceived: false,
+    delivery_status: "en_attente",
+    delivery_address: "Avenue Léopold Senghor, Sousse",
+    sales_channel: "pos",
+    warehouse_location: "Magasin Principal Tunis",
+    items: [
+      { code: "PNT-BLA-15L", description: "Peinture Blanche 15L", quantity: 60, unitPrice: 85.000, totalTTC: 6069.000 },
+      { code: "OUT-PRO-230", description: "Outillage pro (Meuleuse 230mm)", quantity: 20, unitPrice: 145.000, totalTTC: 4046.000 }
+    ],
+    recouvrementSteps: [],
+    is_demo: true
+  },
+  {
+    id: "demo-inv_3",
+    invoiceNumber: "FAC-2026-003",
+    clientId: "demo-cli_3",
+    clientName: "Afrique Bâtiment",
+    amountHT: 14200.000,
+    vatRate: 19,
+    vatAmount: 2698.000,
+    withholdingTaxRate: 1.5,
+    withholdingAmount: 213.000,
+    amountNetToPay: 16685.000,
+    amountTTC: 16898.000,
+    status: "Unpaid",
+    issuedDate: "2026-06-01",
+    dueDate: "2026-07-01",
+    collectedAmount: 0,
+    withholdingCertificateReceived: false,
+    delivery_status: "livre",
+    delivery_address: "Route de Gabès Km 3, Sfax",
+    sales_channel: "field_sales",
+    warehouse_location: "Dépôt Central Radès",
+    items: [
+      { code: "FER-BETON-12", description: "Rond à béton Ø12mm (Barre 12m)", quantity: 300, unitPrice: 28.000, totalTTC: 9996.000 },
+      { code: "CIM-CPJ45", description: "Ciment CPJ 45 (Sac 50kg)", quantity: 400, unitPrice: 14.500, totalTTC: 6902.000 }
+    ],
+    recouvrementSteps: [
+      { id: "step_1", date: "2026-07-05", actionType: "Email", notes: "Relance amiable niveau 1 transmise au service comptable.", performedBy: "Khaled Ben Amor" },
+      { id: "step_2", date: "2026-07-20", actionType: "Call", notes: "Appel téléphonique au DAF d'Afrique Bâtiment, promesse de virement fin de mois.", performedBy: "Khaled Ben Amor" }
+    ],
+    is_demo: true
+  }
+];
+
 export default function BillingManager({ 
-  invoices, 
-  clients, 
+  invoices: incomingInvoices, 
+  clients: incomingClients, 
   adminSettings, 
   onUpdateAdminSettings,
   onUpdateInvoices,
   smtpSettings,
   emailTemplates = [],
   communicationLogs = [],
-  onUpdateCommunicationLogs
+  onUpdateCommunicationLogs,
+  activeTenantId,
+  isDemoCompany = false
 }: BillingManagerProps) {
+  // Strict check for Demo tenant vs Production tenant
+  const isDemoTenant = React.useMemo(() => {
+    if (isDemoCompany) return true;
+    const tid = String(activeTenantId || localStorage.getItem('carthage_active_company') || '').toLowerCase().trim();
+    if (tid.includes('parent') || tid.includes('prod') || tid === 'inter-affaires' || tid === 'company_parent' || tid === 'elyssa entreprises s.a.') {
+      return false;
+    }
+    return tid === 'inter-affaires-demo' || tid === 'demo' || tid === 'company_demo' || tid.includes('démo') || tid.includes('demo') || tid.includes('sandbox');
+  }, [activeTenantId, isDemoCompany]);
+
+  // Direct state initialization: STRICT isolation (empty [] for PROD, demo only for demo tenants)
+  const [invoices, setInvoices] = useState<Invoice[]>(() => {
+    if (!isDemoTenant) {
+      try {
+        localStorage.removeItem('carthage_demo_invoices');
+      } catch (_) {}
+      return Array.isArray(incomingInvoices) 
+        ? incomingInvoices.filter(i => !i.is_demo && !String(i.id || '').startsWith('demo-')) 
+        : [];
+    }
+    if (Array.isArray(incomingInvoices) && incomingInvoices.length > 0) {
+      return incomingInvoices;
+    }
+    return DEFAULT_DEMO_INVOICES;
+  });
+
+  const [clients, setClients] = useState<Client[]>(() => {
+    if (!isDemoTenant) {
+      try {
+        localStorage.removeItem('carthage_demo_clients');
+      } catch (_) {}
+      return Array.isArray(incomingClients) 
+        ? incomingClients.filter(c => !c.is_demo && !String(c.id || '').startsWith('demo-')) 
+        : [];
+    }
+    if (Array.isArray(incomingClients) && incomingClients.length > 0) {
+      return incomingClients;
+    }
+    return DEFAULT_DEMO_CLIENTS;
+  });
+
+  useEffect(() => {
+    if (!isDemoTenant) {
+      try {
+        localStorage.removeItem('carthage_demo_invoices');
+      } catch (_) {}
+      const sanitized = Array.isArray(incomingInvoices) 
+        ? incomingInvoices.filter(i => !i.is_demo && !String(i.id || '').startsWith('demo-')) 
+        : [];
+      setInvoices(sanitized);
+    } else if (Array.isArray(incomingInvoices) && incomingInvoices.length > 0) {
+      setInvoices(incomingInvoices);
+    }
+  }, [incomingInvoices, isDemoTenant]);
+
+  useEffect(() => {
+    if (!isDemoTenant) {
+      try {
+        localStorage.removeItem('carthage_demo_clients');
+      } catch (_) {}
+      const sanitized = Array.isArray(incomingClients) 
+        ? incomingClients.filter(c => !c.is_demo && !String(c.id || '').startsWith('demo-')) 
+        : [];
+      setClients(sanitized);
+    } else if (Array.isArray(incomingClients) && incomingClients.length > 0) {
+      setClients(incomingClients);
+    }
+  }, [incomingClients, isDemoTenant]);
+
+  const updateInvoices = (newInvoices: Invoice[]) => {
+    setInvoices(newInvoices);
+    if (onUpdateInvoices) {
+      onUpdateInvoices(newInvoices);
+    }
+  };
+
   const templatesToUse = Array.isArray(emailTemplates) && emailTemplates.length > 0 
     ? emailTemplates 
     : INITIAL_EMAIL_TEMPLATES;
@@ -473,7 +645,7 @@ export default function BillingManager({
           }
           return inv;
         });
-        onUpdateInvoices(updated);
+        updateInvoices(updated);
 
       } else {
         setEmailFeedbackMessage({
@@ -528,26 +700,26 @@ export default function BillingManager({
     const matchedClient = clients.find(c => c.id === invoiceClientId);
     const clientName = matchedClient ? matchedClient.name : 'Client Inconnu';
 
-    const vatAmount = Math.round(amountHTInput * (vatRateInput / 100) * 1000) / 1000;
-    const amountTTC = Math.round((amountHTInput + vatAmount + stampDutyValue) * 1000) / 1000;
-    let withholdingAmount = 0;
-    if (amountTTC >= adminSettings.withholdingThreshold) {
-      withholdingAmount = Math.round(amountTTC * (withholdingRateInput / 100) * 1000) / 1000;
-    }
-    const amountNetToPay = Math.round((amountTTC - withholdingAmount) * 1000) / 1000;
+    const taxCalc = computeInvoiceTaxes({
+      amountHT: amountHTInput,
+      vatRate: vatRateInput,
+      applyTimbre: stampDutyValue > 0,
+      applyWithholding: true,
+      withholdingRate: withholdingRateInput
+    });
 
     const newInv: Invoice = {
       id: `inv_${Date.now()}`,
       clientId: invoiceClientId,
       clientName,
       invoiceNumber: `FA-2026-${String(invoices.length + 10).padStart(4, '0')}`,
-      amountHT: amountHTInput,
-      vatRate: vatRateInput,
-      vatAmount,
+      amountHT: taxCalc.amountHT,
+      vatRate: taxCalc.vatRate,
+      vatAmount: taxCalc.vatAmount,
       withholdingTaxRate: withholdingRateInput,
-      withholdingAmount,
-      amountTTC,
-      amountNetToPay,
+      withholdingAmount: taxCalc.withholdingAmount,
+      amountTTC: taxCalc.amountTTC,
+      amountNetToPay: taxCalc.amountNetToPay,
       status: 'Unpaid',
       issuedDate: new Date().toISOString().split('T')[0],
       dueDate: dueDateInput || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -555,7 +727,7 @@ export default function BillingManager({
       withholdingCertificateReceived: false
     };
 
-    onUpdateInvoices([...invoices, newInv]);
+    updateInvoices([...invoices, newInv]);
     setSelectedInvoiceId(newInv.id);
     setIsAddingInvoice(false);
 
@@ -587,7 +759,7 @@ export default function BillingManager({
       return inv;
     });
 
-    onUpdateInvoices(updated);
+    updateInvoices(updated);
     setCollectionActionNote('');
   };
 
@@ -602,7 +774,7 @@ export default function BillingManager({
       }
       return inv;
     });
-    onUpdateInvoices(updated);
+    updateInvoices(updated);
   };
 
   const handleChangeInvoiceStatus = (status: InvoiceStatus) => {
@@ -617,18 +789,18 @@ export default function BillingManager({
       }
       return inv;
     });
-    onUpdateInvoices(updated);
+    updateInvoices(updated);
   };
 
   const handleDeleteInvoice = (id: string) => {
     if (!confirm('Voulez-vous supprimer définitivement cette écriture comptable ?')) return;
     const remaining = invoices.filter(inv => inv.id !== id);
-    onUpdateInvoices(remaining);
+    updateInvoices(remaining);
     setSelectedInvoiceId(remaining[0]?.id || null);
   };
 
   const isDemoInvoice = (inv: any) => {
-    return inv.id?.startsWith('demo-') || inv.is_demo === true || inv.isDemo === true || ['inv_1', 'inv_2', 'inv_3', 'inv_4', 'inv_5'].includes(inv.id);
+    return isDemoTenant && (inv.id?.startsWith('demo-') || inv.is_demo === true || inv.isDemo === true || ['inv_1', 'inv_2', 'inv_3', 'inv_4', 'inv_5'].includes(inv.id));
   };
 
   const filteredInvoices = invoices.filter(inv => {
@@ -1567,7 +1739,7 @@ export default function BillingManager({
                           }
                           return inv;
                         });
-                        onUpdateInvoices(updated);
+                        updateInvoices(updated);
                         alert("Procédure de mise en demeure enregistrée dans le journal de suivi !");
                         setActiveDetailTab('recovery');
                       }}

@@ -19,10 +19,15 @@ import {
 } from 'lucide-react';
 import { TenantSubscription, FieldAgentLicense } from '../../types/mobileTerrain';
 import { MobileLicenseService } from '../../services/mobileLicenseService';
+import { CollaboratorAccount } from '../../types';
 
 interface LicenseManagerProps {
   tenantId?: string;
+  activeCompanyName?: string;
+  collaborators?: CollaboratorAccount[];
   onNavigateToStore?: () => void;
+  isTrial?: boolean;
+  isDemoTenant?: boolean;
 }
 
 /**
@@ -30,9 +35,23 @@ interface LicenseManagerProps {
  * Contrôle rigoureusement les quotas de souscription maxFieldAgents et bloque tout dépassement.
  */
 export const LicenseManager: React.FC<LicenseManagerProps> = ({
-  tenantId = 'GEP',
-  onNavigateToStore
+  tenantId = 'Inter-Affaires',
+  activeCompanyName,
+  collaborators = [],
+  onNavigateToStore,
+  isTrial = true,
+  isDemoTenant
 }) => {
+  // Détermination stricte du mode DÉMO vs PROD
+  const isDemo = Boolean(
+    isDemoTenant ||
+    tenantId === 'company_demo' ||
+    tenantId?.toLowerCase().includes('démo') ||
+    tenantId?.toLowerCase().includes('demo') ||
+    activeCompanyName?.toLowerCase().includes('démo') ||
+    activeCompanyName?.toLowerCase().includes('demo')
+  );
+
   // États locaux
   const [subscription, setSubscription] = useState<TenantSubscription | null>(null);
   const [agents, setAgents] = useState<FieldAgentLicense[]>([]);
@@ -52,8 +71,8 @@ export const LicenseManager: React.FC<LicenseManagerProps> = ({
   const loadData = async () => {
     setLoading(true);
     try {
-      const sub = await MobileLicenseService.getTenantSubscription(tenantId);
-      const agList = await MobileLicenseService.getTenantFieldAgents(tenantId);
+      const sub = await MobileLicenseService.getTenantSubscription(tenantId, isDemo);
+      const agList = await MobileLicenseService.getTenantFieldAgents(tenantId, isDemo, collaborators);
       setSubscription(sub);
       setAgents(agList);
     } catch (err) {
@@ -65,7 +84,7 @@ export const LicenseManager: React.FC<LicenseManagerProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [tenantId]);
+  }, [tenantId, isDemo, collaborators]);
 
   if (loading || !subscription) {
     return (
@@ -269,7 +288,16 @@ export const LicenseManager: React.FC<LicenseManagerProps> = ({
 
             <div className="flex justify-between text-[11px] text-slate-400 pt-1">
               <span>{Math.max(0, maxQuota - activeCount)} licence(s) disponible(s)</span>
-              <span>Offre : {subscription.plan} ({subscription.addOnPricing.pricePerExtraFieldAgent} TND/mois/agent sup)</span>
+              <span>
+                {isTrial || subscription.plan === 'TRIAL' || tenantId === 'MD' ? (
+                  <span className="text-amber-400 font-semibold flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Offre : ÉVALUATION ILLIMITÉE (5 licences terrain test incluses)
+                  </span>
+                ) : (
+                  `Offre : ${subscription.plan} (${subscription.addOnPricing.pricePerExtraFieldAgent} TND/mois/agent sup)`
+                )}
+              </span>
             </div>
           </div>
         </div>
@@ -344,8 +372,24 @@ export const LicenseManager: React.FC<LicenseManagerProps> = ({
             <tbody className="divide-y divide-slate-800/60">
               {filteredAgents.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-slate-500 text-sm">
-                    Aucun collaborateur trouvé pour ce filtre.
+                  <td colSpan={4} className="py-12 text-center text-slate-400 text-sm">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="p-3 bg-slate-800/80 rounded-full text-slate-400 border border-slate-700">
+                        <Users className="w-6 h-6 text-slate-400" />
+                      </div>
+                      <p className="font-semibold text-slate-200">
+                        {agents.length === 0 
+                          ? "Aucun collaborateur enregistré pour ce compte"
+                          : "Aucun collaborateur trouvé pour ce filtre"
+                        }
+                      </p>
+                      <p className="text-xs text-slate-500 max-w-md">
+                        {agents.length === 0 
+                          ? "Rendez-vous dans la section Gestion des Collaborateurs pour ajouter des salariés réels à votre organisation avant d'activer leurs licences PWA Mobile Terrain (MOD-11)."
+                          : "Modifiez vos critères de recherche ou sélectionnez un autre département pour afficher les agents."
+                        }
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -370,8 +414,17 @@ export const LicenseManager: React.FC<LicenseManagerProps> = ({
                             {agent.agentName.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div className="font-semibold text-white flex items-center gap-2">
-                              {agent.agentName}
+                            <div className="font-semibold text-white flex items-center gap-2 flex-wrap">
+                              <span>{agent.agentName}</span>
+                              {agent.agentId === 'demo-emp_4' || agent.agentName.toLowerCase().includes('mohamed ali') ? (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                                  Force de Vente / Van Sales
+                                </span>
+                              ) : agent.agentId === 'demo-emp_7' || agent.agentName.toLowerCase().includes('hamza ben salem') ? (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 font-bold">
+                                  Logistique & Expéditions
+                                </span>
+                              ) : null}
                               {isLicensed && (
                                 <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                                   PWA Active

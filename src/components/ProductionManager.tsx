@@ -1226,11 +1226,11 @@ export default function ProductionManager({
                     <div className="mt-5 pt-3 border-t border-slate-100 flex justify-between items-center">
                       <div>
                         <span className="text-[10px] text-slate-400 font-bold block uppercase leading-none">Coût de Revient Indus.</span>
-                        <span className="text-[11px] text-slate-400 block">Mat. {totalMatCost.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} TND</span>
+                        <span className="text-[11px] text-slate-400 block">Mat. {(totalMatCost ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 3 })} TND</span>
                       </div>
                       <div className="text-right">
                         <span className="text-base font-black text-indigo-600 font-mono">
-                          {totalCost.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                          {(totalCost ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                         </span>
                         <span className="text-[9px] text-slate-400 block font-bold uppercase leading-none">par unité produite</span>
                       </div>
@@ -1339,11 +1339,11 @@ export default function ProductionManager({
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 flex justify-between items-center">
                     <div className="space-y-1">
                       <span className="text-slate-500 font-semibold block text-[11px]">Total Pièces Produits</span>
-                      <span className="text-lg font-black text-slate-900 font-mono">{(oeeMetrics.totalProduced).toLocaleString('fr-FR')} unités</span>
+                      <span className="text-lg font-black text-slate-900 font-mono">{(oeeMetrics?.totalProduced ?? 0).toLocaleString('fr-FR')} unités</span>
                     </div>
                     <div className="space-y-1 text-right">
                       <span className="text-slate-500 font-semibold block text-[11px]">Dont Rebuts Matières</span>
-                      <span className="text-lg font-black text-rose-600 font-mono">{(oeeMetrics.totalScrapped).toLocaleString('fr-FR')} u</span>
+                      <span className="text-lg font-black text-rose-600 font-mono">{(oeeMetrics?.totalScrapped ?? 0).toLocaleString('fr-FR')} u</span>
                     </div>
                   </div>
 
@@ -1628,7 +1628,7 @@ export default function ProductionManager({
                         <span className="font-mono">Frais d'approche : +{landingInfo.landedMarkupRatioPercent}%</span>
                       </div>
                       <p className="text-[10px] opacity-80">
-                        Port : {landingInfo.folder.portOfArrival || 'Radès'} | Transitaire : {landingInfo.folder.transitterName} | Frais annexes (Douane/Fret/Acconage) : {landingInfo.totalLandingExpensesTND.toLocaleString('fr-FR')} TND
+                        Port : {landingInfo.folder.portOfArrival || 'Radès'} | Transitaire : {landingInfo.folder.transitterName} | Frais annexes (Douane/Fret/Acconage) : {(landingInfo.totalLandingExpensesTND ?? 0).toLocaleString('fr-FR')} TND
                       </p>
                       {landingInfo.isBlockedInCustoms && (
                         <p className="text-[10px] font-bold italic">

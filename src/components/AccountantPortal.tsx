@@ -34,6 +34,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { TRIAL_ACCOUNTANT_DOSSIERS, TRIAL_CABINET_DOCUMENTS } from '../data/mockTrialData';
 
 export interface ClientDossier {
   id: string;
@@ -70,16 +71,22 @@ export interface AccountantPortalProps {
   onBackToLanding?: () => void;
   onSwitchCompany?: (companyName: string, tenantId?: string, mf?: string) => void;
   setActiveTab?: (tabId: string) => void;
+  isTrial?: boolean;
 }
 
 export const AccountantPortal: React.FC<AccountantPortalProps> = ({
   onBackToLanding,
   onSwitchCompany,
-  setActiveTab
+  setActiveTab,
+  isTrial = false
 }) => {
   const [activeTab, setActiveTabLocal] = useState<'dossiers' | 'tej_consolidation' | 'ged_vault'>('dossiers');
-  const [dossiers, setDossiers] = useState<ClientDossier[]>(INITIAL_DEMO_DOSSIERS);
-  const [documents, setDocuments] = useState<CabinetDocument[]>(INITIAL_CABINET_DOCS);
+  const [dossiers, setDossiers] = useState<ClientDossier[]>(() => {
+    return isTrial ? TRIAL_ACCOUNTANT_DOSSIERS : INITIAL_DEMO_DOSSIERS;
+  });
+  const [documents, setDocuments] = useState<CabinetDocument[]>(() => {
+    return isTrial ? TRIAL_CABINET_DOCUMENTS : INITIAL_CABINET_DOCS;
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'alert' | 'pending' | 'validated'>('all');
   
@@ -108,11 +115,18 @@ export const AccountantPortal: React.FC<AccountantPortalProps> = ({
   };
 
   const handleResetDemoData = () => {
-    setDossiers(INITIAL_DEMO_DOSSIERS);
-    setDocuments(INITIAL_CABINET_DOCS);
+    setDossiers(isTrial ? TRIAL_ACCOUNTANT_DOSSIERS : INITIAL_DEMO_DOSSIERS);
+    setDocuments(isTrial ? TRIAL_CABINET_DOCUMENTS : INITIAL_CABINET_DOCS);
     setBatchSignedSuccess(false);
-    showToast('Portefeuille cabinet réinitialisé avec 4 dossiers clients complets (SFE, Sfax Distribution, Batiment Sahel, GTS).');
+    showToast('Portefeuille cabinet réinitialisé avec les 3 dossiers clients complets (SFE, Sfax Distribution, Bâtiment Sahel).');
   };
+
+  React.useEffect(() => {
+    if (isTrial) {
+      if (dossiers.length === 0) setDossiers(TRIAL_ACCOUNTANT_DOSSIERS);
+      if (documents.length === 0) setDocuments(TRIAL_CABINET_DOCUMENTS);
+    }
+  }, [isTrial]);
 
   const handleCreateDossier = (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,14 +275,6 @@ export const AccountantPortal: React.FC<AccountantPortalProps> = ({
                 <span>← Retour Site</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={handleResetDemoData}
-              className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-              <span>CHARGER DÉMOS</span>
-            </button>
             <button
               type="button"
               onClick={() => setShowAddDossierModal(true)}

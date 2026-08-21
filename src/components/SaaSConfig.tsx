@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import SaaSInvoiceModal from './SaaSInvoiceModal';
 import EvaluationGuideComponent from './EvaluationGuideComponent';
 import { ConfirmationModal } from './ConfirmationModal';
+import { activateClientPack, SaasPackType } from '../services/licensingService';
 import { 
   CreditCard, 
   CheckCircle2, 
@@ -299,6 +300,9 @@ export default function SaaSConfig({
   onClearDemoData,
 }: SaaSConfigProps) {
   const isSuperAdmin = currentUser?.role === 'SuperAdmin';
+  const isParentTenant = activeCompanyName?.toLowerCase().includes('inter-affaires') ||
+                         activeCompanyName === 'company_parent' ||
+                         currentUser?.companyId === 'company_parent';
 
   const getAuthHeaders = (): Record<string, string> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1196,7 +1200,7 @@ export default function SaaSConfig({
                 status: 'approved' as const,
                 paymentMethod: 'Flouci' as const,
                 licenseKey: genKey,
-                contactEmail: currentUser?.email || 'contact@elyssa.pro',
+                contactEmail: currentUser?.email || (isSuperAdmin ? 'contact@elyssa.pro' : 'contact@entreprise.tn'),
                 modules: isModule ? [finalPackId] : (isCartModules ? pendingDetails?.modules : undefined)
               };
               saveLicenceRequests([newReq, ...licenceRequests]);
@@ -1311,6 +1315,10 @@ export default function SaaSConfig({
   };
 
   const handleInsertDemos = () => {
+    if (isParentTenant) {
+      console.warn('[Demo Injection Blocked] Demo data injection is disabled on Parent / Inter-Affaires tenant.');
+      return;
+    }
     const demoClients: PublisherClient[] = [
       { id: 'pc-demo-1', companyName: 'STE CARTHAGE IMPORT-EXPORT', email: 'carthage@import.tn', password: 'Carthage2026!', location: 'Nabeul', packId: 'full', paymentGateway: 'Virement', status: 'trial', joinedDate: '2026-06-24', interval: 'yearly' },
       { id: 'pc-demo-2', companyName: 'EL KEF AGRICOLE COOPERATIVE', email: 'kef@agri.tn', password: 'Carthage2026!', location: 'El Kef', packId: 'logistics', paymentGateway: 'Virement', status: 'active', joinedDate: '2026-06-24', interval: 'quarterly' },
@@ -1556,7 +1564,7 @@ export default function SaaSConfig({
         price: cartNetToPay,
         requestDate: new Date().toISOString().split('T')[0],
         status: 'pending',
-        contactEmail: currentUser?.email || 'contact@elyssa.pro',
+        contactEmail: currentUser?.email || (isSuperAdmin ? 'contact@elyssa.pro' : 'contact@entreprise.tn'),
         modules: [...cartModules]
       };
       // Keep existing requests and append the new one so companies can place multiple parallel orders
@@ -1746,7 +1754,7 @@ export default function SaaSConfig({
             price: checkoutPrice,
             requestDate: new Date().toISOString().split('T')[0],
             status: 'pending',
-            contactEmail: currentUser?.email || 'contact@elyssa.pro'
+            contactEmail: currentUser?.email || (isSuperAdmin ? 'contact@elyssa.pro' : 'contact@entreprise.tn')
           };
           // Keep existing requests and append the new one so companies can place multiple parallel orders
           saveLicenceRequests([newReq, ...licenceRequests]);
@@ -1767,7 +1775,7 @@ export default function SaaSConfig({
             status: 'approved' as const,
             paymentMethod: 'card' as const,
             licenseKey: genKey,
-            contactEmail: currentUser?.email || 'contact@elyssa.pro',
+            contactEmail: currentUser?.email || (isSuperAdmin ? 'contact@elyssa.pro' : 'contact@entreprise.tn'),
             modules: checkoutModule ? [checkoutModule.id] : undefined
           };
 
@@ -1858,6 +1866,18 @@ export default function SaaSConfig({
           }
 
           // Success feedback
+          let mappedPackType: SaasPackType = 'CUSTOM';
+          if (countdownPack === 'pos' || countdownPack === 'commerce') mappedPackType = 'COMMERCE_POS';
+          else if (countdownPack === 'logistics' || countdownPack === 'wms') mappedPackType = 'LOGISTICS_WMS';
+          else if (countdownPack === 'full' || countdownPack === 'industrial') mappedPackType = 'FULL_INDUSTRIAL';
+          else if (countdownPack === 'trial' || countdownPack === 'FREE_TRIAL') mappedPackType = 'FREE_TRIAL';
+
+          try {
+            activateClientPack(activeCompanyName, activeCompanyName, mappedPackType, countdownModules);
+          } catch (licErr) {
+            console.warn('[SaaSConfig] Licensing activation error:', licErr);
+          }
+
           const packDisplayName = countdownPack === 'full' 
             ? 'Elyssa Premium (Services & Commerce)' 
             : countdownPack === 'industrial' 
@@ -4003,38 +4023,40 @@ export default function SaaSConfig({
         </div>
       </div>
 
-      {/* 🛠️ CONTRÔLES DES DONNÉES DE DÉMONSTRATION & SIMULATION */}
-      <div className="bg-slate-900 border border-indigo-950/80 p-6 rounded-3xl space-y-4" id="publisher-demo-simulation-panel">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="space-y-1">
-            <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>🛠️ Mode Démo : Entreprises & Indicateurs de Simulation</span>
-            </h3>
-            <p className="text-[10.5px] text-slate-400 font-semibold leading-normal font-sans text-left">
-              Générez instantanément un ensemble complet de clients de démonstration tunisiens (STE CARTHAGE, EL KEF AGRICOLE, BIZERTE MARITIME, etc.), de demandes de licence d'évaluation et de logs d'activité. Ces entités sont étiquetées avec un badge <span className="text-amber-400 font-bold">"Démo"</span> distinctif pour éviter toute confusion avec vos vrais clients en production, et peuvent être purgées proprement en un seul clic.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleInsertDemos}
-              className="px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer border-0 shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Injecter les Démos</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteDemos}
-              className="px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 cursor-pointer border-0 shadow-sm"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Supprimer les Démos</span>
-            </button>
+      {/* 🛠️ CONTRÔLES DES DONNÉES DE DÉMONSTRATION & SIMULATION (Masqués sur le tenant Éditeur Parent / Inter-Affaires) */}
+      {!isParentTenant && (
+        <div className="bg-slate-900 border border-indigo-950/80 p-6 rounded-3xl space-y-4" id="publisher-demo-simulation-panel">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-1">
+              <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>🛠️ Mode Démo : Entreprises & Indicateurs de Simulation</span>
+              </h3>
+              <p className="text-[10.5px] text-slate-400 font-semibold leading-normal font-sans text-left">
+                Générez instantanément un ensemble complet de clients de démonstration tunisiens (STE CARTHAGE, EL KEF AGRICOLE, BIZERTE MARITIME, etc.), de demandes de licence d'évaluation et de logs d'activité. Ces entités sont étiquetées avec un badge <span className="text-amber-400 font-bold">"Démo"</span> distinctif pour éviter toute confusion avec vos vrais clients en production, et peuvent être purgées proprement en un seul clic.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleInsertDemos}
+                className="px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer border-0 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Injecter les Démos</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteDemos}
+                className="px-3.5 py-2 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 cursor-pointer border-0 shadow-sm"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Supprimer les Démos</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 🔔 CENTRE D'ALERTES ET TÉMOINS D'ACTIVITÉ */}
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4" id="publisher-alerts-witness-panel">

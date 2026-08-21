@@ -45,14 +45,38 @@ export interface SaaSBankConfig {
   updatedAt?: string;
 }
 
+/**
+ * Recursively cleans an object or array to ensure it contains NO undefined values,
+ * which cause Firestore setDoc/updateDoc to throw "Unsupported field value: undefined".
+ * Undefined values in objects are stripped, and undefined in arrays are mapped to null.
+ */
+export function cleanFirestoreData<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as any;
+  }
+  if (typeof data !== 'object') {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => (item === undefined ? null : cleanFirestoreData(item))) as any;
+  }
+  const cleaned: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data as Record<string, any>)) {
+    if (value !== undefined) {
+      cleaned[key] = cleanFirestoreData(value);
+    }
+  }
+  return cleaned as T;
+}
+
 // Helper to save SaaS payment config to Firestore
 export const saveSaaSBankConfig = async (config: SaaSBankConfig) => {
   try {
     const docRef = doc(db, 'admin_settings', 'payment_config');
-    await setDoc(docRef, {
+    await setDoc(docRef, cleanFirestoreData({
       ...config,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    }), { merge: true });
     console.log("SaaS Payment Config saved to Firestore successfully");
   } catch (error) {
     console.warn("Notice: SaaS payment config save skipped or offline:", error);
@@ -102,10 +126,10 @@ export interface CompanyERPState {
 export const saveCompanyERPState = async (companyName: string, state: CompanyERPState) => {
   try {
     const docRef = doc(db, 'companies', companyName || 'default_company');
-    await setDoc(docRef, {
+    await setDoc(docRef, cleanFirestoreData({
       ...state,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    }), { merge: true });
     console.log(`ERP State for ${companyName} saved to Firestore successfully`);
     return true;
   } catch (error) {

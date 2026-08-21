@@ -145,14 +145,17 @@ const ADMIN_SETTINGS_FILE_PATH = path.join(process.cwd(), 'data_admin_settings.j
 
 function getDeletedCompanyKeys(): Set<string> {
   const deletedSet = new Set<string>();
+  const PROTECTED_KEYS = new Set(['pc-parent-elyssa', 'inter-affaires', 'pc-md', 'md', 'md@gmail.com', 'contact@elyssa.pro', 'admin@elyssa.pro', 'ziedbenmiled3@gmail.com']);
   try {
     if (fs.existsSync(DELETED_COMPANIES_FILE_PATH)) {
       const data = JSON.parse(fs.readFileSync(DELETED_COMPANIES_FILE_PATH, 'utf-8'));
       if (Array.isArray(data)) {
         data.forEach((item: any) => {
           if (item) {
-            if (item.id) deletedSet.add(String(item.id).toLowerCase().trim());
-            if (item.companyName) deletedSet.add(String(item.companyName).toLowerCase().trim());
+            const idKey = item.id ? String(item.id).toLowerCase().trim() : '';
+            const nameKey = item.companyName ? String(item.companyName).toLowerCase().trim() : '';
+            if (idKey && !PROTECTED_KEYS.has(idKey)) deletedSet.add(idKey);
+            if (nameKey && !PROTECTED_KEYS.has(nameKey)) deletedSet.add(nameKey);
           }
         });
       }
@@ -666,6 +669,79 @@ async function ensureBaseCollectionsExistAndSeedParent(): Promise<void> {
           }
         }
 
+        // 2b. Check and heal permanent MD company in publisher_clients & companies
+        const mdClientRef = doc(db, 'publisher_clients', 'pc-md');
+        const mdClientSnap = await withTimeout(getDoc(mdClientRef), 12000);
+        const mdClientData = {
+          id: 'pc-md',
+          company_id: 'pc-md',
+          companyName: 'MD',
+          email: 'md@gmail.com',
+          location: 'Tunis',
+          packId: 'full',
+          paymentGateway: 'Flouci',
+          status: 'active',
+          joinedDate: '2026-06-22',
+          isEmailConfirmed: true,
+          interval: 'yearly',
+          password: 'bochra1985',
+          plainPassword: 'bochra1985',
+          pin: '123456'
+        };
+
+        if (!mdClientSnap.exists()) {
+          console.log("[INITIALIZATION] 'pc-md' is absent. Seeding MD company...");
+          await withTimeout(setDoc(mdClientRef, mdClientData), 12000);
+        } else {
+          const existing = mdClientSnap.data();
+          if (existing.status !== 'active' && existing.status !== 'paid') {
+            await withTimeout(setDoc(mdClientRef, { ...existing, status: 'active', isEmailConfirmed: true }, { merge: true }), 12000);
+          }
+        }
+
+        const mdCompRef = doc(db, 'companies', 'pc-md');
+        const mdCompSnap = await withTimeout(getDoc(mdCompRef), 12000);
+        if (!mdCompSnap.exists()) {
+          await withTimeout(setDoc(mdCompRef, {
+            id: 'pc-md',
+            company_id: 'pc-md',
+            companyName: 'MD',
+            name: 'MD',
+            email: 'md@gmail.com',
+            location: 'Tunis',
+            packId: 'full',
+            paymentGateway: 'Flouci',
+            status: 'active',
+            joinedDate: '2026-06-22',
+            password: 'bochra1985',
+            pin: '123456',
+            isEmailConfirmed: true
+          }), 12000);
+        }
+
+        const mdCollabRef = doc(db, 'collaborators', 'collab_md_owner');
+        const mdCollabSnap = await withTimeout(getDoc(mdCollabRef), 12000);
+        const mdCollabData = {
+          id: 'collab_md_owner',
+          name: 'MD (Gérant / Dirigeant)',
+          email: 'md@gmail.com',
+          password: bcrypt.hashSync('bochra1985', 10),
+          plainPassword: 'bochra1985',
+          pin: '123456',
+          pinCode: '123456',
+          role: 'DIRIGEANT',
+          status: 'Active',
+          company: 'MD',
+          company_id: 'pc-md',
+          companyId: 'pc-md',
+          assignedTasks: [],
+          createdDate: '2026-06-22'
+        };
+        if (!mdCollabSnap.exists()) {
+          console.log("[INITIALIZATION] Seeding MD manager account 'collab_md_owner'...");
+          await withTimeout(setDoc(mdCollabRef, mdCollabData), 12000);
+        }
+
         // 3. Seed and heal demo clients in publisher_clients (Run in parallel)
         const demoClients = [
           { id: 'pc-demo-1', companyName: 'STE CARTHAGE IMPORT-EXPORT', email: 'carthage@import.tn', password: 'Carthage2026!', location: 'Nabeul', packId: 'full', paymentGateway: 'Virement', status: 'trial', joinedDate: '2026-06-24', interval: 'yearly' },
@@ -1012,8 +1088,9 @@ async function savePublisherClients(data: any[]): Promise<boolean> {
       const existingIds = snapshot.docs.map((d: any) => d.id);
       const incomingIds = new Set(data.map(item => item.id).filter(Boolean));
       
+      const PROTECTED_IDS = new Set(['pc-parent-elyssa', 'pc-md']);
       const deletions = existingIds
-        .filter(id => !incomingIds.has(id))
+        .filter(id => !incomingIds.has(id) && !PROTECTED_IDS.has(id))
         .map(id => withTimeout(deleteDoc(doc(db, 'publisher_clients', id)), 3000));
 
       if (deletions.length > 0) {
@@ -2550,8 +2627,8 @@ app.get('/api/db/active-sessions', async (req, res) => {
   }
 });
 
-// Server side persistent DB for Carthage protected under strict multi-tenant isolation
-app.get('/api/db/publisher-clients', enforceCompanyId, async (req: any, res) => {
+// Server side persistent DB for Carthage/Elyssa publisher-clients (Public read for login & client registration)
+app.get('/api/db/publisher-clients', async (req: any, res) => {
   try {
     const data = await getPublisherClients();
     res.json(data);
@@ -2561,17 +2638,13 @@ app.get('/api/db/publisher-clients', enforceCompanyId, async (req: any, res) => 
   }
 });
 
-app.post('/api/db/publisher-clients', enforceCompanyId, async (req: any, res) => {
+app.post('/api/db/publisher-clients', async (req: any, res) => {
   const data = req.body;
-  const companyId = req.companyId;
+  const companyId = req.headers['x-company-id'] || req.companyId || 'pc-parent-elyssa';
   console.log(`[SIGNUP LOG] POST /api/db/publisher-clients called. companyId: "${companyId}". Is array: ${Array.isArray(data)}. Item count: ${Array.isArray(data) ? data.length : 0}`);
   if (Array.isArray(data)) {
-    console.log(`[SIGNUP LOG] Client data received:`, JSON.stringify(data.map(c => ({ id: c.id, companyName: c.companyName, email: c.email, status: c.status, packId: c.packId })), null, 2));
-    
     const currentFullList = await getPublisherClients();
-    const existingIds = new Set(currentFullList.map(item => item.id).filter(Boolean));
-    const newItems = data.filter(item => item.id && !existingIds.has(item.id));
-
+    
     // Detect trial-to-active upgrades and trigger automated demo purges
     for (const incomingClient of data) {
       if (incomingClient.id && incomingClient.status !== 'trial') {
@@ -2587,7 +2660,7 @@ app.post('/api/db/publisher-clients', enforceCompanyId, async (req: any, res) =>
       }
     }
 
-    if (companyId === 'pc-parent-elyssa') {
+    if (companyId === 'pc-parent-elyssa' || companyId === 'pc-md') {
       await savePublisherClients(data);
     } else {
       const filteredIncoming = data.filter(item => item.id === companyId || item.company_id === companyId);
@@ -3123,10 +3196,14 @@ app.post('/api/db/delete-company', async (req, res) => {
     return res.status(400).json({ error: "L'identifiant de l'entreprise est requis." });
   }
 
-  try {
-    const targetIdLower = String(id).toLowerCase().trim();
-    const targetNameLower = companyName ? String(companyName).toLowerCase().trim() : '';
+  const targetIdLower = String(id).toLowerCase().trim();
+  const targetNameLower = companyName ? String(companyName).toLowerCase().trim() : '';
 
+  if (targetIdLower === 'pc-md' || targetIdLower === 'md' || targetNameLower === 'md' || targetIdLower === 'pc-parent-elyssa' || targetNameLower === 'inter-affaires') {
+    return res.status(403).json({ error: "L'entreprise MD ou Inter-Affaires est protégée et ne peut pas être supprimée." });
+  }
+
+  try {
     // 1. Record in server deleted tracker
     recordCompanyDeletionInServer(id, companyName);
 
@@ -5132,7 +5209,7 @@ app.post('/api/auth/direct-bypass', rateLimiter(10, 15 * 60 * 1000), async (req,
   return res.status(401).json({ error: "Bypass invalide." });
 });
 
-// 0. Test Gemini API Key (Ping test on gemini-2.5-flash)
+// 0. Test Gemini API Key (Ping test on gemini-3.6-flash)
 app.post('/api/gemini/test-key', async (req, res) => {
   try {
     const { apiKey } = req.body;
@@ -5145,14 +5222,14 @@ app.post('/api/gemini/test-key', async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: 'Test de connexion API. Réponds "OK".'
     });
 
     if (response && response.text) {
       return res.status(200).json({
         valid: true,
-        message: 'Clé API Gemini 2.5 Flash valide et fonctionnelle ! ✅'
+        message: 'Clé API Gemini 3.6 Flash valide et fonctionnelle ! ✅'
       });
     } else {
       throw new Error('Réponse vide obtenue de Gemini.');
@@ -5211,7 +5288,7 @@ Veuillez générer un rapport d'analyse stratégique concis et formel en França
 - Suggestion d'évolution tarifaire ou de fidélisation commerciale adaptée (en devises TND).`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
 
@@ -5283,7 +5360,7 @@ Veuillez générer un rapport financier concis et formel d'aide à la décision 
 Utilisez un ton rigoureux, professionnel, adapté pour un Directeur Financier de PME Tunisienne.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
 
@@ -5354,7 +5431,7 @@ Veuillez rédiger un document d'aide à la décision commerciale en Français, s
 Veuillez utiliser un ton rigoureux, d'expert financier et économique.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
 
@@ -5420,7 +5497,7 @@ Veuillez rédiger une veille sectorielle synthétique présentant :
 - Des directives stratégiques constantes pour conserver notre part de marché.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
 
@@ -5500,7 +5577,7 @@ Votre rapport doit être rédigé de façon professionnelle et être structuré 
 4. **RECOMMANDATIONS DE POSITIONNEMENT & STRATÉGIE SECTORIELLE**`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
 
@@ -5595,7 +5672,7 @@ app.post('/api/gemini/ocr', rateLimiter(50, 60 * 1000), async (req, res) => {
     };
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: { parts: [imagePart, textPart] },
       config: {
         responseMimeType: 'application/json',
@@ -7039,6 +7116,25 @@ app.get('/sitemap.xml', async (req, res) => {
   } catch (e) {
     res.status(500).send('Error generating sitemap');
   }
+});
+
+// Explicit Static Fallbacks to prevent 404
+app.get(['/favicon.ico', '/favicon.svg'], (req, res) => {
+  const favPath = path.join(process.cwd(), 'public', 'favicon.svg');
+  if (fs.existsSync(favPath)) {
+    res.type('image/svg+xml');
+    return res.sendFile(favPath);
+  }
+  res.status(204).end();
+});
+
+app.get('/manifest.json', (req, res) => {
+  const manifestPath = path.join(process.cwd(), 'public', 'manifest.json');
+  if (fs.existsSync(manifestPath)) {
+    res.type('application/json');
+    return res.sendFile(manifestPath);
+  }
+  res.json({ short_name: "Elyssa ERP", name: "Elyssa ERP Suite", start_url: "/" });
 });
 
 // ==========================================

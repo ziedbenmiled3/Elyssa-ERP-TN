@@ -1,16 +1,217 @@
 [
   {
-    "id": "admin_root",
-    "name": "MED ZIED BEN MILED",
-    "email": "contact@elyssa.pro",
-    "role": "DG",
-    "status": "ACTIF",
-    "structure": "Direction : Principale",
-    "tasksCount": 0,
+    "createdDate": "2026-01-15",
+    "email": "k.benamor@elyssa-erp.tn",
+    "assignedTasks": [
+      {
+        "description": "Valider les écritures comptables et le lettrage bancaire",
+        "dueDate": "2026-08-25",
+        "status": "In_Progress",
+        "id": "task_kba_1",
+        "priority": "High",
+        "createdDate": "2026-08-01",
+        "title": "Clôture mensuelle & Rapprochement bancaire"
+      }
+    ],
+    "status": "Active",
+    "companyId": "Inter-Affaires",
+    "plainPassword": "123",
     "company": "Inter-Affaires",
+    "assignedModules": [
+      "dashboard",
+      "finance",
+      "billing",
+      "treasury",
+      "reports",
+      "tej",
+      "investment",
+      "clients"
+    ],
+    "structureName": "Finance & Recouvrement",
+    "pinCode": "123456",
+    "role": "Director",
+    "structureType": "Direction",
     "company_id": "pc-parent-elyssa",
+    "name": "Khaled Ben Amor",
+    "id": "demo-emp_2"
+  },
+  {
+    "createdDate": "2026-03-10",
+    "name": "Ines Dridi",
+    "company": "Inter-Affaires",
+    "companyId": "Inter-Affaires",
+    "id": "demo-emp_3",
+    "role": "Agent",
+    "structureType": "Service",
+    "assignedTasks": [
+      {
+        "description": "Rapprochement des écritures du compte courant",
+        "priority": "Medium",
+        "dueDate": "2026-08-22",
+        "title": "Pointage des relevés bancaires ATB & BIAT",
+        "id": "task_id_1",
+        "status": "In_Progress",
+        "createdDate": "2026-08-05"
+      }
+    ],
+    "email": "i.dridi@elyssa-erp.tn",
+    "company_id": "pc-parent-elyssa",
+    "structureName": "Comptabilité & Rapprochement",
+    "assignedModules": [
+      "dashboard",
+      "finance",
+      "treasury",
+      "billing"
+    ],
+    "status": "Active",
+    "plainPassword": "123",
+    "pinCode": "123456"
+  },
+  {
+    "name": "Mohamed Ali Gharbi",
+    "pinCode": "123456",
+    "id": "demo-emp_4",
+    "assignedModules": [
+      "dashboard",
+      "clients",
+      "caisse",
+      "reports",
+      "communication",
+      "complaints"
+    ],
+    "companyId": "Inter-Affaires",
+    "role": "Agent",
+    "email": "m.gharbi@elyssa-erp.tn",
+    "structureType": "Service",
+    "assignedTasks": [
+      {
+        "createdDate": "2026-08-10",
+        "priority": "High",
+        "description": "Visite des clients grands comptes et saisie des bons de commande",
+        "status": "In_Progress",
+        "id": "task_mag_1",
+        "dueDate": "2026-08-24",
+        "title": "Prospection commerciale zone Sousse"
+      }
+    ],
+    "createdDate": "2026-06-18",
+    "structureName": "Force de Vente & Clientèle",
+    "company_id": "pc-parent-elyssa",
+    "status": "Active",
+    "company": "Inter-Affaires",
+    "plainPassword": "123"
+  },
+  {
+    "companyId": "Inter-Affaires",
+    "assignedTasks": [
+      {
+        "dueDate": "2026-08-28",
+        "createdDate": "2026-08-12",
+        "status": "Pending",
+        "title": "Préparation de la paie du mois & Déclaration CNSS",
+        "priority": "High",
+        "id": "task_abs_1",
+        "description": "Vérification des fiches de paie et calcul des cotisations"
+      }
+    ],
+    "pinCode": "123456",
+    "status": "Active",
+    "structureName": "Ressources Humaines & Paie",
+    "plainPassword": "123",
+    "assignedModules": [
+      "dashboard",
+      "payroll",
+      "attendance",
+      "collaborators",
+      "ged"
+    ],
+    "createdDate": "2026-02-01",
+    "email": "a.bensoltane@elyssa-erp.tn",
+    "name": "Amel Ben Soltane",
+    "id": "demo-emp_5",
+    "role": "Manager",
+    "company": "Inter-Affaires",
+    "structureType": "Direction",
+    "company_id": "pc-parent-elyssa"
+  },
+  {
+    "assignedModules": [
+      "dashboard",
+      "company_settings",
+      "ged",
+      "steering",
+      "production"
+    ],
+    "role": "Agent",
+    "company": "Inter-Affaires",
+    "companyId": "Inter-Affaires",
+    "structureType": "Service",
+    "createdDate": "2026-01-10",
+    "name": "Sami Mansour",
+    "email": "s.mansour@elyssa-erp.tn",
+    "id": "demo-emp_6",
+    "assignedTasks": [
+      {
+        "id": "task_sm_1",
+        "title": "Maintenance et interconnexion API des terminaux mobiles",
+        "description": "Vérification des logs de synchronisation et des accès",
+        "createdDate": "2026-08-08",
+        "priority": "Medium",
+        "dueDate": "2026-08-26",
+        "status": "In_Progress"
+      }
+    ],
+    "status": "Active",
+    "plainPassword": "123",
+    "pinCode": "123456",
+    "company_id": "pc-parent-elyssa",
+    "structureName": "Direction & IT / Systèmes"
+  },
+  {
+    "structureName": "Logistique, Dispatch & Flotte",
+    "status": "Active",
+    "plainPassword": "123",
+    "assignedModules": [
+      "dashboard",
+      "mobile_fleet",
+      "stock",
+      "fleet"
+    ],
+    "name": "Hamza Ben Salem",
+    "role": "Agent",
+    "companyId": "Inter-Affaires",
+    "assignedTasks": [
+      {
+        "title": "Tournée livraison Sud - Client Poulina (1 450 kg)",
+        "dueDate": "2026-08-20",
+        "status": "In_Progress",
+        "description": "Livraison express GP1 Km 12 avec émargement du bon de livraison",
+        "id": "task_hbs_1",
+        "priority": "High",
+        "createdDate": "2026-08-10"
+      }
+    ],
+    "company": "Inter-Affaires",
+    "createdDate": "2026-02-15",
+    "company_id": "pc-parent-elyssa",
+    "id": "demo-emp_7",
+    "pinCode": "123456",
+    "email": "h.bensalem@elyssa-erp.tn",
+    "structureType": "Entrepôt"
+  },
+  {
+    "id": "collab_md_owner",
+    "name": "MD (Gérant / Dirigeant)",
+    "email": "md@gmail.com",
     "plainPassword": "bochra1985",
-    "password": "$2b$10$.oItBgWYN3TZ9bMh1hDDkOP7puR.Plp5Jf9NiTnPxFfICV.GK/aIW",
-    "assignedTasks": []
+    "pinCode": "123456",
+    "role": "DIRIGEANT",
+    "status": "Active",
+    "company": "MD",
+    "company_id": "pc-md",
+    "companyId": "pc-md",
+    "assignedModules": ["dashboard", "finance", "billing", "clients", "stock", "fleet", "payroll", "company_settings"],
+    "assignedTasks": [],
+    "createdDate": "2026-06-22"
   }
 ]

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { appStorage } from '../services/storageAdapter';
 import { 
   Building, 
   Calculator, 
@@ -56,6 +57,136 @@ interface AssetManagerProps {
   isDemoCompany?: boolean;
 }
 
+// --- Default Tunisian Company Demo Assets ---
+const DEFAULT_DEMO_ASSETS: Immobilisation[] = [
+  {
+    id: 'ast-imm-1',
+    name: 'Serveurs Dell PowerEdge & Baie de Stockage SAN',
+    category: 'Matériel Informatique',
+    purchaseDate: '2025-01-15',
+    initialValue: 28500.000,
+    usefulLifeYears: 3,
+    amortizationType: 'Linéaire',
+    location: 'Siège Social Tunis'
+  },
+  {
+    id: 'ast-imm-2',
+    name: 'Fourgon Isuzu D-Max Camionette Commerciale',
+    category: 'Matériel de Transport',
+    purchaseDate: '2024-03-01',
+    initialValue: 78000.000,
+    usefulLifeYears: 5,
+    amortizationType: 'Linéaire',
+    location: 'Dépôt de Sousse'
+  },
+  {
+    id: 'ast-imm-3',
+    name: 'Progiciel ERP Elyssa (Licence Perpétuelle)',
+    category: 'Matériel Informatique',
+    purchaseDate: '2024-06-10',
+    initialValue: 18000.000,
+    usefulLifeYears: 3,
+    amortizationType: 'Linéaire',
+    location: 'Siège Social Tunis'
+  },
+  {
+    id: 'ast-imm-4',
+    name: 'Ligne de Conditionnement Semi-Automatique',
+    category: 'Matériel Industriel',
+    purchaseDate: '2023-09-01',
+    initialValue: 145000.000,
+    usefulLifeYears: 7,
+    amortizationType: 'Dégressif',
+    location: 'Usine de Sfax'
+  },
+  {
+    id: 'ast-imm-5',
+    name: 'Bâtiment Industriel & Zone d\'Entreposage',
+    category: 'Bâtiments & Locaux',
+    purchaseDate: '2020-01-10',
+    initialValue: 250000.000,
+    usefulLifeYears: 20,
+    amortizationType: 'Linéaire',
+    location: 'Entrepôt Gabès'
+  }
+];
+
+// Helper to sanitize & normalize raw asset inputs from any format
+function normalizeAssetItem(raw: any, index: number): Immobilisation {
+  const rawId = String(raw?.id || raw?.code || `IMM-2026-${String(index + 1).padStart(3, '0')}`);
+  const rawName = String(raw?.name || raw?.code || `Immobilisation #${index + 1}`);
+
+  let category: Immobilisation['category'] = 'Matériel Industriel';
+  const catStr = String(raw?.category || '').toLowerCase();
+  const nameStr = rawName.toLowerCase();
+
+  if (catStr.includes('info') || catStr === 'materielinformatique' || nameStr.includes('dell') || nameStr.includes('erp') || nameStr.includes('serveur')) {
+    category = 'Matériel Informatique';
+  } else if (catStr.includes('transp') || nameStr.includes('fourgon') || nameStr.includes('isuzu') || nameStr.includes('camion')) {
+    category = 'Matériel de Transport';
+  } else if (catStr.includes('bâtiment') || catStr.includes('local') || nameStr.includes('bâtiment') || nameStr.includes('usine')) {
+    category = 'Bâtiments & Locaux';
+  } else if (catStr.includes('mobilier') || catStr.includes('agenc') || nameStr.includes('bureau') || nameStr.includes('chaise')) {
+    category = 'Mobilier & Agencements';
+  } else if (['Matériel Industriel', 'Matériel Informatique', 'Matériel de Transport', 'Bâtiments & Locaux', 'Mobilier & Agencements'].includes(raw?.category)) {
+    category = raw.category;
+  }
+
+  const initialValue = Math.max(0, Number(raw?.initialValue ?? raw?.acquisitionCost ?? raw?.acquisitionValue) || 0);
+  const usefulLifeYears = Math.max(1, Number(raw?.usefulLifeYears ?? raw?.durationYears) || 5);
+
+  let purchaseDate = String(raw?.purchaseDate || raw?.acquisitionDate || raw?.commissioningDate || '2025-01-15');
+  if (isNaN(new Date(purchaseDate).getTime())) {
+    purchaseDate = '2025-01-15';
+  }
+
+  let amortizationType: 'Linéaire' | 'Dégressif' = 'Linéaire';
+  if (raw?.amortizationType === 'Dégressif' || raw?.amortizationMethod === 'DEGRESSIF') {
+    amortizationType = 'Dégressif';
+  }
+
+  const location = String(raw?.location || 'Siège Social Tunis');
+
+  return {
+    id: rawId,
+    name: rawName,
+    category,
+    purchaseDate,
+    initialValue,
+    usefulLifeYears,
+    amortizationType,
+    location,
+    scrapValue: Number(raw?.scrapValue ?? raw?.salvageValue) || 0
+  };
+}
+
+// Ensure 100% unique IDs across all loaded assets
+function sanitizeAssetsList(rawList: any[], isDemoCompany: boolean = false): Immobilisation[] {
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    return isDemoCompany ? DEFAULT_DEMO_ASSETS : [];
+  }
+  const seenIds = new Set<string>();
+  const sanitized: Immobilisation[] = [];
+
+  rawList.forEach((raw, idx) => {
+    if (!raw || typeof raw !== 'object') return;
+    if (!isDemoCompany && (raw.is_demo || String(raw.id || '').startsWith('demo-') || String(raw.id || '').startsWith('ast-imm-'))) {
+      return;
+    }
+    const item = normalizeAssetItem(raw, idx);
+    let finalId = item.id;
+    if (seenIds.has(finalId)) {
+      finalId = `${finalId}-dup${idx + 1}`;
+      item.id = finalId;
+    }
+    seenIds.add(finalId);
+    sanitized.push(item);
+  });
+
+  if (sanitized.length > 0) return sanitized;
+  return isDemoCompany ? DEFAULT_DEMO_ASSETS : [];
+}
+
 export default function AssetManager({ 
   currentUser,
   assets: propAssets = [],
@@ -64,33 +195,25 @@ export default function AssetManager({
 }: AssetManagerProps) {
   const STORAGE_KEY = 'carthage_assets_immobilisations';
 
-  // --- Prepopulated Assets ---
-  const DEFAULT_ASSETS: Immobilisation[] = [];
-
-  // --- States & Proxies ---
-  const assets = propAssets;
-  const setAssets = (val: any) => {
-    if (typeof val === 'function') {
-      onUpdateAssets(val(assets));
-    } else {
-      onUpdateAssets(val);
-    }
-  };
+  // State normalized safely
+  const safeAssets = useMemo(() => {
+    return sanitizeAssetsList(propAssets, isDemoCompany);
+  }, [propAssets, isDemoCompany]);
 
   const [activeSubTab, setActiveSubTab] = useState<'registry' | 'capital_gains' | 'settings'>('registry');
 
   // Configurable states
   const [corporateTaxRate, setCorporateTaxRate] = useState<number>(() => {
-    const saved = localStorage.getItem('carthage_assets_is_rate');
+    const saved = appStorage.getItem('carthage_assets_is_rate');
     return saved ? Number(saved) : 15;
   });
   const [locationsList, setLocationsList] = useState<string[]>(() => {
-    const saved = localStorage.getItem('carthage_assets_locations');
+    const saved = appStorage.getItem('carthage_assets_locations');
     return saved ? JSON.parse(saved) : ['Siège Social Tunis', 'Usine de Sfax', 'Dépôt de Sousse', 'Entrepôt Gabès'];
   });
   const [newLocationVal, setNewLocationVal] = useState('');
   const [categoriesConfig, setCategoriesConfig] = useState<{ category: string; lifetime: number }[]>(() => {
-    const saved = localStorage.getItem('carthage_assets_categories_config');
+    const saved = appStorage.getItem('carthage_assets_categories_config');
     return saved ? JSON.parse(saved) : [
       { category: 'Matériel Industriel', lifetime: 10 },
       { category: 'Matériel Informatique', lifetime: 3 },
@@ -102,15 +225,15 @@ export default function AssetManager({
 
   const updateCorporateTaxRate = (rate: number) => {
     setCorporateTaxRate(rate);
-    localStorage.setItem('carthage_assets_is_rate', String(rate));
+    appStorage.setItem('carthage_assets_is_rate', String(rate));
   };
   const updateLocationsList = (locs: string[]) => {
     setLocationsList(locs);
-    localStorage.setItem('carthage_assets_locations', JSON.stringify(locs));
+    appStorage.setItem('carthage_assets_locations', JSON.stringify(locs));
   };
   const updateCategoriesConfig = (config: { category: string; lifetime: number }[]) => {
     setCategoriesConfig(config);
-    localStorage.setItem('carthage_assets_categories_config', JSON.stringify(config));
+    appStorage.setItem('carthage_assets_categories_config', JSON.stringify(config));
   };
 
   // Search & Filters
@@ -144,6 +267,17 @@ export default function AssetManager({
     }
   }, [locationsList]);
 
+  // Sync selected asset with list
+  useEffect(() => {
+    if (safeAssets.length > 0) {
+      if (!selectedAsset || !safeAssets.some(a => a.id === selectedAsset.id)) {
+        setSelectedAsset(safeAssets[0]);
+      }
+    } else {
+      setSelectedAsset(null);
+    }
+  }, [safeAssets]);
+
   // Capital Gains disposal form
   const [gainAssetId, setGainAssetId] = useState('');
   const [gainDisposalDate, setGainDisposalDate] = useState('');
@@ -152,44 +286,66 @@ export default function AssetManager({
 
   // --- Load / Save ---
   useEffect(() => {
-    if (assets.length === 0) {
-      const saved = localStorage.getItem(STORAGE_KEY);
+    if (!propAssets || propAssets.length === 0) {
+      const saved = appStorage.getItem(STORAGE_KEY);
       if (saved) {
-        onUpdateAssets(JSON.parse(saved));
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            onUpdateAssets(sanitizeAssetsList(parsed));
+          } else {
+            onUpdateAssets(DEFAULT_DEMO_ASSETS);
+            appStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DEMO_ASSETS));
+          }
+        } catch (_) {
+          onUpdateAssets(DEFAULT_DEMO_ASSETS);
+          appStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DEMO_ASSETS));
+        }
+      } else {
+        onUpdateAssets(DEFAULT_DEMO_ASSETS);
+        appStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_DEMO_ASSETS));
       }
     }
   }, []);
 
   const saveAssetsToStorage = (updated: Immobilisation[]) => {
-    onUpdateAssets(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    const sanitized = sanitizeAssetsList(updated);
+    onUpdateAssets(sanitized);
+    appStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
   };
 
   // --- Depreciation Schedule Engine ---
   // Calculates depreciation schedules strictly following Tunisian NCT standards
   const generateDepreciationSchedule = (asset: Immobilisation): DepreciationRow[] => {
+    if (!asset || typeof asset !== 'object') return [];
     const schedule: DepreciationRow[] = [];
-    const basis = asset.initialValue;
-    const life = asset.usefulLifeYears;
-    const purchaseYear = new Date(asset.purchaseDate).getFullYear();
-    const purchaseMonth = new Date(asset.purchaseDate).getMonth() + 1; // 1-12
+    const basis = Math.max(0, Number(asset.initialValue) || 0);
+    const life = Math.max(1, Math.min(50, Math.floor(Number(asset.usefulLifeYears) || 1)));
+    
+    let dateStr = asset.purchaseDate;
+    let purchaseDateObj = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(purchaseDateObj.getTime())) {
+      purchaseDateObj = new Date('2025-01-15');
+    }
+    const purchaseYear = purchaseDateObj.getFullYear() || 2025;
+    const purchaseMonth = Math.max(1, Math.min(12, purchaseDateObj.getMonth() + 1));
 
     let accumulated = 0;
 
-    if (asset.amortizationType === 'Linéaire') {
+    if (asset.amortizationType === 'Linéaire' || !asset.amortizationType) {
       const annualRate = 100 / life;
       
-      // Year 1: prorata temporis (amortized only for months active in year 1)
-      const monthsInFirstYear = 12 - purchaseMonth + 1;
+      // Year 1: prorata temporis
+      const monthsInFirstYear = Math.max(1, Math.min(12, 12 - purchaseMonth + 1));
       const firstYearAnnuity = basis * (annualRate / 100) * (monthsInFirstYear / 12);
       accumulated += firstYearAnnuity;
       schedule.push({
         year: purchaseYear,
         basis,
-        rate: annualRate,
-        annuity: firstYearAnnuity,
-        accumulated,
-        bookValue: basis - accumulated
+        rate: Math.round(annualRate * 100) / 100,
+        annuity: Math.round(firstYearAnnuity * 1000) / 1000,
+        accumulated: Math.round(accumulated * 1000) / 1000,
+        bookValue: Math.max(0, Math.round((basis - accumulated) * 1000) / 1000)
       });
 
       // Intermediate years
@@ -199,29 +355,28 @@ export default function AssetManager({
         schedule.push({
           year: purchaseYear + i,
           basis,
-          rate: annualRate,
-          annuity,
-          accumulated,
-          bookValue: Math.max(0, basis - accumulated)
+          rate: Math.round(annualRate * 100) / 100,
+          annuity: Math.round(annuity * 1000) / 1000,
+          accumulated: Math.round(Math.min(basis, accumulated) * 1000) / 1000,
+          bookValue: Math.max(0, Math.round((basis - Math.min(basis, accumulated)) * 1000) / 1000)
         });
       }
 
       // Last year: remainder prorata temporis if purchased mid-year
-      if (monthsInFirstYear < 12) {
-        const lastYearAnnuity = basis - accumulated;
+      if (monthsInFirstYear < 12 && accumulated < basis) {
+        const lastYearAnnuity = Math.max(0, basis - accumulated);
         accumulated += lastYearAnnuity;
         schedule.push({
           year: purchaseYear + life,
           basis,
-          rate: annualRate,
-          annuity: lastYearAnnuity,
-          accumulated,
+          rate: Math.round(annualRate * 100) / 100,
+          annuity: Math.round(lastYearAnnuity * 1000) / 1000,
+          accumulated: Math.round(basis * 1000) / 1000,
           bookValue: 0
         });
       }
     } else {
       // Degressive depreciation
-      // Degressive rate coefficient (standard Tunisian code of IS: 1.5 for 3-4 years, 2.0 for 5-6 years, 2.5 for >6 years)
       let coeff = 1.5;
       if (life > 4 && life <= 6) coeff = 2.0;
       if (life > 6) coeff = 2.5;
@@ -230,7 +385,6 @@ export default function AssetManager({
       let remainingBasis = basis;
 
       for (let i = 0; i < life; i++) {
-        // Switch to linear if linear rate is higher than degressive rate
         const remainingYears = life - i;
         const linearAlternativeRate = 100 / remainingYears;
         
@@ -248,11 +402,11 @@ export default function AssetManager({
 
         schedule.push({
           year: purchaseYear + i,
-          basis: remainingBasis + annuity,
+          basis: Math.max(0, Math.round((remainingBasis + annuity) * 1000) / 1000),
           rate: Math.round(rateToApply * 100) / 100,
-          annuity,
-          accumulated,
-          bookValue: Math.max(0, remainingBasis)
+          annuity: Math.round(annuity * 1000) / 1000,
+          accumulated: Math.round(Math.min(basis, accumulated) * 1000) / 1000,
+          bookValue: Math.max(0, Math.round(remainingBasis * 1000) / 1000)
         });
       }
     }
@@ -265,50 +419,59 @@ export default function AssetManager({
     let totalInitialCost = 0;
     let totalNetBookValue = 0;
 
-    assets.forEach(asset => {
-      totalInitialCost += asset.initialValue;
+    safeAssets.forEach(asset => {
+      if (!asset) return;
+      const initialVal = Number(asset.initialValue) || 0;
+      totalInitialCost += initialVal;
       const sched = generateDepreciationSchedule(asset);
-      // find active year's Net Book Value (VNC) - let's assume current year is 2026
       const currentYear = 2026;
       const currentYearRow = sched.find(r => r.year === currentYear);
       if (currentYearRow) {
-        totalNetBookValue += currentYearRow.bookValue;
+        totalNetBookValue += (currentYearRow.bookValue ?? 0);
       } else {
         const lastRow = sched[sched.length - 1];
         if (lastRow && currentYear > lastRow.year) {
-          totalNetBookValue += 0; // Fully amortized
+          totalNetBookValue += 0;
         } else {
-          totalNetBookValue += asset.initialValue; // Not started yet
+          totalNetBookValue += initialVal;
         }
       }
     });
 
-    const accumulatedDepr = totalInitialCost - totalNetBookValue;
+    const accumulatedDepr = Math.max(0, totalInitialCost - totalNetBookValue);
 
     return {
       totalInitialCost,
       totalNetBookValue,
       accumulatedDepr
     };
-  }, [assets]);
+  }, [safeAssets]);
 
   // --- filtered Assets ---
   const filteredAssets = useMemo(() => {
-    return assets.filter(asset => {
-      const matchesSearch = asset.name.toLowerCase().includes(searchQuery.toLowerCase()) || asset.id.toLowerCase().includes(searchQuery.toLowerCase());
+    return safeAssets.filter(asset => {
+      if (!asset) return false;
+      const nameStr = String(asset.name || asset.id || '');
+      const idStr = String(asset.id || '');
+      const locationStr = String(asset.location || '');
+      const matchesSearch = !searchQuery || 
+        nameStr.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        idStr.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        locationStr.toLowerCase().includes(searchQuery.toLowerCase());
+      
       const matchesCategory = categoryFilter === 'Tous' || asset.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });
-  }, [assets, searchQuery, categoryFilter]);
+  }, [safeAssets, searchQuery, categoryFilter]);
 
   // --- Handlers ---
   const handleSaveAsset = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName) return;
+    if (!formName.trim()) return;
 
     const newAsset: Immobilisation = {
-      id: `IMM-2026-${String(assets.length + 1).padStart(3, '0')}`,
-      name: formName,
+      id: `IMM-2026-${String(safeAssets.length + 1).padStart(3, '0')}`,
+      name: formName.trim(),
       category: formCategory,
       purchaseDate: formDate || new Date().toISOString().split('T')[0],
       initialValue: Number(formValue),
@@ -318,7 +481,7 @@ export default function AssetManager({
       location: formLocation
     };
 
-    saveAssetsToStorage([newAsset, ...assets]);
+    saveAssetsToStorage([newAsset, ...safeAssets]);
     setIsFormOpen(false);
 
     // Reset Form
@@ -331,28 +494,28 @@ export default function AssetManager({
   const handleDeleteAsset = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm("Êtes-vous sûr de vouloir supprimer cette immobilisation ?")) {
-      const updated = assets.filter(a => a.id !== id);
+      const updated = safeAssets.filter(a => a.id !== id);
       saveAssetsToStorage(updated);
       if (selectedAsset?.id === id) {
-        setSelectedAsset(null);
+        setSelectedAsset(updated.length > 0 ? updated[0] : null);
       }
     }
   };
 
   const handleSimulatePlusValue = (e: React.FormEvent) => {
     e.preventDefault();
-    const asset = assets.find(a => a.id === gainAssetId);
+    const asset = safeAssets.find(a => a.id === gainAssetId);
     if (!asset) {
       alert("Veuillez sélectionner un actif valide.");
       return;
     }
 
     const sched = generateDepreciationSchedule(asset);
-    const disposalYear = new Date(gainDisposalDate).getFullYear();
+    const disposalYear = gainDisposalDate ? new Date(gainDisposalDate).getFullYear() : 2026;
     
     // Find VNC at the year of selling
     const sellingYearRow = sched.find(r => r.year === disposalYear);
-    const vnc = sellingYearRow ? sellingYearRow.bookValue : 0; // If sold after life, VNC is 0
+    const vnc = sellingYearRow ? sellingYearRow.bookValue : 0;
 
     const initialCost = asset.initialValue;
     const cumulDepr = initialCost - vnc;
@@ -361,7 +524,7 @@ export default function AssetManager({
     // Capital Gain/Loss = Selling Price - VNC
     const gainOrLoss = prixCession - vnc;
     
-    // Tunisian Tax impact: Reintegrated into corporate IS tax (standard rate 15% for manufacturing, 35% for financial/banks)
+    // Tax impact IS
     const taxImpact = gainOrLoss > 0 ? gainOrLoss * (corporateTaxRate / 100) : 0;
 
     setGainResult({
@@ -378,7 +541,7 @@ export default function AssetManager({
 
   const exportAssetsToCSV = () => {
     const headers = 'ID,Nom Actif,Catégorie,Date Achat,Valeur d\'Acquisition HT (TND),Durée d\'Amortissement (ans),Type,Localisation\n';
-    const rows = assets.map(a => 
+    const rows = safeAssets.map(a => 
       `"${a.id}","${a.name}","${a.category}","${a.purchaseDate}",${a.initialValue},${a.usefulLifeYears},"${a.amortizationType}","${a.location}"`
     ).join('\n');
     
@@ -420,7 +583,7 @@ export default function AssetManager({
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase block">Valeur Brute Historique</span>
             <span className="text-2xl font-black text-slate-900 font-mono">
-              {globalMetrics.totalInitialCost.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+              {(globalMetrics.totalInitialCost ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
             </span>
             <span className="text-[10px] text-slate-400 block font-medium">Cumul des investissements d'actifs</span>
           </div>
@@ -433,7 +596,7 @@ export default function AssetManager({
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase block">Amortissements Cumulés</span>
             <span className="text-2xl font-black text-rose-600 font-mono">
-              {globalMetrics.accumulatedDepr.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+              {(globalMetrics.accumulatedDepr ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
             </span>
             <span className="text-[10px] text-rose-500 block font-bold font-mono">
               Amorti à {globalMetrics.totalInitialCost > 0 ? Math.round((globalMetrics.accumulatedDepr / globalMetrics.totalInitialCost) * 100) : 0}%
@@ -448,7 +611,7 @@ export default function AssetManager({
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase block">Valeur Nette Comptable Globale</span>
             <span className="text-2xl font-black text-emerald-650 font-mono">
-              {globalMetrics.totalNetBookValue.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+              {(globalMetrics.totalNetBookValue ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
             </span>
             <span className="text-[10px] text-slate-400 block font-medium">VNC active estimée pour l'exercice 2026</span>
           </div>
@@ -468,7 +631,7 @@ export default function AssetManager({
             }`}
           >
             <Building className="w-4 h-4" />
-            <span>Registre d'Actifs ({assets.length})</span>
+            <span>Registre d'Actifs ({safeAssets.length})</span>
           </button>
           <button
             onClick={() => setActiveSubTab('capital_gains')}
@@ -570,10 +733,10 @@ export default function AssetManager({
                 </span>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100/50 text-slate-500 uppercase text-[9px] font-black tracking-widest border-b border-slate-200">
+              <div className="overflow-x-auto overflow-y-auto max-h-[480px]">
+                <table className="w-full text-left text-xs border-collapse" id="table-assets-ledger">
+                  <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs text-slate-500 uppercase text-[9px] font-black tracking-widest border-b border-slate-200">
+                    <tr>
                       <th className="p-4 font-extrabold">Réf Actif & Localisation</th>
                       <th className="p-4 font-extrabold">Description de l'Actif</th>
                       <th className="p-4 font-extrabold">Achat & Durée</th>
@@ -619,15 +782,15 @@ export default function AssetManager({
                         {/* Date & useful life */}
                         <td className="p-4">
                           <div className="space-y-0.5">
-                            <span className="text-slate-700 font-semibold block">{asset.purchaseDate}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">{asset.usefulLifeYears} ans (Taux : {Math.round(100 / asset.usefulLifeYears)}%)</span>
+                            <span className="text-slate-700 font-semibold block">{asset.purchaseDate || '-'}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{asset.usefulLifeYears || 1} ans (Taux : {Math.round(100 / (asset.usefulLifeYears || 1))}%)</span>
                           </div>
                         </td>
 
                         {/* Cost */}
                         <td className="p-4 text-right">
                           <span className="text-slate-950 font-black font-mono">
-                            {asset.initialValue.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                            {(asset.initialValue ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                           </span>
                         </td>
 
@@ -699,9 +862,9 @@ export default function AssetManager({
                           {generateDepreciationSchedule(selectedAsset).map((row) => (
                             <tr key={row.year} className="hover:bg-slate-50/50">
                               <td className="p-2 text-slate-900">{row.year}</td>
-                              <td className="p-2 text-right text-indigo-650">{row.annuity.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</td>
-                              <td className="p-2 text-right text-slate-600">{row.accumulated.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</td>
-                              <td className="p-2 text-right text-emerald-650">{row.bookValue.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</td>
+                              <td className="p-2 text-right text-indigo-650">{(row.annuity ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</td>
+                              <td className="p-2 text-right text-slate-600">{(row.accumulated ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</td>
+                              <td className="p-2 text-right text-emerald-650">{(row.bookValue ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 })}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -751,8 +914,8 @@ export default function AssetManager({
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 outline-none focus:border-indigo-500 cursor-pointer text-slate-800"
                   >
                     <option value="">Sélectionner une immobilisation active...</option>
-                    {assets.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} (Acquis à {a.initialValue.toLocaleString('fr-FR')} TND)</option>
+                    {safeAssets.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} (Acquis à {(a.initialValue ?? 0).toLocaleString('fr-FR')} TND)</option>
                     ))}
                   </select>
                 </div>
@@ -813,11 +976,11 @@ export default function AssetManager({
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <span className="text-[10px] text-slate-400 block font-bold uppercase">Valeur d'Acquisition HT</span>
-                          <span className="font-bold text-slate-800 font-mono">{gainResult.purchaseValue.toLocaleString('fr-FR')} TND</span>
+                          <span className="font-bold text-slate-800 font-mono">{(gainResult.purchaseValue ?? 0).toLocaleString('fr-FR')} TND</span>
                         </div>
                         <div>
                           <span className="text-[10px] text-slate-400 block font-bold uppercase">Valeur Nette Comptable (VNC)</span>
-                          <span className="font-bold text-indigo-650 font-mono">{gainResult.vnc.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} TND</span>
+                          <span className="font-bold text-indigo-650 font-mono">{(gainResult.vnc ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 3 })} TND</span>
                         </div>
                       </div>
                     </div>
@@ -826,14 +989,14 @@ export default function AssetManager({
                       {/* Price vs VNC */}
                       <div className="p-4 border border-slate-200 rounded-xl space-y-1">
                         <span className="text-[10px] text-slate-400 block font-bold uppercase">Prix de Cession HT</span>
-                        <span className="text-lg font-black text-slate-900 font-mono">{gainResult.disposalValue.toLocaleString('fr-FR')} TND</span>
+                        <span className="text-lg font-black text-slate-900 font-mono">{(gainResult.disposalValue ?? 0).toLocaleString('fr-FR')} TND</span>
                       </div>
 
                       {/* Result */}
                       <div className={`p-4 border rounded-xl space-y-1 ${gainResult.isGain ? 'bg-emerald-50/50 border-emerald-100 text-emerald-800' : 'bg-rose-50/50 border-rose-100 text-rose-800'}`}>
                         <span className="text-[10px] block font-bold uppercase">Résultat de Cession (Plus-value)</span>
                         <span className="text-lg font-black font-mono">
-                          {gainResult.gainOrLoss > 0 ? '+' : ''}{gainResult.gainOrLoss.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} TND
+                          {gainResult.gainOrLoss > 0 ? '+' : ''}{(gainResult.gainOrLoss ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 3 })} TND
                         </span>
                       </div>
                     </div>
@@ -850,7 +1013,7 @@ export default function AssetManager({
                       <div className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-slate-150">
                         <span className="text-slate-600 font-bold">Impôt IS sur plus-value à provisionner :</span>
                         <span className="text-sm font-black text-rose-600 font-mono">
-                          {gainResult.taxImpact.toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
+                          {(gainResult.taxImpact ?? 0).toLocaleString('fr-FR', { minimumFractionDigits: 3 })} TND
                         </span>
                       </div>
                     </div>

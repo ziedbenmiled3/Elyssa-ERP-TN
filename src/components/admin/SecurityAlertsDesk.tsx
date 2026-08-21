@@ -262,13 +262,13 @@ export const SecurityAlertsDesk: React.FC<SecurityAlertsDeskProps> = ({
                       <div className="flex items-center space-x-1.5">
                         <Clock className="w-3.5 h-3.5 text-slate-500" />
                         <span>
-                          {new Date(alert.timestamp).toLocaleTimeString('fr-FR', {
+                          {alert?.timestamp ? new Date(alert.timestamp).toLocaleTimeString('fr-FR', {
                             hour: '2-digit', minute: '2-digit'
-                          })}
+                          }) : '--:--'}
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-500 block">
-                        {new Date(alert.timestamp).toLocaleDateString('fr-FR')}
+                        {alert?.timestamp ? new Date(alert.timestamp).toLocaleDateString('fr-FR') : 'N/A'}
                       </span>
                     </td>
 

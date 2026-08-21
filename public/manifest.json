@@ -1,0 +1,15 @@
+{
+  "short_name": "Elyssa ERP",
+  "name": "Elyssa ERP Suite",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone"
+}

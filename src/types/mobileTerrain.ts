@@ -353,7 +353,7 @@ export interface VanArticleStock {
 
 export interface TenantSubscription {
   tenantId: string;
-  plan: 'ESSENTIAL' | 'PRO' | 'ENTERPRISE';
+  plan: 'ESSENTIAL' | 'PRO' | 'ENTERPRISE' | 'TRIAL';
   activeModules: string[];
   quotas: {
     maxUsers: number;

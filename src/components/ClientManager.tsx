@@ -40,9 +40,122 @@ interface ClientManagerProps {
   clients: Client[];
   onUpdateClients: (updatedClients: Client[]) => void;
   readOnly?: boolean;
+  activeTenantId?: string;
+  isDemoCompany?: boolean;
 }
 
-export default function ClientManager({ clients, onUpdateClients, readOnly = false }: ClientManagerProps) {
+export const DEFAULT_DEMO_CLIENTS: Client[] = [
+  {
+    id: "demo-cli_1",
+    name: "Société Tunisienne de Construction (STC)",
+    matriculeFiscal: "0849203/A/M/000",
+    email: "contact@stc-batiment.tn",
+    phone: "+216 71 840 210",
+    address: "Zone Industrielle Charguia II, Tunis",
+    category: "Local",
+    sector: "BTP & Gros Œuvre",
+    revenuePotential: 85000,
+    createdDate: "2026-01-10",
+    status: "Active",
+    engagements: [
+      { id: "eng_1", title: "Livraison Chantier Les Berges du Lac", description: "Fourniture Ciment CPJ 45 et fers à béton", dueDate: "2026-08-25", status: "Pending", is_demo: true },
+      { id: "eng_2", title: "Négociation remise annuelle grands comptes", description: "Revue des tarifs sur approvisionnement Q4", dueDate: "2026-09-01", status: "Pending", is_demo: true }
+    ],
+    notes: "Client fidèle de référence sur le Grand Tunis. Encours autorisé 50 000 TND.",
+    is_demo: true
+  },
+  {
+    id: "demo-cli_2",
+    name: "Comptoir du Centre",
+    matriculeFiscal: "1120489/B/P/000",
+    email: "achats@comptoir-centre.tn",
+    phone: "+216 73 220 180",
+    address: "Avenue Léopold Senghor, Sousse",
+    category: "Local",
+    sector: "Distribution & Négoce Matériaux",
+    revenuePotential: 45000,
+    createdDate: "2026-02-15",
+    status: "Active",
+    engagements: [
+      { id: "eng_3", title: "Réapprovisionnement Stock Peintures", description: "Envoi catalogue Astral et outillage", dueDate: "2026-08-28", status: "Pending", is_demo: true }
+    ],
+    notes: "Distributeur régional leader sur le Sahel. Règlements par traites à 60 jours.",
+    is_demo: true
+  },
+  {
+    id: "demo-cli_3",
+    name: "Afrique Bâtiment",
+    matriculeFiscal: "0994821/C/M/000",
+    email: "direction@afrique-batiment.tn",
+    phone: "+216 74 400 950",
+    address: "Route de Gabès Km 3, Sfax",
+    category: "Local",
+    sector: "Entreprise Générale BTP",
+    revenuePotential: 60000,
+    createdDate: "2026-03-01",
+    status: "Active",
+    engagements: [
+      { id: "eng_4", title: "Règlement Facture FAC-2026-003", description: "Suivi du dossier de recouvrement et promesse virement", dueDate: "2026-08-30", status: "Pending", is_demo: true }
+    ],
+    notes: "Grand chantier Sud en cours. Vigilance sur les délais de paiement.",
+    is_demo: true
+  }
+];
+
+export default function ClientManager({ 
+  clients: incomingClients, 
+  onUpdateClients, 
+  readOnly = false,
+  activeTenantId,
+  isDemoCompany = false
+}: ClientManagerProps) {
+  // Strict check for Demo tenant vs Production tenant
+  const isDemoTenant = React.useMemo(() => {
+    if (isDemoCompany) return true;
+    const tid = String(activeTenantId || localStorage.getItem('carthage_active_company') || '').toLowerCase().trim();
+    if (tid.includes('parent') || tid.includes('prod') || tid === 'inter-affaires' || tid === 'company_parent' || tid === 'elyssa entreprises s.a.') {
+      return false;
+    }
+    return tid === 'inter-affaires-demo' || tid === 'demo' || tid === 'company_demo' || tid.includes('démo') || tid.includes('demo') || tid.includes('sandbox');
+  }, [activeTenantId, isDemoCompany]);
+
+  // Direct state initialization: STRICT isolation (empty [] for PROD, demo only for demo tenants)
+  const [clients, setClients] = useState<Client[]>(() => {
+    if (!isDemoTenant) {
+      try {
+        localStorage.removeItem('carthage_demo_clients');
+      } catch (_) {}
+      return Array.isArray(incomingClients) 
+        ? incomingClients.filter(c => !c.is_demo && !String(c.id || '').startsWith('demo-')) 
+        : [];
+    }
+    if (Array.isArray(incomingClients) && incomingClients.length > 0) {
+      return incomingClients;
+    }
+    return DEFAULT_DEMO_CLIENTS;
+  });
+
+  React.useEffect(() => {
+    if (!isDemoTenant) {
+      try {
+        localStorage.removeItem('carthage_demo_clients');
+      } catch (_) {}
+      const sanitized = Array.isArray(incomingClients) 
+        ? incomingClients.filter(c => !c.is_demo && !String(c.id || '').startsWith('demo-')) 
+        : [];
+      setClients(sanitized);
+    } else if (Array.isArray(incomingClients) && incomingClients.length > 0) {
+      setClients(incomingClients);
+    }
+  }, [incomingClients, isDemoTenant]);
+
+  const updateClients = (updated: Client[]) => {
+    setClients(updated);
+    if (onUpdateClients) {
+      onUpdateClients(updated);
+    }
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'All' | 'Local' | 'Export'>('All');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
@@ -82,7 +195,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
   const [newClientEmail, setNewClientEmail] = useState('');
   const [newClientPhone, setNewClientPhone] = useState('');
   const [newClientAddress, setNewClientAddress] = useState('');
-  const [newClientCategory, setNewClientCategory] = useState<'Local' | 'Export'>('Local');
+  const [newClientCategory, setNewClientCategory] = useState<string>('Local');
   const [newClientSector, setNewClientSector] = useState('');
   const [newClientRevenue, setNewClientRevenue] = useState<number>(10000);
   const [newClientNotes, setNewClientNotes] = useState('');
@@ -93,7 +206,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
   const [editClientEmail, setEditClientEmail] = useState('');
   const [editClientPhone, setEditClientPhone] = useState('');
   const [editClientAddress, setEditClientAddress] = useState('');
-  const [editClientCategory, setEditClientCategory] = useState<'Local' | 'Export'>('Local');
+  const [editClientCategory, setEditClientCategory] = useState<string>('Local');
   const [editClientSector, setEditClientSector] = useState('');
   const [editClientRevenue, setEditClientRevenue] = useState<number>(10000);
   const [editClientNotes, setEditClientNotes] = useState('');
@@ -126,7 +239,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
       createdDate: new Date().toISOString().split('T')[0]
     };
 
-    onUpdateClients([...clients, newClient]);
+    updateClients([...clients, newClient]);
     setSelectedClientId(newClient.id);
     setIsAddingClient(false);
     
@@ -176,7 +289,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
       return c;
     });
 
-    onUpdateClients(updated);
+    updateClients(updated);
     setIsEditingClient(false);
   };
 
@@ -188,7 +301,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
       }
       return c;
     });
-    onUpdateClients(updated);
+    updateClients(updated);
   };
 
   const handleUpdateStatus = (status: 'Active' | 'Inactive') => {
@@ -199,7 +312,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
       }
       return c;
     });
-    onUpdateClients(updated);
+    updateClients(updated);
   };
 
   const handleAddCommitment = (e: React.FormEvent) => {
@@ -221,7 +334,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
       return c;
     });
 
-    onUpdateClients(updated);
+    updateClients(updated);
     setIsAddingCommitment(false);
     setCommitmentTitle('');
     setCommitmentDesc('');
@@ -246,7 +359,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
       }
       return c;
     });
-    onUpdateClients(updated);
+    updateClients(updated);
   };
 
   const handleDeleteCommitment = (commitmentId: string) => {
@@ -260,7 +373,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
       }
       return c;
     });
-    onUpdateClients(updated);
+    updateClients(updated);
   };
 
   const handleDeleteClient = (clientId: string) => {
@@ -273,7 +386,7 @@ export default function ClientManager({ clients, onUpdateClients, readOnly = fal
   const confirmDeleteClient = () => {
     if (clientToDeleteInManager) {
       const remaining = clients.filter(c => c.id !== clientToDeleteInManager.id);
-      onUpdateClients(remaining);
+      updateClients(remaining);
       setSelectedClientId(remaining[0]?.id || null);
       setClientToDeleteInManager(null);
     }

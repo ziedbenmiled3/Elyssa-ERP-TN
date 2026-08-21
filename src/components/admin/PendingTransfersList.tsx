@@ -299,12 +299,12 @@ export const PendingTransfersList: React.FC<PendingTransfersListProps> = ({
             ) : (
               filteredOrders.map((order) => {
                 const isProcessing = processingCmdId === order.id;
-                const createdDate = new Date(order.createdAt).toLocaleDateString('fr-TN', {
+                const createdDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('fr-TN', {
                   day: '2-digit',
                   month: 'short',
                   hour: '2-digit',
                   minute: '2-digit'
-                });
+                }) : 'N/A';
 
                 return (
                   <tr key={order.id} className="hover:bg-slate-900/80 transition-colors group">

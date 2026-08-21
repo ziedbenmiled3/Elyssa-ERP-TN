@@ -119,10 +119,11 @@ export const FieldAgentsMap: React.FC<FieldAgentsMapProps> = ({
         {activeSessions.map((session) => {
           const isSelected = session.id === selectedSessionId;
           const isVan = session.type === 'VAN_SALES';
-          const formattedTime =
-            typeof session.checkIn.timestamp === 'string'
+          const formattedTime = session.checkIn?.timestamp
+            ? (typeof session.checkIn.timestamp === 'string'
               ? new Date(session.checkIn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : session.checkIn.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              : (session.checkIn.timestamp instanceof Date ? session.checkIn.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(session.checkIn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })))
+            : '--:--';
 
           return (
             <Marker

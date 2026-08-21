@@ -29,6 +29,7 @@ import { WireTransferOrderModal } from './ModuleCatalogCard';
 interface ModuleStoreProps {
   tenantId?: string;
   onNavigateToLicenseManager?: () => void;
+  isTrial?: boolean;
 }
 
 /**
@@ -36,8 +37,9 @@ interface ModuleStoreProps {
  * Présente le module "Flotte Mobile & Opérations Terrain" (MOD-11) à la carte et dans les Packs SaaS.
  */
 export const ModuleStore: React.FC<ModuleStoreProps> = ({
-  tenantId = 'GEP',
-  onNavigateToLicenseManager
+  tenantId = 'MD',
+  onNavigateToLicenseManager,
+  isTrial = true
 }) => {
   // États locaux
   const [subscription, setSubscription] = useState<TenantSubscription | null>(null);
@@ -143,25 +145,45 @@ export const ModuleStore: React.FC<ModuleStoreProps> = ({
         </div>
 
         {/* Badge Offre Actuelle */}
-        <div className="flex items-center gap-4 bg-slate-900/80 p-4 rounded-xl border border-slate-700/80">
-          <div className="p-3 bg-amber-500/10 rounded-lg text-amber-400 border border-amber-500/20">
-            <Building2 className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-xs text-slate-400">Offre souscrite actuelle</div>
-            <div className="text-lg font-bold text-white flex items-center gap-2">
-              Pack {subscription.plan}
-              {isProOrEnterprise ? (
-                <BadgeCheck className="w-4 h-4 text-emerald-400" />
-              ) : (
-                <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Essentiel</span>
-              )}
+        {(() => {
+          const isTrialMode = isTrial || subscription.plan === 'TRIAL' || tenantId === 'MD' || tenantId === 'Inter-Affaires';
+          return (
+            <div className="flex items-center gap-4 bg-slate-900/90 p-4 rounded-xl border border-amber-500/30 shadow-lg">
+              <div className="p-3 bg-amber-500/15 rounded-lg text-amber-400 border border-amber-500/30 shrink-0">
+                {isTrialMode ? <Sparkles className="w-6 h-6 animate-pulse" /> : <Building2 className="w-6 h-6" />}
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 font-medium">Offre souscrite actuelle</div>
+                {isTrialMode ? (
+                  <>
+                    <div className="text-sm font-black text-amber-300 flex items-center gap-2 mt-0.5">
+                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        MODE ÉVALUATION ILLIMITÉE (TRIAL 14 JOURS)
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-300 mt-1 max-w-sm leading-relaxed">
+                      Accès complet aux 33 modules métier + Licences Mobiles Terrain actives pour test.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-lg font-bold text-white flex items-center gap-2">
+                      Pack {subscription.plan}
+                      {isProOrEnterprise ? (
+                        <BadgeCheck className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Essentiel</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {subscription.quotas.maxUsers} Utilisateurs Web • {subscription.quotas.maxFieldAgents} Agents Mobile Terrain
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="text-xs text-slate-400 mt-0.5">
-              {subscription.quotas.maxUsers} Utilisateurs Web • {subscription.quotas.maxFieldAgents} Agents Mobile Terrain
-            </div>
-          </div>
-        </div>
+          );
+        })()}
       </div>
 
       {/* Barre d'onglets de la Boutique */}

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { appStorage } from './services/storageAdapter';
 import { useAiCopilot } from "./hooks/useAiCopilot";
 import { CopilotChatDrawer } from "./components/CopilotChatDrawer";
 import { MessageSquare } from "lucide-react";
@@ -38,11 +39,17 @@ import {
   Vehicle,
   MissionOrder,
   FleetExpense,
-  IncidentRecord
+  IncidentRecord,
+  AUTHORIZED_COMPANIES,
+  CompanyTenant
 } from './types';
 
 import { purgeTenantData, clearDemoData as clearDemoDataService, reloadDemoData } from './services/demoDataService';
 import { seedHyperConnectedDemoData } from './services/hyperConnectedDemoSeeder';
+import { registerNewTrialTenant, activateClientPack, getTenantMeta } from './services/licensingService';
+import { TenantProvider, useTenant } from './context/TenantContext';
+import { MailService } from './services/mailService';
+import { DEMO_UNIVERSE } from './data/demoUniverse';
 
 import { 
   INITIAL_ADMIN_SETTINGS, 
@@ -69,204 +76,52 @@ import {
 } from './data/financeMock';
 
 const DEFAULT_FLEET_VEHICLES: Vehicle[] = [
-  { id: 'demo-v_1', brand: 'Peugeot', model: 'Partner', registrationNumber: '228 TUN 4091', purchaseDate: '2024-03-12', purchasePrice: 62000.000, status: 'Active', assignedToEmployeeId: 'demo-emp_3', assignedEmployeeName: 'Mohamed Ali Gharbi (Démo)' },
-  { id: 'demo-v_2', brand: 'Citroën', model: 'C-Elysée', registrationNumber: '215 TUN 9811', purchaseDate: '2023-01-15', purchasePrice: 48000.000, status: 'Active', assignedToEmployeeId: 'demo-emp_1', assignedEmployeeName: 'Khaled Ben Amor (Démo)' },
-  { id: 'demo-v_3', brand: 'Dacia', model: 'Duster', registrationNumber: '235 TUN 3254', purchaseDate: '2025-06-10', purchasePrice: 78000.000, status: 'Active', assignedToEmployeeId: 'demo-emp_2', assignedEmployeeName: 'Ines Dridi (Démo)' },
-  { id: 'demo-v_4', brand: 'Renault', model: 'Clio 5', registrationNumber: '204 TUN 1542', purchaseDate: '2022-09-22', purchasePrice: 42000.000, status: 'UnderRepair', assignedToEmployeeId: 'demo-emp_3', assignedEmployeeName: 'Mohamed Ali Gharbi (Démo)' },
-  { id: 'demo-v_904', brand: 'Isuzu', model: 'D-Max Camionette', registrationNumber: '240 TN 8812', purchaseDate: '2024-02-10', purchasePrice: 72000.000, status: 'Active', assignedToEmployeeId: 'EMP-904', assignedEmployeeName: 'Sami Ben Ali' },
-  { id: 'demo-v_912', brand: 'Toyota', model: 'Hilux Pick-Up', registrationNumber: '198 TN 4410', purchaseDate: '2023-08-15', purchasePrice: 85000.000, status: 'Active', assignedToEmployeeId: 'EMP-912', assignedEmployeeName: 'Mohamed Trabelsi' },
-  { id: 'demo-v_920', brand: 'Peugeot', model: 'Boxer Fourgon', registrationNumber: '215 TN 1092', purchaseDate: '2024-04-01', purchasePrice: 68000.000, status: 'Active', assignedToEmployeeId: 'EMP-920', assignedEmployeeName: 'Youssef Mansour' },
-  { id: 'demo-v_935', brand: 'Citroën', model: 'Berlingo Van', registrationNumber: '201 TN 6621', purchaseDate: '2023-11-20', purchasePrice: 52000.000, status: 'Active', assignedToEmployeeId: 'EMP-935', assignedEmployeeName: 'Karem Chaabane' },
-  { id: 'demo-v_942', brand: 'Renault', model: 'Clio 5', registrationNumber: '228 TN 3301', purchaseDate: '2024-01-10', purchasePrice: 46000.000, status: 'Active', assignedToEmployeeId: 'EMP-942', assignedEmployeeName: 'Fatma Gharbi' },
-  { id: 'demo-v_950', brand: 'Isuzu', model: 'D-Max 4x4', registrationNumber: '215 TUN 9832', purchaseDate: '2023-08-18', purchasePrice: 89000.000, status: 'Active', assignedToEmployeeId: 'EMP-950', assignedEmployeeName: 'Hamadi Rekik' },
-  { id: 'demo-v_951', brand: 'Hyundai', model: 'H100 Fourgon', registrationNumber: '219 TN 5510', purchaseDate: '2024-05-12', purchasePrice: 58000.000, status: 'Active', assignedToEmployeeId: 'EMP-951', assignedEmployeeName: 'Ahmed Karray' }
+  { id: 'demo-v_1', brand: 'Peugeot', model: 'Partner', registrationNumber: '228 TUN 4091', purchaseDate: '2024-03-12', purchasePrice: 62000.000, status: 'Active', assignedToEmployeeId: 'demo-emp_6', assignedEmployeeName: 'Hamza Ben Salem' },
+  { id: 'demo-v_2', brand: 'Isuzu', model: 'D-Max', registrationNumber: '240 TN 8812', purchaseDate: '2024-02-10', purchasePrice: 72000.000, status: 'Active', assignedToEmployeeId: 'demo-emp_6', assignedEmployeeName: 'Hamza Ben Salem' },
+  { id: 'demo-v_3', brand: 'Citroën', model: 'C-Élysée', registrationNumber: '215 TUN 9811', purchaseDate: '2023-01-15', purchasePrice: 48000.000, status: 'Active', assignedToEmployeeId: 'demo-emp_3', assignedEmployeeName: 'Mohamed Ali Gharbi' }
 ];
 
 const DEFAULT_FLEET_MISSIONS: MissionOrder[] = [
   { 
     id: 'demo-mo_1', 
-    employeeId: 'demo-emp_3', 
-    employeeName: 'Mohamed Ali Gharbi (Démo)', 
-    vehicleId: 'demo-v_1', 
-    vehicleLabel: 'Peugeot Partner (228 TUN 4091)', 
+    employeeId: 'demo-emp_6', 
+    employeeName: 'Hamza Ben Salem', 
+    vehicleId: 'demo-v_2', 
+    vehicleLabel: 'Isuzu D-Max (240 TN 8812)', 
     transportType: 'CompanyCar',
-    destination: 'Sfax / Gabès', 
-    purpose: 'Livraison de pièces détachées urgentes aux clients zone industrielle', 
-    departureDateTime: '2026-06-15T07:15', 
-    returnDateTime: '2026-06-16T19:45', 
-    status: 'Completed',
+    destination: 'Tunis / Sfax', 
+    purpose: 'Livraison Client Poulina - Tunis/Sfax', 
+    departureDateTime: '2026-08-10T07:30', 
+    returnDateTime: '2026-08-10T19:00', 
+    status: 'Approved',
+    allowancesGranted: 60.000,
     expenses: [
-      { id: 'demo-me_mo1_1', category: 'Hotel', description: 'Chambre individuelle Hôtel Sfax Centre', amount: 145.000, invoiceNumber: 'FA_SFAX_998', date: '2026-06-15' },
-      { id: 'demo-me_mo1_2', category: 'Food', description: 'Dîner et petit-déjeuner', amount: 35.000, invoiceNumber: 'RE_SFAX_321', date: '2026-06-15' }
+      { id: 'demo-me_mo1_1', category: 'Food', description: 'Repas et frais déplacement livraison Poulina', amount: 35.000, invoiceNumber: 'RE_SFAX_88', date: '2026-08-10' }
     ]
   },
   { 
     id: 'demo-mo_2', 
-    employeeId: 'demo-emp_1', 
-    employeeName: 'Khaled Ben Amor (Démo)', 
-    vehicleId: 'demo-v_2', 
-    vehicleLabel: 'Citroën C-Elysée (215 TUN 9811)', 
-    transportType: 'CompanyCar',
-    destination: 'Tunis Centre / BFT Bank', 
-    purpose: 'Rapprochement bancaire physique et signature de protocoles', 
-    departureDateTime: '2026-06-20T09:30', 
-    returnDateTime: '2026-06-20T13:00', 
-    status: 'Approved',
-    expenses: []
-  },
-  { 
-    id: 'demo-mo_3', 
-    employeeId: 'demo-emp_2', 
-    employeeName: 'Ines Dridi (Démo)', 
+    employeeId: 'demo-emp_3', 
+    employeeName: 'Mohamed Ali Gharbi', 
     vehicleId: 'demo-v_3', 
-    vehicleLabel: 'Dacia Duster (235 TUN 3254)', 
+    vehicleLabel: 'Citroën C-Élysée (215 TUN 9811)', 
     transportType: 'CompanyCar',
     destination: 'Sousse', 
-    purpose: 'Audit logistique inter-entreprises du dépôt côtier', 
-    departureDateTime: '2026-06-22T08:00', 
-    returnDateTime: '2026-06-24T18:00', 
-    status: 'Draft',
+    purpose: 'Prospection Sousse', 
+    departureDateTime: '2026-08-10T08:00', 
+    returnDateTime: '2026-08-10T18:00', 
+    status: 'Approved',
+    allowancesGranted: 50.000,
     expenses: [
-      { id: 'demo-me_mo3_1', category: 'Hotel', description: 'Réservation Hôtel Tej Marhaba Sousse (2 nuits)', amount: 260.000, invoiceNumber: 'TM_SOUSSE_11', date: '2026-06-22' }
+      { id: 'demo-me_mo2_1', category: 'Food', description: 'Déjeuner client prospection commerciale Sousse', amount: 30.000, invoiceNumber: 'RE_SOUSSE_12', date: '2026-08-10' }
     ]
-  },
-  { 
-    id: 'demo-mo_4', 
-    employeeId: 'demo-emp_2', 
-    employeeName: 'Ines Dridi (Démo)', 
-    transportType: 'Other', 
-    otherTransportLabel: 'Avion', 
-    destination: 'Paris / Salon de la Logistique', 
-    purpose: 'Négociation partenariats fret maritime et renouvellement agrément douanier', 
-    departureDateTime: '2026-06-25T08:00', 
-    returnDateTime: '2026-06-28T22:00', 
-    status: 'Approved', 
-    expenses: [
-      { id: 'demo-me_mo4_1', category: 'Flight', description: "Billet d'avion Tunis-Paris A/R Tunisair", amount: 1120.000, invoiceNumber: 'TUV_32441', date: '2026-06-25' },
-      { id: 'demo-me_mo4_2', category: 'Hotel', description: 'Hôtel Ibis Paris 3 Nuits', amount: 980.000, invoiceNumber: 'PAR_HOST_889', date: '2026-06-25' },
-      { id: 'demo-me_mo4_3', category: 'Visa', description: 'Frais Consulaires TLS contact Visa Schengen', amount: 280.000, invoiceNumber: 'TLS_SHEN_2026', date: '2026-06-22' },
-      { id: 'demo-me_mo4_4', category: 'Food', description: 'Frais de restauration et métro Paris RER', amount: 150.000, date: '2026-06-26' }
-    ]
-  },
-  {
-    id: 'demo-mo_904',
-    employeeId: 'EMP-904',
-    employeeName: 'Sami Ben Ali',
-    vehicleId: 'demo-v_904',
-    vehicleLabel: 'Camionette Isuzu (240 TN 8812)',
-    transportType: 'CompanyCar',
-    destination: 'Grand Tunis & Ben Arous',
-    purpose: 'Tournée Commerciale Van Sales & Prospection B2B clients grands comptes',
-    departureDateTime: '2026-08-05T08:00',
-    returnDateTime: '2026-08-05T18:00',
-    status: 'Approved',
-    expenses: [
-      { id: 'demo-me_904_1', category: 'Fuel', description: 'Recharge carte carburant Ola Energy Lac 2', amount: 140.000, invoiceNumber: 'BON_OLA_904', date: '2026-08-05' }
-    ]
-  },
-  {
-    id: 'demo-mo_912',
-    employeeId: 'EMP-912',
-    employeeName: 'Mohamed Trabelsi',
-    vehicleId: 'demo-v_912',
-    vehicleLabel: 'Toyota Hilux Pick-Up (198 TN 4410)',
-    transportType: 'CompanyCar',
-    destination: 'Port de Sousse Extension',
-    purpose: 'Supervision Chantier BTP & Approvisionnement Béton/Acier',
-    departureDateTime: '2026-08-05T07:30',
-    returnDateTime: '2026-08-05T19:00',
-    status: 'Approved',
-    expenses: [
-      { id: 'demo-me_912_1', category: 'Toll', description: 'Badge télépéage autoroute A1 Sousse', amount: 35.000, invoiceNumber: 'PEA_AUT_SOUSSE', date: '2026-08-05' }
-    ]
-  },
-  {
-    id: 'demo-mo_920',
-    employeeId: 'EMP-920',
-    employeeName: 'Youssef Mansour',
-    vehicleId: 'demo-v_920',
-    vehicleLabel: 'Peugeot Boxer Fourgon (215 TN 1092)',
-    transportType: 'CompanyCar',
-    destination: 'Sfax / Route de Mahdia',
-    purpose: 'Livraison palette produits agroalimentaires & Encaissement grossistes',
-    departureDateTime: '2026-08-04T06:00',
-    returnDateTime: '2026-08-05T20:00',
-    status: 'Approved',
-    expenses: [
-      { id: 'demo-me_920_1', category: 'Fuel', description: 'Plein Gazole 50 SNDP Agil Sfax', amount: 210.000, invoiceNumber: 'AGIL_SFAX_331', date: '2026-08-04' }
-    ]
-  },
-  {
-    id: 'demo-mo_935',
-    employeeId: 'EMP-935',
-    employeeName: 'Karem Chaabane',
-    vehicleId: 'demo-v_935',
-    vehicleLabel: 'Citroën Berlingo Van (201 TN 6621)',
-    transportType: 'CompanyCar',
-    destination: 'Nabeul / Zone Industrielle Cap Bon',
-    purpose: 'Maintenance préventive ligne d emballage semi-automatique',
-    departureDateTime: '2026-08-05T08:30',
-    returnDateTime: '2026-08-05T17:30',
-    status: 'Approved',
-    expenses: []
-  },
-  {
-    id: 'demo-mo_942',
-    employeeId: 'EMP-942',
-    employeeName: 'Fatma Gharbi',
-    vehicleId: 'demo-v_942',
-    vehicleLabel: 'Renault Clio 5 (228 TN 3301)',
-    transportType: 'CompanyCar',
-    destination: 'Bizerte / Site Industriel Menzel Bourguiba',
-    purpose: 'Contrôle Qualité ISO 9001 & Audit conformité matières premières',
-    departureDateTime: '2026-08-05T09:00',
-    returnDateTime: '2026-08-05T16:30',
-    status: 'Approved',
-    expenses: []
-  },
-  {
-    id: 'demo-mo_950',
-    employeeId: 'EMP-950',
-    employeeName: 'Hamadi Rekik',
-    vehicleId: 'demo-v_950',
-    vehicleLabel: 'Isuzu D-Max 4x4 (215 TUN 9832)',
-    transportType: 'CompanyCar',
-    destination: 'Kairouan & Sidi Bouzid',
-    purpose: 'Inspections techniques puits & forages d eau potable',
-    departureDateTime: '2026-08-05T07:00',
-    returnDateTime: '2026-08-05T19:30',
-    status: 'Approved',
-    expenses: []
-  },
-  {
-    id: 'demo-mo_951',
-    employeeId: 'EMP-951',
-    employeeName: 'Ahmed Karray',
-    vehicleId: 'demo-v_951',
-    vehicleLabel: 'Hyundai H100 Fourgon (219 TN 5510)',
-    transportType: 'CompanyCar',
-    destination: 'Gabès & Medenine',
-    purpose: 'Livraison matériel hydraulique & tuyauterie polyéthylène',
-    departureDateTime: '2026-08-05T06:30',
-    returnDateTime: '2026-08-05T20:30',
-    status: 'Approved',
-    expenses: []
   }
 ];
 
 const DEFAULT_FLEET_EXPENSES: any[] = [
-  { id: 'demo-exp_1', date: '2026-06-02', vehicleId: 'demo-v_1', vehicleLabel: 'Peugeot Partner (228 TUN 4091) (Démo)', category: 'GasolineBonus', amount: 120.000, invoiceNb: 'BON_OLA_39912', providerName: 'Ola Energy Charguia', description: 'Recharge carte carburant mensuel' },
-  { id: 'demo-exp_2', date: '2026-06-05', vehicleId: 'demo-v_2', vehicleLabel: 'Citroën C-Elysée (215 TUN 9811) (Démo)', category: 'Insurance', amount: 980.050, invoiceNb: 'FACT_AST_2026', providerName: 'Assurances ASTREE', description: 'Renouvellement contrat assurance tous risques annuel' },
-  { id: 'demo-exp_3', date: '2026-06-08', vehicleId: 'demo-v_4', vehicleLabel: 'Renault Clio 5 (204 TUN 1542) (Démo)', category: 'SpareParts', amount: 340.000, invoiceNb: 'PIECE_RENA_002', providerName: 'Maison Renault Tunis', description: 'Remplacement plaquettes et disques de freins avant' },
-  { id: 'demo-exp_4', date: '2026-06-08', vehicleId: 'demo-v_4', vehicleLabel: 'Renault Clio 5 (204 TUN 1542) (Démo)', category: 'MechanicLabor', amount: 75.000, invoiceNb: 'MO_MEC_GASTON', providerName: 'Atelier Gaston Mécanique', description: "Main d'œuvre montage plaquettes" },
-  { id: 'demo-exp_5', date: '2026-06-11', vehicleId: 'demo-v_3', vehicleLabel: 'Dacia Duster (235 TUN 3254) (Démo)', category: 'Vignette', amount: 180.000, invoiceNb: 'REC_FIN_9921', providerName: 'Recette des Finances Tunis', description: "Droit de circulation de l'exercice 2026" },
-  { id: 'demo-exp_6', date: '2026-06-15', vehicleId: 'demo-v_1', vehicleLabel: 'Peugeot Partner (228 TUN 4091) (Démo)', category: 'Toll', amount: 12.000, invoiceNb: 'PEA_MOR_AUT', providerName: 'Tunisie Autoroutes S.A.', description: 'Recharge badge Tunisie Autoroute' },
-  { id: 'demo-exp_7', date: '2026-06-17', vehicleId: 'demo-v_4', vehicleLabel: 'Renault Clio 5 (204 TUN 1542) (Démo)', category: 'PanelBeaterInvoice', amount: 450.000, invoiceNb: 'FACT_TOLIER_99', providerName: 'Tôlerie Moderne El Ouardia', description: 'Rattrapage froissement aile arrière droite' },
-  { id: 'demo-exp_904', date: '2026-06-22', vehicleId: 'demo-v_904', vehicleLabel: 'Camionette Isuzu (240 TN 8812)', category: 'GasolineBonus', amount: 140.000, invoiceNb: 'BON_OLA_904', providerName: 'Ola Energy Lac 2', description: 'Recharge carte carburant Van Sales (Sami Ben Ali)' },
-  { id: 'demo-exp_912', date: '2026-06-20', vehicleId: 'demo-v_912', vehicleLabel: 'Toyota Hilux (198 TN 4410)', category: 'Toll', amount: 35.000, invoiceNb: 'PEA_AUT_SOUSSE', providerName: 'Tunisie Autoroutes S.A.', description: 'Badge télépéage trajet Chantier Sousse (Mohamed Trabelsi)' },
-  { id: 'demo-exp_920', date: '2026-06-21', vehicleId: 'demo-v_920', vehicleLabel: 'Peugeot Boxer (215 TN 1092)', category: 'GasolineBonus', amount: 210.000, invoiceNb: 'AGIL_SFAX_331', providerName: 'SNDP Agil Sfax', description: 'Plein Gazole 50 tournée livraison Sud (Youssef Mansour)' },
-  { id: 'demo-exp_935', date: '2026-06-18', vehicleId: 'demo-v_935', vehicleLabel: 'Citroën Berlingo (201 TN 6621)', category: 'MechanicLabor', amount: 165.000, invoiceNb: 'FACT_CIT_6621', providerName: 'Citroën Nabeul Service', description: 'Vidange huile synthétique et changement filtres (Karem Chaabane)' },
-  { id: 'demo-exp_942', date: '2026-06-15', vehicleId: 'demo-v_942', vehicleLabel: 'Renault Clio 5 (228 TN 3301)', category: 'Insurance', amount: 790.000, invoiceNb: 'COMAR_2026_QUAL', providerName: 'Assurances COMAR', description: 'Contrat assurance flotte mission inspection (Fatma Gharbi)' }
+  { id: 'demo-exp_1', date: '2026-08-01', vehicleId: 'demo-v_2', vehicleLabel: 'Isuzu D-Max (240 TN 8812)', category: 'GasolineBonus', amount: 450.000, invoiceNb: 'BON_TOT_450', providerName: 'TotalEnergies', description: 'Carburant TotalEnergies - Tournée livraison Sud' },
+  { id: 'demo-exp_2', date: '2026-08-03', vehicleId: 'demo-v_1', vehicleLabel: 'Peugeot Partner (228 TUN 4091)', category: 'MechanicLabor', amount: 280.000, invoiceNb: 'FACT_VID_280', providerName: 'Atelier Central Service', description: 'Entretien vidange complète et remplacement filtres' },
+  { id: 'demo-exp_3', date: '2026-08-05', vehicleId: 'demo-v_3', vehicleLabel: 'Citroën C-Élysée (215 TUN 9811)', category: 'Insurance', amount: 650.000, invoiceNb: 'VIG_ASSUR_650', providerName: 'Assurances STAR / Recette Finances', description: 'Vignette fiscale & Assurance flotte annuelle' }
 ];
 
 const DEFAULT_FLEET_INCIDENTS: any[] = [
@@ -528,7 +383,8 @@ import LoginPage from './components/LoginPage';
 import FinanceManager from './components/FinanceManager';
 import UserGuide from './components/UserGuide';
 import InvestmentManager from './components/InvestmentManager';
-import PayrollManager from './components/PayrollManager';
+import StockMarketManager from './components/StockMarketManager';
+import PayrollManager, { UNIFIED_7_PAYROLL_EMPLOYEES, INTER_AFFAIRES_EMPLOYEES } from './components/PayrollManager';
 import GedManager from './components/GedManager';
 import FleetManager from './components/FleetManager';
 import TransitLogistiqueManager from './components/TransitLogistiqueManager';
@@ -561,7 +417,7 @@ import { WarehousePickingScreen } from './components/WarehousePickingScreen';
 import AccountantPortal from './components/AccountantPortal';
 import { canAccess } from './utils/auth_utils';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from './utils/firebase';
+import { db, cleanFirestoreData } from './utils/firebase';
 
 
 import { 
@@ -743,78 +599,32 @@ const resetAllStates = (): void => {
   } catch (e) {}
 };
 
-const isDynamicPersistenceDisallowed = (key: string): boolean => {
-  const k = key.toLowerCase();
-  // Strictly prevent any local persistence of dynamic collaborator, employee, absence, contract, payroll, purchasing, production or general ERP collection data
-  return (
-    k.includes('collaborator') ||
-    k.includes('employee') ||
-    k.includes('contract') ||
-    k.includes('absence') ||
-    k.includes('payslip') ||
-    k.includes('purchasing') ||
-    k.includes('production') ||
-    k.includes('requisition') ||
-    k.includes('order') ||
-    k.includes('nomenclature') ||
-    k.includes('manufacturing') ||
-    k.includes('client') ||
-    k.includes('complaint') ||
-    k.includes('invoice') ||
-    k.includes('visit_report') ||
-    k.includes('competitor') ||
-    k.includes('supplier') ||
-    k.includes('product') ||
-    k.includes('stock_movement') ||
-    k.includes('incoming_email') ||
-    k.includes('email_template') ||
-    k.includes('communication_log') ||
-    k.includes('bank_account') ||
-    k.includes('bank_transaction') ||
-    k.includes('tax_declaration') ||
-    k.includes('year_end_closing') ||
-    k.includes('document')
-  );
-};
-
 const scopedStorage = {
   getItem: (key: string): string | null => {
-    if (isDynamicPersistenceDisallowed(key)) {
-      console.log(`[Storage Blocked] Reading blocked for dynamic key: ${key}`);
-      return null;
-    }
     if (companySpecificKeys.includes(key)) {
       const activeCompany = getActiveCompanyNameFromStorage();
       const suffix = activeCompany.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      return window.localStorage.getItem(`${key}_${suffix}`);
+      return appStorage.getItem(`${key}_${suffix}`);
     }
-    return window.localStorage.getItem(key);
+    return appStorage.getItem(key);
   },
   setItem: (key: string, value: string): void => {
-    if (isDynamicPersistenceDisallowed(key)) {
-      console.log(`[Storage Blocked] Writing blocked for dynamic key: ${key}`);
-      return;
-    }
     if (companySpecificKeys.includes(key)) {
       const activeCompany = getActiveCompanyNameFromStorage();
       const suffix = activeCompany.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      window.localStorage.setItem(`${key}_${suffix}`, value);
+      appStorage.setItem(`${key}_${suffix}`, value);
       return;
     }
-    window.localStorage.setItem(key, value);
+    appStorage.setItem(key, value);
   },
   removeItem: (key: string): void => {
-    if (isDynamicPersistenceDisallowed(key)) {
-      console.log(`[Storage Blocked] Deletion blocked for dynamic key: ${key}`);
-      return;
-    }
     if (companySpecificKeys.includes(key)) {
       const activeCompany = getActiveCompanyNameFromStorage();
       const suffix = activeCompany.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      window.localStorage.removeItem(`${key}_${suffix}`);
+      appStorage.removeItem(`${key}_${suffix}`);
       return;
     }
-    window.localStorage.removeItem(key);
+    appStorage.removeItem(key);
   },
   clear: (): void => {
     clearAppCache();
@@ -1022,11 +832,34 @@ const getCompleteDemoPayload = (companyName: string) => {
 
   let demoEmployees: Employee[] = [
     {
+      id: `demo-emp_${suffix}_0`,
+      matricule: 'EMP-0000',
+      name: 'Meriam Doudou',
+      email: `m.doudou@${domain}`,
+      jobTitle: 'Gérante / Direction Générale',
+      department: 'Direction Générale',
+      ssn: '10019283-01',
+      cin: '04123456',
+      rib: '03001010015920038000',
+      baseSalary: 4500.000,
+      transportAllowance: 250.000,
+      presenceAllowance: 80.000,
+      otherAllowances: 500.000,
+      familySituation: 'Married_2',
+      isChefDeFamille: true,
+      status: 'Active',
+      hiringDate: '2022-01-01',
+      company: companyName
+    },
+    {
       id: `demo-emp_${suffix}_1`,
+      matricule: 'EMP-0001',
       name: 'Khaled Ben Amor',
       email: `k.benamor@${domain}`,
       jobTitle: 'Directeur Financier & Recouvrement',
+      department: 'Finance',
       ssn: '14839211-92',
+      cin: '08912345',
       rib: '03001010015920038472',
       baseSalary: 2600.000,
       transportAllowance: 180.000,
@@ -1040,10 +873,13 @@ const getCompleteDemoPayload = (companyName: string) => {
     },
     {
       id: `demo-emp_${suffix}_2`,
+      matricule: 'EMP-0002',
       name: 'Ines Dridi',
       email: `i.dridi@${domain}`,
       jobTitle: 'Responsable Rapprochement',
+      department: 'Finance',
       ssn: '20943810-18',
+      cin: '07123456',
       rib: '08102030026710048259',
       baseSalary: 1750.000,
       transportAllowance: 120.000,
@@ -1057,10 +893,13 @@ const getCompleteDemoPayload = (companyName: string) => {
     },
     {
       id: `demo-emp_${suffix}_3`,
+      matricule: 'EMP-0003',
       name: 'Mohamed Ali Gharbi',
       email: `m.gharbi@${domain}`,
-      jobTitle: 'Chargé Clientèle Extérieure',
+      jobTitle: 'Chargé Clientèle / Ventes',
+      department: 'Ventes',
       ssn: '12554739-44',
+      cin: '06543210',
       rib: '12004050037840059341',
       baseSalary: 1400.000,
       transportAllowance: 110.000,
@@ -1074,10 +913,13 @@ const getCompleteDemoPayload = (companyName: string) => {
     },
     {
       id: `demo-emp_${suffix}_4`,
+      matricule: 'EMP-0004',
       name: 'Amel Ben Soltane',
       email: `a.bensoltane@${domain}`,
       jobTitle: 'Responsable Ressources Humaines',
+      department: 'RH',
       ssn: '19483029-45',
+      cin: '06123456',
       rib: '05201040059283749501',
       baseSalary: 2100.000,
       transportAllowance: 150.000,
@@ -1091,10 +933,13 @@ const getCompleteDemoPayload = (companyName: string) => {
     },
     {
       id: `demo-emp_${suffix}_5`,
+      matricule: 'EMP-0005',
       name: 'Sami Mansour',
       email: `s.mansour@${domain}`,
       jobTitle: 'Développeur ERP Principal',
+      department: 'Direction & IT',
       ssn: '11049382-77',
+      cin: '05123456',
       rib: '14102030048592837410',
       baseSalary: 3200.000,
       transportAllowance: 200.000,
@@ -1104,6 +949,26 @@ const getCompleteDemoPayload = (companyName: string) => {
       isChefDeFamille: false,
       status: 'Active',
       hiringDate: '2025-01-10',
+      company: companyName
+    },
+    {
+      id: `demo-emp_${suffix}_6`,
+      matricule: 'EMP-0006',
+      name: 'Hamza Ben Salem',
+      email: `h.bensalem@${domain}`,
+      jobTitle: 'Chauffeur Livreur / Logistique',
+      department: 'Logistique',
+      ssn: '16928301-22',
+      cin: '08812345',
+      rib: '08102030026710048102',
+      baseSalary: 1450.000,
+      transportAllowance: 120.000,
+      presenceAllowance: 80.000,
+      otherAllowances: 100.000,
+      familySituation: 'Married_1',
+      isChefDeFamille: true,
+      status: 'Active',
+      hiringDate: '2024-02-15',
       company: companyName
     },
     {
@@ -1366,7 +1231,7 @@ const getCompleteDemoPayload = (companyName: string) => {
   ];
 
   const demoAssets = [
-    { id: 'demo-ast_1', code: 'IM-2026-001', name: 'Serveur de données Dell PowerEdge', category: 'MaterielInformatique', acquisitionDate: '2026-01-15', acquisitionValue: 8500, status: 'Active', residualValue: 6800 }
+    { id: 'demo-ast_1', companyId: companyName || 'demo_company', code: 'IM-2026-001', name: 'Serveur de données Dell PowerEdge', category: 'CORPORELLE', accountCode: '222', acquisitionDate: '2026-01-15', commissioningDate: '2026-01-15', acquisitionCost: 8500, salvageValue: 0, durationYears: 3, amortizationMethod: 'LINEAIRE' }
   ];
 
   const isSFE = companyName?.toLowerCase().includes('sfe') || companyName?.toLowerCase().includes('fabrication');
@@ -1636,7 +1501,8 @@ const getCompleteDemoPayload = (companyName: string) => {
   };
 };
 
-export default function App() {
+function AppMain() {
+  const { currentTenant, setCurrentTenant, isDemoEnvironment, activePack, allowedModules } = useTenant();
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
     // 1. Bypass sandbox storage isolation when opening top-level tabs for printing
     const params = new URLSearchParams(window.location.search);
@@ -1764,8 +1630,14 @@ export default function App() {
         console.error(e);
       }
     }
-    return 'Inter-Affaires';
+    return currentTenant?.name || 'Inter-Affaires';
   });
+
+  useEffect(() => {
+    if (currentTenant && currentTenant.name) {
+      setActiveCompanyName(currentTenant.name);
+    }
+  }, [currentTenant]);
 
   // Expert-Comptable / Cabinet Dossier Context
   const [accountantClientContext, setAccountantClientContext] = useState<{
@@ -2127,19 +1999,28 @@ export default function App() {
   const checkAccess = (moduleId: string, companyId: string): boolean => {
     if (!currentUser) return false;
 
+    const userEmail = String(currentUser.email || '').toLowerCase().trim();
     const roleUpper = String(currentUser.role || '').toUpperCase().trim();
-    if (roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'DIRIGEANT' || roleUpper === 'MANAGER' || roleUpper === 'DIRECTOR') {
+    if (userEmail === 'md@gmail.com' || roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'DIRIGEANT' || roleUpper === 'DG' || roleUpper === 'GERANT' || roleUpper === 'MANAGER' || roleUpper === 'DIRECTOR') {
       return true;
     }
 
     const targetComp = String(companyId || activeCompanyName || '').toUpperCase().trim();
-    if (isSimulationActive || targetComp === 'GEP' || targetComp.includes('GEP') || targetComp === 'ELYSSA ENTREPRISES S.A.' || targetComp === 'INTER-AFFAIRES') {
+    if (isSimulationActive || targetComp === 'GEP' || targetComp.includes('GEP') || targetComp === 'ELYSSA ENTREPRISES S.A.' || targetComp === 'INTER-AFFAIRES' || targetComp === 'MD' || targetComp === 'PC-MD') {
       return true;
     }
 
     // Core modules (Paramètres de l'entreprise, TEJ, Admin, Copilot) are always accessible
-    if (['saas_config', 'admin', 'company_settings', 'tej', 'copilot'].includes(moduleId)) {
+    if (['saas_config', 'admin', 'company_settings', 'tej', 'copilot', 'dashboard', 'executive_dashboard'].includes(moduleId)) {
       return true;
+    }
+
+    // Check licensing metadata from appStorage if present
+    const tenantMeta = getTenantMeta(companyId || activeCompanyName);
+    if (tenantMeta && Array.isArray(tenantMeta.allowedModules)) {
+      if (tenantMeta.allowedModules.includes('*')) return true;
+      if (['saas_config', 'admin', 'company_settings', 'tej', 'copilot', 'dashboard', 'executive_dashboard'].includes(moduleId)) return true;
+      if (tenantMeta.allowedModules.includes(moduleId)) return true;
     }
 
     // When in Accountant / Cabinet Mode, Cabinet has full default access to Cabinet ERP suite modules
@@ -2150,12 +2031,12 @@ export default function App() {
     }
 
     let client = publisherClients.find(c => 
-      c && (c.id === companyId || c.companyName?.toLowerCase() === companyId?.toLowerCase())
+      c && (c.id === companyId || c.company_id === companyId || c.companyName?.toLowerCase() === companyId?.toLowerCase() || (companyId && c.id?.toLowerCase() === `pc-${companyId.toLowerCase()}`))
     );
 
     // If no client record exists yet for companyId, construct a fallback active client record
     if (!client) {
-      if (companyId?.toLowerCase() === 'elyssa entreprises s.a.') {
+      if (companyId?.toLowerCase() === 'elyssa entreprises s.a.' || companyId?.toLowerCase() === 'md' || companyId?.toLowerCase() === 'pc-md') {
         return true;
       }
       client = {
@@ -2166,6 +2047,11 @@ export default function App() {
         license_status: 'paid',
         modules: []
       };
+    }
+
+    const packIdStr = String(client.packId || '').toLowerCase();
+    if (packIdStr === 'full' || packIdStr === 'custom' || packIdStr === 'industrial' || packIdStr === 'enterprise' || packIdStr === 'industriel' || packIdStr === 'full_industrial') {
+      return true;
     }
 
     // Determine license status
@@ -2197,13 +2083,14 @@ export default function App() {
   const isModuleUnlockedState = (tabId: string): boolean => {
     if (!currentUser) return false;
 
+    const userEmail = String(currentUser.email || '').toLowerCase().trim();
     const roleUpper = String(currentUser.role || '').toUpperCase().trim();
-    if (roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'DIRIGEANT' || roleUpper === 'MANAGER' || roleUpper === 'DIRECTOR') {
+    if (userEmail === 'md@gmail.com' || roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'DIRIGEANT' || roleUpper === 'DG' || roleUpper === 'GERANT' || roleUpper === 'MANAGER' || roleUpper === 'DIRECTOR') {
       return true;
     }
 
     const targetComp = String(activeCompanyName || '').toUpperCase().trim();
-    if (targetComp === 'GEP' || targetComp.includes('GEP')) {
+    if (targetComp === 'GEP' || targetComp.includes('GEP') || targetComp === 'MD' || targetComp === 'PC-MD') {
       return true;
     }
 
@@ -2212,7 +2099,7 @@ export default function App() {
       return true;
     }
     // core modules are always free and unlocked
-    if (['admin', 'saas_config', 'company_settings', 'tej'].includes(tabId)) {
+    if (['admin', 'saas_config', 'company_settings', 'tej', 'copilot', 'dashboard', 'executive_dashboard'].includes(tabId)) {
       return true;
     }
     
@@ -2220,7 +2107,7 @@ export default function App() {
     return checkAccess(tabId, activeCompanyName);
   };
 
-  const isDemoCompany = activeCompanyName.toLowerCase() === "elyssa entreprises s.a." || activeCompanyName.toLowerCase() === "inter-affaires";
+  const isDemoCompany = activeCompanyName === 'Inter-Affaires (Démo)' || activeCompanyName === 'company_demo' || (Boolean(activeCompanyName) && activeCompanyName.toLowerCase().includes('démo') && !activeCompanyName.toLowerCase().includes('parent'));
 
   const handleSidebarItemClick = (tabId: string) => {
     if (tabId === 'copilot') {
@@ -2276,14 +2163,6 @@ export default function App() {
     }
   }, [activeTab]);
   
-  // Force one-time cache invalidation and clean fetch on reload
-  if (typeof window !== 'undefined') {
-    ['elyssa_collaborators', 'elyssa_tours', 'elyssa_audit_logs', 'elyssa_cession_events', 'elyssa_cession_entries', 'carthage_collaborators', 'carthage_delivery_tours', 'carthage_cession_audit_entries', 'carthage_mobile_devices', 'carthage_field_sessions', 'carthage_mobile_orders', 'carthage_chantier_reports', 'carthage_fleet_inventory'].forEach(key => localStorage.removeItem(key));
-    if (!sessionStorage.getItem('elyssa_erp_cache_purged_v4')) {
-      clearAppCache();
-      sessionStorage.setItem('elyssa_erp_cache_purged_v4', 'true');
-    }
-  }
 
   const [trialRegisteredCompany, setTrialRegisteredCompany] = useState<any>(() => {
     const saved = localStorage.getItem('carthage_trial_registered_prospect');
@@ -2315,7 +2194,6 @@ export default function App() {
       if (email === 'contact@nexuswp.pro' || email === 'ziedbenmiled3@gmail.com') return false;
       if (name.includes('mohamed ben ali') || name.includes('rim oueslati') || email.includes('mohamed.a') || email.includes('rim.o')) return false;
       if (c.company === 'INTER AFFAIRES') return false;
-      if (c.id?.startsWith('collab_demo_')) return false;
       if (email === 'contact@elyssa.pro' && (c.id !== 'admin_root' || c.status === 'Suspended' || c.status === 'SUSPENDU')) return false;
       return true;
     });
@@ -2331,7 +2209,18 @@ export default function App() {
     });
   };
 
-  const [collaborators, setCollaborators] = useState<CollaboratorAccount[]>([ROOT_ADMIN]);
+  const [collaborators, setCollaborators] = useState<CollaboratorAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem('carthage_collaborators') || localStorage.getItem('elyssa_collaborators');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return sanitizeCollaboratorsList(parsed);
+        }
+      }
+    } catch (e) {}
+    return [ROOT_ADMIN];
+  });
 
   const [hasLoadedClientsFromServer, setHasLoadedClientsFromServer] = useState(false);
   const [hasLoadedCollaboratorsFromServer, setHasLoadedCollaboratorsFromServer] = useState(false);
@@ -2588,6 +2477,13 @@ export default function App() {
         localStorage.setItem('carthage_publisher_clients', JSON.stringify(updatedPubClients));
         handleUpdatePublisherClients(updatedPubClients);
 
+        // Register trial tenant metadata and inject demo simulation dataset
+        try {
+          registerNewTrialTenant(newTrialInfo.companyName, newTrialInfo.companyName);
+        } catch (regErr) {
+          console.warn('[Trial Signup] Failed to register trial tenant meta:', regErr);
+        }
+
         // Sync collaborators state with returned records from server (which have correctly saved plainPassword properties)
         if (Array.isArray(data.collaborators)) {
           setCollaborators(prev => {
@@ -2654,6 +2550,7 @@ export default function App() {
         console.error('Error parsing tenant settings', e);
       }
     }
+
     return {
       ...adminSettings,
       companyName: companyName,
@@ -2694,11 +2591,11 @@ export default function App() {
     // Save to Firestore tenant document (company_erp_data) for BYOK Gemini API key and company settings
     try {
       const docRef = doc(db, 'company_erp_data', docId);
-      setDoc(docRef, {
+      setDoc(docRef, cleanFirestoreData({
         geminiApiKey: newSettings.geminiApiKey || '',
         admin_settings: newSettings,
         updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(err => console.warn('Notice: Firestore tenant settings sync skipped:', err));
+      }), { merge: true }).catch(err => console.warn('Notice: Firestore tenant settings sync skipped:', err));
     } catch (e) {
       console.warn('Notice: Firestore tenant settings sync error:', e);
     }
@@ -2989,6 +2886,11 @@ export default function App() {
       localStorage.setItem('elyssa_company_locations', JSON.stringify(filtered));
       return filtered;
     });
+    setPerformanceContracts(prev => {
+      const filtered = prev.filter(item => !isDemoRecord(item) && !item.is_demo && !item.is_demo_data);
+      localStorage.setItem('carthage_performance_contracts', JSON.stringify(filtered));
+      return filtered;
+    });
 
     setCollaborators(prevCollabs => {
       const filtered = prevCollabs.filter(c => {
@@ -3124,18 +3026,18 @@ export default function App() {
   });
 
   const [smtpSettings, setSmtpSettings] = useState<SmtpSettings>(() => {
-    const saved = localStorage.getItem('carthage_smtp_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SMTP_SETTINGS;
+    const activeCompany = getActiveCompanyNameFromStorage();
+    return MailService.loadTenantSmtpSettings(activeCompany, activeCompany);
   });
 
   const [imapSettings, setImapSettings] = useState<ImapSettings>(() => {
-    const saved = localStorage.getItem('carthage_imap_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_IMAP_SETTINGS;
+    const activeCompany = getActiveCompanyNameFromStorage();
+    return MailService.loadTenantImapSettings(activeCompany, activeCompany);
   });
 
   const [incomingEmails, setIncomingEmails] = useState<IncomingEmail[]>(() => {
-    const saved = localStorage.getItem('carthage_incoming_emails');
-    return saved ? JSON.parse(saved) : [];
+    const activeCompany = getActiveCompanyNameFromStorage();
+    return MailService.loadTenantImapInbox(activeCompany, activeCompany);
   });
 
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>(() => {
@@ -3220,6 +3122,14 @@ export default function App() {
   });
 
   const [assets, setAssets] = useState<any[]>(() => {
+    const activeCompany = getActiveCompanyNameFromStorage();
+    if (activeCompany?.toLowerCase().includes('inter-affaires') || activeCompany === 'company_parent') {
+      try {
+        localStorage.removeItem('carthage_assets_immobilisations_inter_affaires__parent_');
+        localStorage.removeItem('carthage_assets_immobilisations_company_parent');
+      } catch (_) {}
+      return [];
+    }
     const saved = localStorage.getItem('carthage_assets_immobilisations');
     return saved ? JSON.parse(saved) : [];
   });
@@ -3245,8 +3155,24 @@ export default function App() {
   });
 
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>(() => {
+    const activeCompany = getActiveCompanyNameFromStorage();
+    if (activeCompany?.toLowerCase().includes('inter-affaires') || activeCompany === 'company_parent') {
+      try {
+        localStorage.removeItem('carthage_purchasing_orders_inter_affaires__parent_');
+        localStorage.removeItem('carthage_purchasing_orders_company_parent');
+      } catch (_) {}
+    }
     const saved = localStorage.getItem('carthage_purchasing_orders');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (activeCompany?.toLowerCase().includes('inter-affaires') || activeCompany === 'company_parent') {
+          return parsed.filter((p: any) => p && !String(p.id || '').startsWith('demo-') && !String(p.supplierName || '').includes('Ciments de Bizerte') && !String(p.supplierName || '').includes('EL FOULADH'));
+        }
+        return parsed;
+      } catch (_) {}
+    }
+    return [];
   });
 
   const [supplierPerformance, setSupplierPerformance] = useState<any[]>(() => {
@@ -3262,7 +3188,7 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch { /* ignore */ }
     }
-    return DEFAULT_IMPORT_FOLDERS;
+    return [];
   });
 
   const [lcRequests, setLcRequests] = useState<LCRequest[]>(() => {
@@ -3273,7 +3199,7 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch { /* ignore */ }
     }
-    return DEFAULT_LC_REQUESTS;
+    return [];
   });
 
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
@@ -3281,14 +3207,10 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const ids = new Set(parsed.map((v: any) => v.id));
-          const missing = DEFAULT_FLEET_VEHICLES.filter(v => !ids.has(v.id));
-          return missing.length > 0 ? [...parsed, ...missing] : parsed;
-        }
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch { /* ignore */ }
     }
-    return DEFAULT_FLEET_VEHICLES;
+    return [];
   });
 
   const [missions, setMissions] = useState<MissionOrder[]>(() => {
@@ -3296,14 +3218,10 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const ids = new Set(parsed.map((m: any) => m.id));
-          const missing = DEFAULT_FLEET_MISSIONS.filter(m => !ids.has(m.id));
-          return missing.length > 0 ? [...parsed, ...missing] : parsed;
-        }
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch { /* ignore */ }
     }
-    return DEFAULT_FLEET_MISSIONS;
+    return [];
   });
 
   const [expenses, setExpenses] = useState<any[]>(() => {
@@ -3314,7 +3232,7 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch { /* ignore */ }
     }
-    return DEFAULT_FLEET_EXPENSES;
+    return [];
   });
 
   const [incidents, setIncidents] = useState<any[]>(() => {
@@ -3325,7 +3243,7 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch { /* ignore */ }
     }
-    return DEFAULT_FLEET_INCIDENTS;
+    return [];
   });
 
   // --- SIMULATION / DEMO MODE CRM INJECTION ENGINE ---
@@ -4084,6 +4002,10 @@ export default function App() {
   const [isDemoDataLoading, setIsDemoDataLoading] = useState<boolean>(false);
 
   const loadCompanyDemoData = async () => {
+    if (!isDemoCompany) {
+      alert("Action verrouillée : Le chargement des données de démonstration est strictement réservé à la session 'Inter-Affaires (Démo)' afin de protéger l'environnement de production.");
+      return;
+    }
     if (!activeCompanyName) return;
     setIsDemoDataLoading(true);
     try {
@@ -4092,6 +4014,190 @@ export default function App() {
 
       // 2. Inject Hyper-Connected Scenario directly into Firestore subcollections & LocalStorage
       const seeded = await seedHyperConnectedDemoData(activeCompanyName);
+
+      // --- 2.b. INJECTION DU PACK MOCK GLOBAL DÉMO & SYNCHRONISATION COLLABORATEURS-RH ---
+      // We define the 7 unified payroll employees and map them to collaborators
+      const todayDateStr = new Date().toISOString().split('T')[0];
+      const packEmployees = [
+        { id: 'demo-emp_0', matricule: 'EMP-0000', name: 'Meriam Doudou', email: 'm.doudou@carthage.com.tn', jobTitle: 'Gérante / Direction Générale', department: 'Direction Générale', ssn: '10019283-01', cin: '04123456', rib: '03001010015920038000', baseSalary: 4500.000, transportAllowance: 0, presenceAllowance: 0, otherAllowances: 0, familySituation: 'Married_2', isChefDeFamille: true, status: 'Active', hiringDate: '2022-01-01' },
+        { id: 'demo-emp_1', matricule: 'EMP-0001', name: 'Khaled Ben Amor', email: 'k.benamor@carthage.com.tn', jobTitle: 'Directeur Financier & Recouvrement', department: 'Finance', ssn: '14839211-92', cin: '08912345', rib: '03001010015920038472', baseSalary: 2600.000, transportAllowance: 180.000, presenceAllowance: 80.000, otherAllowances: 300.000, familySituation: 'Married_2', isChefDeFamille: true, status: 'Active', hiringDate: '2023-01-15' },
+        { id: 'demo-emp_2', matricule: 'EMP-0002', name: 'Ines Dridi', email: 'i.dridi@carthage.com.tn', jobTitle: 'Responsable Rapprochement', department: 'Finance', ssn: '20943810-18', cin: '07123456', rib: '08102030026710048259', baseSalary: 1750.000, transportAllowance: 120.000, presenceAllowance: 80.000, otherAllowances: 150.000, familySituation: 'Single', isChefDeFamille: false, status: 'Active', hiringDate: '2024-03-10' },
+        { id: 'demo-emp_3', matricule: 'EMP-0003', name: 'Mohamed Ali Gharbi', email: 'm.gharbi@carthage.com.tn', jobTitle: 'Chargé Clientèle / Ventes', department: 'Ventes', ssn: '12554739-44', cin: '06543210', rib: '12004050037840059341', baseSalary: 1400.000, transportAllowance: 110.000, presenceAllowance: 80.000, otherAllowances: 100.000, familySituation: 'Married_1', isChefDeFamille: true, status: 'Active', hiringDate: '2025-06-18' },
+        { id: 'demo-emp_4', matricule: 'EMP-0004', name: 'Amel Ben Soltane', email: 'a.bensoltane@carthage.com.tn', jobTitle: 'Responsable Ressources Humaines', department: 'RH', ssn: '19483029-45', cin: '06123456', rib: '05201040059283749501', baseSalary: 2100.000, transportAllowance: 150.000, presenceAllowance: 80.000, otherAllowances: 200.000, familySituation: 'Married_3', isChefDeFamille: true, status: 'Active', hiringDate: '2024-11-01' },
+        { id: 'demo-emp_5', matricule: 'EMP-0005', name: 'Sami Mansour', email: 's.mansour@carthage.com.tn', jobTitle: 'Développeur ERP Principal', department: 'Direction & IT', ssn: '11049382-77', cin: '05123456', rib: '14102030048592837410', baseSalary: 3200.000, transportAllowance: 200.000, presenceAllowance: 80.000, otherAllowances: 500.000, familySituation: 'Single', isChefDeFamille: false, status: 'Active', hiringDate: '2025-01-10' },
+        { id: 'demo-emp_6', matricule: 'EMP-0006', name: 'Hamza Ben Salem', email: 'h.bensalem@carthage.com.tn', jobTitle: 'Chauffeur Livreur / Logistique', department: 'Logistique', ssn: '16928301-22', cin: '08812345', rib: '08102030026710048102', baseSalary: 1450.000, transportAllowance: 0, presenceAllowance: 0, otherAllowances: 0, familySituation: 'Married_1', isChefDeFamille: true, status: 'Active', hiringDate: '2024-02-15' }
+      ];
+      const packCollaborators = [
+        {
+          id: 'collab_demo_emp_0',
+          name: 'Meriam Doudou',
+          email: 'm.doudou@carthage.com.tn',
+          password: '123',
+          role: 'Manager',
+          structureType: 'Direction',
+          structureName: 'Direction Générale',
+          status: 'Active',
+          company: activeCompanyName,
+          assignedTasks: [],
+          createdDate: '2026-01-01',
+          avatarUrl: 'https://ui-avatars.com/api/?name=Meriam+Doudou&background=6366f1&color=fff'
+        },
+        {
+          id: 'collab_demo_emp_1',
+          name: 'Khaled Ben Amor',
+          email: 'k.benamor@carthage.com.tn',
+          password: '123',
+          role: 'Director',
+          structureType: 'Direction',
+          structureName: 'Finance & Recouvrement',
+          status: 'Active',
+          company: activeCompanyName,
+          assignedTasks: [],
+          createdDate: '2026-01-15',
+          avatarUrl: 'https://ui-avatars.com/api/?name=Khaled+Ben+Amor&background=059669&color=fff'
+        },
+        {
+          id: 'collab_demo_emp_2',
+          name: 'Ines Dridi',
+          email: 'i.dridi@carthage.com.tn',
+          password: '123',
+          role: 'Agent',
+          structureType: 'Service',
+          structureName: 'Comptabilité & Rapprochement',
+          status: 'Active',
+          company: activeCompanyName,
+          assignedTasks: [],
+          createdDate: '2026-03-10',
+          avatarUrl: 'https://ui-avatars.com/api/?name=Ines+Dridi&background=0284c7&color=fff'
+        },
+        {
+          id: 'collab_demo_emp_3',
+          name: 'Mohamed Ali Gharbi',
+          email: 'm.gharbi@carthage.com.tn',
+          password: '123',
+          role: 'Agent',
+          structureType: 'Service',
+          structureName: 'Force de Vente & Clientèle',
+          status: 'Active',
+          company: activeCompanyName,
+          assignedTasks: [],
+          createdDate: '2026-06-18',
+          avatarUrl: 'https://ui-avatars.com/api/?name=Mohamed+Ali+Gharbi&background=d97706&color=fff'
+        },
+        {
+          id: 'collab_demo_emp_4',
+          name: 'Amel Ben Soltane',
+          email: 'a.bensoltane@carthage.com.tn',
+          password: '123',
+          role: 'Manager',
+          structureType: 'Direction',
+          structureName: 'Ressources Humaines & Paie',
+          status: 'Active',
+          company: activeCompanyName,
+          assignedTasks: [],
+          createdDate: '2026-11-01',
+          avatarUrl: 'https://ui-avatars.com/api/?name=Amel+Ben+Soltane&background=8b5cf6&color=fff'
+        },
+        {
+          id: 'collab_demo_emp_5',
+          name: 'Sami Mansour',
+          email: 's.mansour@carthage.com.tn',
+          password: '123',
+          role: 'Agent',
+          structureType: 'Service',
+          structureName: 'Développement & Systèmes IT',
+          status: 'Active',
+          company: activeCompanyName,
+          assignedTasks: [],
+          createdDate: '2026-01-10',
+          avatarUrl: 'https://ui-avatars.com/api/?name=Sami+Mansour&background=2563eb&color=fff'
+        },
+        {
+          id: 'collab_demo_emp_6',
+          name: 'Hamza Ben Salem',
+          email: 'h.bensalem@carthage.com.tn',
+          password: '123',
+          role: 'Agent',
+          structureType: 'Entrepôt',
+          structureName: 'Logistique, Dispatch & Flotte',
+          status: 'Active',
+          company: activeCompanyName,
+          assignedTasks: [],
+          createdDate: '2026-02-15',
+          avatarUrl: 'https://ui-avatars.com/api/?name=Hamza+Ben+Salem&background=0d9488&color=fff'
+        }
+      ];
+
+      // Pointage & Présence (7 collaborateurs calés sur la date du jour)
+      const packAttendanceLogs = [
+        { id: 'demo-att-0', employeeId: 'demo-emp_0', employeeName: 'Meriam Doudou', date: todayDateStr, clockIn: '07:50', clockOut: '18:30', status: 'Présent', type: 'Normal', device: 'Terminal Biométrique Siège', geoFenceStatus: 'Dans la zone (Tunis)' },
+        { id: 'demo-att-1', employeeId: 'demo-emp_1', employeeName: 'Khaled Ben Amor', date: todayDateStr, clockIn: '08:00', clockOut: '17:30', status: 'Présent', type: 'Normal', device: 'Terminal Biométrique Tunis', geoFenceStatus: 'Dans la zone (Tunis)' },
+        { id: 'demo-att-2', employeeId: 'demo-emp_2', employeeName: 'Ines Dridi', date: todayDateStr, clockIn: '08:15', clockOut: '17:00', status: 'Retard', type: 'Retard 15min', device: 'Terminal Biométrique Tunis', geoFenceStatus: 'Dans la zone (Tunis)' },
+        { id: 'demo-att-3', employeeId: 'demo-emp_3', employeeName: 'Mohamed Ali Gharbi', date: todayDateStr, clockIn: '07:55', clockOut: '18:15', status: 'Présent', type: 'Normal', device: 'PDA Zebra TC52', geoFenceStatus: 'Dans la zone (Sfax)' },
+        { id: 'demo-att-4', employeeId: 'demo-emp_4', employeeName: 'Amel Ben Soltane', date: todayDateStr, clockIn: '08:02', clockOut: '17:05', status: 'Présent', type: 'Normal', device: 'Terminal Biométrique Tunis', geoFenceStatus: 'Dans la zone (Tunis)' },
+        { id: 'demo-att-5', employeeId: 'demo-emp_5', employeeName: 'Sami Mansour', date: todayDateStr, clockIn: '07:58', clockOut: '17:45', status: 'Présent', type: 'Normal', device: 'Terminal Biométrique Tunis', geoFenceStatus: 'Dans la zone (Tunis)' },
+        { id: 'demo-att-6', employeeId: 'demo-emp_6', employeeName: 'Hamza Ben Salem', date: todayDateStr, clockIn: '07:45', clockOut: '16:30', status: 'Présent', type: 'Normal', device: 'Samsung Galaxy XCover', geoFenceStatus: 'Dans la zone (Dépôt Charguia)' }
+      ];
+
+      // Flotte Mobile (Terminaux assignés)
+      const packMobileDevices = [
+        { id: 'demo-dev-1', type: 'Smartphone', brand: 'Samsung', model: 'Galaxy XCover 5 Rugged', serialNumber: 'SAM-XC5-9921', assignedToId: 'demo-emp_6', assignedToName: 'Hamza Ben Salem', status: 'Actif', lastSync: `${todayDateStr} 08:30`, batteryLevel: 88 },
+        { id: 'demo-dev-2', type: 'Tablette', brand: 'Samsung', model: 'Galaxy Tab Active3', serialNumber: 'SAM-TAB-88992', assignedToId: 'demo-emp_3', assignedToName: 'Mohamed Ali Gharbi', status: 'Actif', lastSync: `${todayDateStr} 09:15`, batteryLevel: 92 }
+      ];
+
+      // Préparations & Picking
+      const packPickings = [
+        { id: 'demo-pick-1', orderNumber: 'CMD-2026-101', status: 'En attente', priority: 'Haute', assignedTo: 'Equipe Quai 1', itemCount: 12, deadline: '2026-06-25 14:00' },
+        { id: 'demo-pick-2', orderNumber: 'CMD-2026-102', status: 'En cours de colisage', priority: 'Moyenne', assignedTo: 'Equipe Quai 2', itemCount: 45, deadline: '2026-06-25 16:30' },
+        { id: 'demo-pick-3', orderNumber: 'CMD-2026-103', status: 'Prêt au quai', priority: 'Normale', assignedTo: 'Equipe Quai 1', itemCount: 8, deadline: '2026-06-25 12:00' }
+      ];
+
+      // Expéditions & Dispatching
+      const packDispatch = [
+        { id: 'demo-disp-1', deliveryNumber: 'BL-2026-501', vehicle: 'Camionnette Isuzu (102 TUN 443)', driver: 'Saber H.', payloadJauge: '85%', status: 'Assigné', destination: 'Sousse' },
+        { id: 'demo-disp-2', deliveryNumber: 'BL-2026-502', vehicle: 'Camionnette Isuzu (102 TUN 443)', driver: 'Saber H.', payloadJauge: '15%', status: 'Assigné', destination: 'Sfax' }
+      ];
+
+      // Espace Expert-Comptable (Grand Livre Simulé)
+      const packAccounting = [
+        { id: 'demo-acc-1', date: '2026-06-20', accountCode: '607000', accountName: 'Achats de marchandises', debit: 4500.000, credit: 0, reference: 'FA-FRN-2026-88', journal: 'Achats', description: 'Facture fournisseur SOPAL' },
+        { id: 'demo-acc-2', date: '2026-06-20', accountCode: '436660', accountName: 'TVA déductible', debit: 855.000, credit: 0, reference: 'FA-FRN-2026-88', journal: 'Achats', description: 'TVA Facture SOPAL' },
+        { id: 'demo-acc-3', date: '2026-06-20', accountCode: '401000', accountName: 'Fournisseurs', debit: 0, credit: 5355.000, reference: 'FA-FRN-2026-88', journal: 'Achats', description: 'Dette fournisseur SOPAL' }
+      ];
+
+      // Trésorerie & Portefeuille
+      const packTreasuryTxs = [
+        { id: 'demo-tx-1', accountId: 'demo-ba_1', date: '2026-06-22', amount: -5355.000, type: 'Out', category: 'Achat', description: 'Virement fournisseur SOPAL', status: 'Cleared', method: 'Virement', reference: 'VIR-2026-99' },
+        { id: 'demo-tx-2', accountId: 'demo-ba_1', date: '2026-06-24', amount: 12500.000, type: 'In', category: 'Vente', description: 'Virement client Poulina', status: 'Cleared', method: 'Virement', reference: 'VIR-2026-102' },
+        { id: 'demo-tx-3', accountId: 'demo-ba_1', date: '2026-06-25', amount: 2500.000, type: 'In', category: 'Vente', description: 'LCN Client SAH', status: 'Pending', method: 'Chèque/Traite', reference: 'LCN-2026-554' }
+      ];
+      const packTreasuryAcc = [
+        { id: 'demo-ba_1', bankName: 'BIAT', accountNumber: '03001010015920038472', accountType: 'Courant', balance: 145250.620, currency: 'TND' }
+      ];
+
+      // Gestion du Parc Matériel (Actifs Immobilisés)
+      const packAssets = [
+        { id: 'demo-ast-1', companyId: activeCompanyName, code: 'IM-2026-001', name: 'Serveur Dell PowerEdge', category: 'CORPORELLE', accountCode: '228', acquisitionDate: '2026-01-15', commissioningDate: '2026-01-15', acquisitionCost: 8500, salvageValue: 0, durationYears: 3, amortizationMethod: 'LINEAIRE' },
+        { id: 'demo-ast-2', companyId: activeCompanyName, code: 'IM-2026-002', name: 'Camionnette Isuzu', category: 'CORPORELLE', accountCode: '224', acquisitionDate: '2025-06-10', commissioningDate: '2025-06-15', acquisitionCost: 65000, salvageValue: 5000, durationYears: 5, amortizationMethod: 'LINEAIRE' },
+        { id: 'demo-ast-3', companyId: activeCompanyName, code: 'IM-2026-003', name: 'Logiciel ERP Elyssa', category: 'INCORPORELLE', accountCode: '212', acquisitionDate: '2026-06-24', commissioningDate: '2026-06-24', acquisitionCost: 15000, salvageValue: 0, durationYears: 5, amortizationMethod: 'LINEAIRE' }
+      ];
+
+      // Appliquer au LocalStorage
+      localStorage.setItem('carthage_employees', JSON.stringify(packEmployees));
+      
+      const savedCollabs = localStorage.getItem('carthage_collaborators');
+      let currentCollabs = savedCollabs ? JSON.parse(savedCollabs) : [];
+      const newCollabs = [...packCollaborators, ...currentCollabs.filter((c: any) => !c.id.startsWith('collab_demo_demo-emp_'))];
+      localStorage.setItem('carthage_collaborators', JSON.stringify(newCollabs));
+
+      localStorage.setItem('carthage_attendance_logs', JSON.stringify(packAttendanceLogs));
+      localStorage.setItem('carthage_mobile_devices', JSON.stringify(packMobileDevices));
+      localStorage.setItem('carthage_warehouse_pickings', JSON.stringify(packPickings));
+      localStorage.setItem('carthage_dispatch_tours', JSON.stringify(packDispatch));
+      localStorage.setItem('carthage_accounting_entries', JSON.stringify(packAccounting));
+      localStorage.setItem('carthage_bank_accounts', JSON.stringify(packTreasuryAcc));
+      localStorage.setItem('carthage_bank_transactions', JSON.stringify(packTreasuryTxs));
+      localStorage.setItem('carthage_assets_immobilisations', JSON.stringify(packAssets));
 
       // 3. Call backend reload endpoint
       const response = await fetch('/api/db/load-demo-data', {
@@ -4184,6 +4290,10 @@ export default function App() {
   };
 
   const purgeCompanyDemoData = async () => {
+    if (!isDemoCompany) {
+      alert("Action verrouillée : La purge des données est strictement réservée à la session 'Inter-Affaires (Démo)' afin de protéger l'environnement de production.");
+      return;
+    }
     if (!activeCompanyName) return;
     setIsDemoDataLoading(true);
     try {
@@ -4290,16 +4400,26 @@ export default function App() {
 
   // GED Electronic Documents State & Employees Sync for GED
   const [employees, setEmployees] = useState<Employee[]>(() => {
+    const defaultEmployees = [...INTER_AFFAIRES_EMPLOYEES, ...UNIFIED_7_PAYROLL_EMPLOYEES];
     const saved = localStorage.getItem('carthage_employees');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((e: any, idx: number) => ensureValidEmployee(e, idx));
+          const validated = parsed.map((e: any, idx: number) => ensureValidEmployee(e, idx));
+          const hasMeriam = validated.some(e => (e.name || '').toLowerCase().includes('meriam'));
+          const hasZied = validated.some(e => (e.name || '').toLowerCase().includes('zied'));
+          if (validated.length >= 11 && hasMeriam && hasZied) {
+            return validated;
+          }
+          return defaultEmployees.map(canon => {
+            const found = validated.find(v => (v.name || '').toLowerCase().trim() === canon.name.toLowerCase().trim());
+            return found ? { ...canon, ...found, status: 'Active' } : canon;
+          });
         }
       } catch (e) { }
     }
-    return [];
+    return defaultEmployees;
   });
 
   const [companyLocations, setCompanyLocations] = useState<any[]>(() => {
@@ -4477,6 +4597,10 @@ export default function App() {
 
   // Import demo data for a specific module
   const importDemoDataForModule = (moduleKey: string) => {
+    if (activeCompanyName?.toLowerCase().includes('inter-affaires') || activeCompanyName === 'company_parent' || currentUser?.companyId === 'company_parent') {
+      console.warn('[Demo Import Blocked] Demo data injection is strictly disabled on Parent / Inter-Affaires tenant.');
+      return;
+    }
     switch (moduleKey) {
       case 'clients': {
         const demoClientsMapped = INITIAL_CLIENTS.map(c => ({
@@ -4914,10 +5038,11 @@ export default function App() {
       }
       case 'asset': {
         const demoAssets = [
-          { id: 'demo-ast_1', code: 'IM-2026-001', name: 'Serveur de données Dell PowerEdge', category: 'MaterielInformatique', acquisitionDate: '2026-01-15', acquisitionValue: 8500, status: 'Active', residualValue: 6800 }
+          { id: 'demo-ast_1', companyId: activeCompanyName || 'demo_company', code: 'IM-2026-001', name: 'Serveur de données Dell PowerEdge', category: 'CORPORELLE', accountCode: '222', acquisitionDate: '2026-01-15', commissioningDate: '2026-01-15', acquisitionCost: 8500, salvageValue: 0, durationYears: 3, amortizationMethod: 'LINEAIRE' }
         ];
         setAssets(demoAssets);
         localStorage.setItem('carthage_assets_immobilisations', JSON.stringify(demoAssets));
+        window.dispatchEvent(new CustomEvent('elyssa_demo_state_changed', { detail: { tenantId: activeCompanyName } }));
         break;
       }
       case 'treasury': {
@@ -5003,18 +5128,18 @@ export default function App() {
           }
         }
 
-        await setDoc(docRef, {
+        await setDoc(docRef, cleanFirestoreData({
           companyLocations: effectiveCompanyLocations,
           qrConfig,
           employees: employees.map(e => ({
             id: e.id,
-            name: e.name,
-            jobTitle: e.jobTitle,
+            name: e.name || '',
+            jobTitle: e.jobTitle || '',
             status: e.status || 'Active',
             branchId: e.branchId || 'loc-maman'
           })),
           updatedAt: new Date().toISOString()
-        }, { merge: true });
+        }), { merge: true });
         console.log("☁️ Global synchronizer: companyLocations and employees list synced to public attendance_settings in Firestore.");
       } catch (err) {
         console.error("Error in global attendance sync:", err);
@@ -5039,6 +5164,8 @@ export default function App() {
       setSuppliers([]);
       setProducts([]);
       setStockMovements([]);
+      setSmtpSettings(MailService.loadTenantSmtpSettings(activeCompanyName, activeCompanyName));
+      setImapSettings(MailService.loadTenantImapSettings(activeCompanyName, activeCompanyName));
       setIncomingEmails([]);
       setCommunicationLogs([]);
       setBankAccounts([]);
@@ -5095,8 +5222,16 @@ export default function App() {
                 if (Array.isArray(resData.suppliers)) setSuppliers(resData.suppliers);
                 if (Array.isArray(resData.products)) setProducts(resData.products);
                 if (Array.isArray(resData.stockMovements)) setStockMovements(resData.stockMovements);
-                if (resData.smtpSettings) setSmtpSettings(resData.smtpSettings);
-                if (resData.imapSettings) setImapSettings(resData.imapSettings);
+                if (resData.smtpSettings) {
+                  setSmtpSettings(MailService.sanitizeSmtpSettings(resData.smtpSettings, activeCompanyName, activeCompanyName));
+                } else {
+                  setSmtpSettings(MailService.loadTenantSmtpSettings(activeCompanyName, activeCompanyName));
+                }
+                if (resData.imapSettings) {
+                  setImapSettings(MailService.sanitizeImapSettings(resData.imapSettings, activeCompanyName, activeCompanyName));
+                } else {
+                  setImapSettings(MailService.loadTenantImapSettings(activeCompanyName, activeCompanyName));
+                }
                 if (Array.isArray(resData.incomingEmails)) setIncomingEmails(resData.incomingEmails);
                 if (Array.isArray(resData.emailTemplates)) setEmailTemplates(resData.emailTemplates);
                 if (Array.isArray(resData.communicationLogs)) setCommunicationLogs(resData.communicationLogs);
@@ -5151,8 +5286,16 @@ export default function App() {
                   setSuppliers(resData.suppliers || []);
                   setProducts(resData.products || []);
                   setStockMovements(resData.stockMovements || []);
-                  if (resData.smtpSettings) setSmtpSettings(resData.smtpSettings);
-                  if (resData.imapSettings) setImapSettings(resData.imapSettings);
+                  if (resData.smtpSettings) {
+                    setSmtpSettings(MailService.sanitizeSmtpSettings(resData.smtpSettings, activeCompanyName, activeCompanyName));
+                  } else {
+                    setSmtpSettings(MailService.loadTenantSmtpSettings(activeCompanyName, activeCompanyName));
+                  }
+                  if (resData.imapSettings) {
+                    setImapSettings(MailService.sanitizeImapSettings(resData.imapSettings, activeCompanyName, activeCompanyName));
+                  } else {
+                    setImapSettings(MailService.loadTenantImapSettings(activeCompanyName, activeCompanyName));
+                  }
                   setIncomingEmails(resData.incomingEmails || []);
                   if (Array.isArray(resData.emailTemplates)) {
                     const companyTemplates = resData.emailTemplates.map((t: any) => ({
@@ -5230,8 +5373,16 @@ export default function App() {
                   setSuppliers(cleanSuppliers);
                   setProducts(cleanProducts);
                   setStockMovements(cleanStockMovements);
-                  if (resData.smtpSettings) setSmtpSettings(resData.smtpSettings);
-                  if (resData.imapSettings) setImapSettings(resData.imapSettings);
+                  if (resData.smtpSettings) {
+                    setSmtpSettings(MailService.sanitizeSmtpSettings(resData.smtpSettings, activeCompanyName, activeCompanyName));
+                  } else {
+                    setSmtpSettings(MailService.loadTenantSmtpSettings(activeCompanyName, activeCompanyName));
+                  }
+                  if (resData.imapSettings) {
+                    setImapSettings(MailService.sanitizeImapSettings(resData.imapSettings, activeCompanyName, activeCompanyName));
+                  } else {
+                    setImapSettings(MailService.loadTenantImapSettings(activeCompanyName, activeCompanyName));
+                  }
                   setIncomingEmails(cleanIncomingEmails);
                   if (Array.isArray(resData.emailTemplates)) {
                     const companyTemplates = resData.emailTemplates.map((t: any) => ({
@@ -5289,6 +5440,8 @@ export default function App() {
     if (!activeCompanyName || isCompanyDataLoading) return;
     if (activeCompanyName === 'Inter-Affaires' || activeCompanyName === 'Elyssa Entreprises S.A.') {
       setEmployees(prev => {
+        const hasZied = prev.some(e => e && (e.id === 'collab_carthage_1' || e.email?.toLowerCase() === 'contact@elyssa.pro'));
+        if (hasZied) return prev;
         const ziedEmployee: Employee = {
           id: 'collab_carthage_1',
           name: 'MED ZIED BEN MILED',
@@ -5306,17 +5459,7 @@ export default function App() {
           hiringDate: '2026-06-22',
           matricule: 'DG-001'
         };
-
-        const hasZied = prev.some(e => e.id === 'collab_carthage_1' || e.email?.toLowerCase() === 'contact@elyssa.pro');
-        const list = hasZied ? prev : [ziedEmployee, ...prev];
-        
-        // Deduplicate list by id
-        const seen = new Set<string>();
-        return list.filter(e => {
-          if (!e || !e.id || seen.has(e.id)) return false;
-          seen.add(e.id);
-          return true;
-        });
+        return [ziedEmployee, ...prev];
       });
     }
   }, [activeCompanyName, isCompanyDataLoading]);
@@ -5468,16 +5611,28 @@ export default function App() {
   }, [stockMovements]);
 
   useEffect(() => {
-    localStorage.setItem('carthage_smtp_settings', JSON.stringify(smtpSettings));
-  }, [smtpSettings]);
+    const activeCompany = getActiveCompanyNameFromStorage();
+    MailService.saveTenantSmtpSettings(activeCompany, smtpSettings);
+    if (MailService.isParentCompanyTenant(activeCompany, activeCompany)) {
+      localStorage.setItem('carthage_smtp_settings', JSON.stringify(smtpSettings));
+    }
+  }, [smtpSettings, activeCompanyName]);
 
   useEffect(() => {
-    localStorage.setItem('carthage_imap_settings', JSON.stringify(imapSettings));
-  }, [imapSettings]);
+    const activeCompany = getActiveCompanyNameFromStorage();
+    MailService.saveTenantImapSettings(activeCompany, imapSettings);
+    if (MailService.isParentCompanyTenant(activeCompany, activeCompany)) {
+      localStorage.setItem('carthage_imap_settings', JSON.stringify(imapSettings));
+    }
+  }, [imapSettings, activeCompanyName]);
 
   useEffect(() => {
-    localStorage.setItem('carthage_incoming_emails', JSON.stringify(incomingEmails));
-  }, [incomingEmails]);
+    const activeCompany = getActiveCompanyNameFromStorage();
+    MailService.saveTenantImapInbox(activeCompany, incomingEmails);
+    if (MailService.isParentCompanyTenant(activeCompany, activeCompany)) {
+      localStorage.setItem('carthage_incoming_emails', JSON.stringify(incomingEmails));
+    }
+  }, [incomingEmails, activeCompanyName]);
 
   useEffect(() => {
     localStorage.setItem('carthage_email_templates', JSON.stringify(emailTemplates));
@@ -5488,6 +5643,14 @@ export default function App() {
   }, [communicationLogs]);
 
   useEffect(() => {
+    const activeCompany = getActiveCompanyNameFromStorage();
+    if (activeCompany?.toLowerCase().includes('inter-affaires') || activeCompany === 'company_parent') {
+      try {
+        localStorage.removeItem('carthage_assets_immobilisations_inter_affaires__parent_');
+        localStorage.removeItem('carthage_assets_immobilisations_company_parent');
+      } catch (_) {}
+      return;
+    }
     localStorage.setItem('carthage_assets_immobilisations', JSON.stringify(assets));
   }, [assets]);
 
@@ -5508,6 +5671,16 @@ export default function App() {
   }, [purchaseRequisitions]);
 
   useEffect(() => {
+    const activeCompany = getActiveCompanyNameFromStorage();
+    if (activeCompany?.toLowerCase().includes('inter-affaires') || activeCompany === 'company_parent') {
+      try {
+        localStorage.removeItem('carthage_purchasing_orders_inter_affaires__parent_');
+        localStorage.removeItem('carthage_purchasing_orders_company_parent');
+      } catch (_) {}
+      const clean = (purchaseOrders || []).filter((p: any) => p && !String(p.id || '').startsWith('demo-') && !String(p.supplierName || '').includes('Ciments de Bizerte') && !String(p.supplierName || '').includes('EL FOULADH'));
+      localStorage.setItem('carthage_purchasing_orders', JSON.stringify(clean));
+      return;
+    }
     localStorage.setItem('carthage_purchasing_orders', JSON.stringify(purchaseOrders));
   }, [purchaseOrders]);
 
@@ -5551,9 +5724,14 @@ export default function App() {
         localStorage.setItem('carthage_suppliers', JSON.stringify(suppliers));
         localStorage.setItem('carthage_products', JSON.stringify(products));
         localStorage.setItem('carthage_stock_movements', JSON.stringify(stockMovements));
-        localStorage.setItem('carthage_smtp_settings', JSON.stringify(smtpSettings));
-        localStorage.setItem('carthage_imap_settings', JSON.stringify(imapSettings));
-        localStorage.setItem('carthage_incoming_emails', JSON.stringify(incomingEmails));
+        MailService.saveTenantSmtpSettings(activeCompanyName, smtpSettings);
+        MailService.saveTenantImapSettings(activeCompanyName, imapSettings);
+        MailService.saveTenantImapInbox(activeCompanyName, incomingEmails);
+        if (MailService.isParentCompanyTenant(activeCompanyName, activeCompanyName)) {
+          localStorage.setItem('carthage_smtp_settings', JSON.stringify(smtpSettings));
+          localStorage.setItem('carthage_imap_settings', JSON.stringify(imapSettings));
+          localStorage.setItem('carthage_incoming_emails', JSON.stringify(incomingEmails));
+        }
         localStorage.setItem('carthage_email_templates', JSON.stringify(emailTemplates));
         localStorage.setItem('carthage_communication_logs', JSON.stringify(communicationLogs));
         localStorage.setItem('carthage_bank_accounts', JSON.stringify(bankAccounts));
@@ -5675,7 +5853,7 @@ export default function App() {
   };
 
   // Nav menu dimensions config themed sections
-  const menuSections = [
+  const menuSections = useMemo(() => [
     {
       title: 'PILOTAGE & PERFORMANCE',
       items: [
@@ -5745,16 +5923,49 @@ export default function App() {
         { id: 'admin', label: 'Console d\'Administration & SecOps', icon: <ShieldAlert className="w-4 h-4" /> },
       ]
     }
-  ];
+  ], []);
 
-  const isRoleAuthorized = (tabId: string): boolean => {
+  const isRoleAuthorized = useCallback((tabId: string): boolean => {
     if (!currentUser) return false;
     if (currentUser.role === 'SuperAdmin') return true;
 
+    const userEmail = String(currentUser.email || '').toLowerCase().trim();
+    const roleUpper = String(currentUser.role || '').toUpperCase().trim();
+
+    // Check if active company has FULL, CUSTOM, INDUSTRIAL, or ENTERPRISE pack
+    const activeClient = publisherClients.find(c => 
+      c && (c.id === activeCompanyName || c.company_id === activeCompanyName || c.companyName?.toLowerCase() === activeCompanyName?.toLowerCase() || (activeCompanyName && c.id?.toLowerCase() === `pc-${activeCompanyName.toLowerCase()}`))
+    );
+    const activePack = String(activeClient?.packId || '').toLowerCase();
+    const isFullOrCustomPack = activePack === 'full' || activePack === 'custom' || activePack === 'industrial' || activePack === 'enterprise' || activePack === 'industriel' || activePack === 'full_industrial' || activePack === 'premium';
+
+    // MD Dirigeant or Dirigeant / DG / Manager of a Full / Custom Pack Company:
+    // If the active company has pack FULL or CUSTOM, or if the user is md@gmail.com / Dirigeant, all 33 modules of the left sidebar are authorized and displayed!
+    if (
+      userEmail === 'md@gmail.com' ||
+      roleUpper === 'DIRIGEANT' ||
+      roleUpper === 'DG' ||
+      roleUpper === 'GERANT' ||
+      roleUpper === 'DIRECTEUR_GENERAL' ||
+      (isFullOrCustomPack && (roleUpper === 'MANAGER' || roleUpper === 'DIRECTOR' || roleUpper === 'ADMIN'))
+    ) {
+      return true;
+    }
+
     // Find the logged-in user in our collaborators list
-    const coll = collaborators.find(c => c.email.toLowerCase() === currentUser.email.toLowerCase());
+    const coll = collaborators.find(c => c.email.toLowerCase() === userEmail);
     
     if (coll) {
+      const collRoleUpper = String(coll.role || '').toUpperCase().trim();
+      if (
+        collRoleUpper === 'DIRIGEANT' ||
+        collRoleUpper === 'DG' ||
+        collRoleUpper === 'GERANT' ||
+        collRoleUpper === 'DIRECTEUR_GENERAL' ||
+        (isFullOrCustomPack && (collRoleUpper === 'MANAGER' || collRoleUpper === 'DIRECTOR' || collRoleUpper === 'ADMIN'))
+      ) {
+        return true;
+      }
       if (coll.role === 'Manager') {
         // Manager can see everything EXCEPT 'admin' (Console d'Administration & SecOps)
         return tabId !== 'admin';
@@ -5765,7 +5976,7 @@ export default function App() {
         return coll.assignedModules ? coll.assignedModules.includes(tabId) : false;
       }
       // For other collaborators (Agent, Viewer, etc.), authorize based on assignedModules if defined
-      if (coll.assignedModules) {
+      if (coll.assignedModules && coll.assignedModules.length > 0) {
         return coll.assignedModules.includes(tabId);
       }
     }
@@ -5785,7 +5996,7 @@ export default function App() {
       return ['dashboard', 'executive_dashboard', 'business_plan', 'portail_client', 'juridique', 'reports', 'caisse', 'clients', 'complaints', 'stock', 'fleet', 'finance', 'payroll', 'ged', 'investment', 'collaborators', 'attendance', 'company_settings', 'transit_logistique', 'lc_manager', 'cession', 'production', 'purchasing', 'asset', 'treasury', 'tej', 'accountant_portal', 'mobile_terrain'].includes(tabId);
     }
     return false;
-  };
+  }, [currentUser, collaborators, publisherClients, activeCompanyName]);
 
   const isAuthorized = (tabId: string): boolean => {
     if (!isRoleAuthorized(tabId)) return false;
@@ -5924,7 +6135,7 @@ export default function App() {
         })
         .filter(item => {
           // Core modules are always allowed
-          if (['admin', 'saas_config', 'company_settings', 'tej', 'copilot'].includes(item.id)) {
+          if (['admin', 'saas_config', 'company_settings', 'tej', 'copilot', 'dashboard', 'executive_dashboard'].includes(item.id)) {
             return true;
           }
           
@@ -5938,7 +6149,7 @@ export default function App() {
         });
       return { ...section, items };
     }).filter(section => section.items.length > 0);
-  }, [menuSections, currentUser, activeCompanyName, publisherClients, superAdminOverride, purchasedModules, hideLockedModules, collaborators]);
+  }, [menuSections, currentUser, activeCompanyName, publisherClients, superAdminOverride, purchasedModules, hideLockedModules, collaborators, isRoleAuthorized]);
 
   const navItems = allowedMenuSections.flatMap(section => section.items);
 
@@ -5981,6 +6192,233 @@ export default function App() {
     }
   }, [activeTab, allowedMenuSections, activeCompanyName, publisherClients, currentUser, superAdminOverride, hideLockedModules]);
 
+  const isDemoTenant = currentTenant?.id === 'company_demo' || currentTenant?.type === 'DEMO_SANDBOX' || Boolean(activeCompanyName && String(activeCompanyName).toLowerCase().includes('démo'));
+
+  const tenantEmployees = useMemo(() => {
+    if (isDemoTenant) {
+      return (DEMO_UNIVERSE.collaborators || []).map((c, idx) => ({
+        id: c.id,
+        tenantId: c.tenantId || 'company_demo',
+        matricule: c.matricule || `EMP-000${idx}`,
+        name: c.name || 'Collaborateur Démo',
+        email: c.email || '',
+        jobTitle: c.jobTitle || 'Collaborateur',
+        role: c.role || 'Agent',
+        phone: c.phone || '',
+        status: (c.status === 'Active' ? 'Active' : 'OnLeave') as 'Active' | 'OnLeave' | 'Terminated',
+        department: c.structureName || 'Direction',
+        companyId: 'company_demo',
+        company: 'company_demo',
+        baseSalary: c.id === 'demo-emp_0' ? 4500.000 : 2500.000,
+        transportAllowance: 100.000,
+        presenceAllowance: 50.000,
+        otherAllowances: 0,
+        isChefDeFamille: true,
+        familySituation: 'Married_2' as const,
+        hiringDate: c.createdDate || '2024-01-01',
+        hireDate: c.createdDate || '2024-01-01',
+        is_demo: true
+      }));
+    }
+    return (employees || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, employees]);
+
+  const tenantVehicles = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.vehicles || [];
+    }
+    return (vehicles || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, vehicles]);
+
+  const tenantMissions = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.missions || [];
+    }
+    return (missions || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, missions]);
+
+  const tenantExpenses = useMemo(() => {
+    if (isDemoTenant) {
+      return (DEMO_UNIVERSE.missions || []).flatMap(m => (m && m.expenses) || []);
+    }
+    return (expenses || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, expenses]);
+
+  const tenantIncidents = useMemo(() => {
+    if (isDemoTenant) {
+      return [];
+    }
+    return (incidents || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, incidents]);
+
+  const tenantContracts = useMemo(() => {
+    if (isDemoTenant) {
+      return [];
+    }
+    return (contracts || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, contracts]);
+
+  const tenantAbsences = useMemo(() => {
+    if (isDemoTenant) {
+      return [];
+    }
+    return (absences || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, absences]);
+
+  const tenantPayslips = useMemo(() => {
+    if (isDemoTenant) {
+      return [];
+    }
+    return (payslips || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, payslips]);
+
+  const tenantPerformanceContracts = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.performanceContracts || [];
+    }
+    return (performanceContracts || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, performanceContracts]);
+
+  const tenantDocuments = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.documents || [];
+    }
+    return (documents || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, documents]);
+
+  const tenantClients = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.clients || [];
+    }
+    return (clients || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, clients]);
+
+  const tenantInvoices = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.invoices || [];
+    }
+    return (invoices || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, invoices]);
+
+  const tenantProducts = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.products || [];
+    }
+    return (products || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, products]);
+
+  const tenantStockMovements = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.stockMovements || [];
+    }
+    return (stockMovements || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, stockMovements]);
+
+  const tenantSuppliers = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.suppliers || [];
+    }
+    return (suppliers || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, suppliers]);
+
+  const tenantManufacturingOrders = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.manufacturingOrders || [];
+    }
+    return (manufacturingOrders || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, manufacturingOrders]);
+
+  const tenantImportFolders = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.importFolders || [];
+    }
+    return (importFolders || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, importFolders]);
+
+  const tenantBankAccounts = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.bankAccounts || [];
+    }
+    return (bankAccounts || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, bankAccounts]);
+
+  const tenantNomenclatures = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.nomenclatures || [];
+    }
+    return (nomenclatures || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, nomenclatures]);
+
+  const tenantLcRequests = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.lcRequests || [];
+    }
+    return (lcRequests || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, lcRequests]);
+
+  const tenantBankTransactions = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.bankTransactions || [];
+    }
+    return (bankTransactions || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, bankTransactions]);
+
+  const tenantTaxDeclarations = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.taxDeclarations || [];
+    }
+    return (taxDeclarations || []).filter(item => Boolean(item && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, taxDeclarations]);
+
+  const tenantYearEndClosings = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.yearEndClosings || [];
+    }
+    return (yearEndClosings || []).filter(item => Boolean(item && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, yearEndClosings]);
+
+  const tenantVisitReports = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.visitReports || [];
+    }
+    return (visitReports || []).filter(item => Boolean(item && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, visitReports]);
+
+  const tenantComplaints = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.complaints || [];
+    }
+    return (complaints || []).filter(item => Boolean(item && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, complaints]);
+
+  const tenantDeliveryTours = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.deliveryTours || [];
+    }
+    return [];
+  }, [isDemoTenant]);
+
+  const tenantPurchaseOrders = useMemo(() => {
+    if (isDemoTenant) {
+      return purchaseOrders;
+    }
+    return (purchaseOrders || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-')) && !String(item.supplierName || '').includes('Ciments de Bizerte') && !String(item.supplierName || '').includes('EL FOULADH')));
+  }, [isDemoTenant, purchaseOrders]);
+
+  const tenantPurchaseRequisitions = useMemo(() => {
+    if (isDemoTenant) {
+      return purchaseRequisitions;
+    }
+    return (purchaseRequisitions || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
+  }, [isDemoTenant, purchaseRequisitions]);
+
+  const tenantSupplierPerformance = useMemo(() => {
+    if (isDemoTenant) {
+      return supplierPerformance;
+    }
+    return (supplierPerformance || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-')) && !String(item.name || item.supplierName || '').includes('Ciments de Bizerte') && !String(item.name || item.supplierName || '').includes('EL FOULADH')));
+  }, [isDemoTenant, supplierPerformance]);
+
   // Standalone Mobile PWA Route
   if (window.location.pathname === '/pocket-attendance' || window.location.pathname.startsWith('/pocket-attendance/')) {
     return <PocketAttendanceView />;
@@ -5990,6 +6428,7 @@ export default function App() {
   if (window.location.pathname === '/espace-expert-comptable' || window.location.pathname.startsWith('/espace-expert-comptable/')) {
     return (
       <AccountantPortal
+        isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
         onBackToLanding={() => {
           window.history.pushState({}, '', '/');
           window.dispatchEvent(new PopStateEvent('popstate'));
@@ -6088,19 +6527,22 @@ export default function App() {
             <h1 className="text-sm font-black text-slate-900 tracking-tight font-display bg-gradient-to-r from-indigo-700 to-slate-900 bg-clip-text text-transparent flex items-center gap-2">
               {currentUser?.role === 'SuperAdmin' ? (
                 <select
-                  value={activeCompanyName}
+                  value={currentTenant?.id || 'company_parent'}
                   onChange={(e) => {
-                    const nextVal = e.target.value;
-                    setActiveCompanyName(nextVal);
-                    localStorage.setItem('carthage_active_company_simulated', nextVal);
+                    const nextId = e.target.value;
+                    const found = AUTHORIZED_COMPANIES.find(c => c.id === nextId || c.name === nextId);
+                    if (found) {
+                      setCurrentTenant(found);
+                      setActiveCompanyName(found.name);
+                      localStorage.setItem('carthage_active_company_simulated', found.name);
+                    }
                   }}
-                  className="text-xs font-black text-indigo-750 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-xl cursor-pointer focus:outline-none transition-all font-sans"
-                  title="Sélecteur d'entreprise pour l'administration globale Elyssa ERP"
+                  className="text-xs font-black text-indigo-750 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-xl cursor-pointer focus:outline-none transition-all font-sans shadow-xs"
+                  title="Sélecteur de session pour l'administration globale Elyssa ERP"
                 >
-                  <option value="Inter-Affaires">🏢 Inter-Affaires (Parent)</option>
-                  {publisherClients.map((client: any) => (
-                    <option key={client.id || client.companyName} value={client.companyName}>
-                      🏢 {client.companyName} ({client.status === 'trial' ? 'Essai' : 'Actif'})
+                  {AUTHORIZED_COMPANIES.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.type === 'PARENT_PROD' ? '🏢' : '🧪'} {company.name} {company.type === 'PARENT_PROD' ? '[PROD ÉDITEUR]' : '[SANDBOX DÉMO]'}
                     </option>
                   ))}
                 </select>
@@ -6196,7 +6638,7 @@ export default function App() {
         {isSidebarOpen && (
           <aside className="w-64 bg-slate-900 text-slate-300 hidden lg:flex flex-col border-r border-slate-800 shrink-0 sticky top-16 h-[calc(100vh-64px)] p-4 justify-between overflow-y-auto print:hidden transition-all duration-200 z-30">
           <div className="space-y-5">
-            {currentUser?.role === 'SuperAdmin' && (
+            {isDemoEnvironment && (
               <div className="space-y-2 shrink-0 bg-slate-950/70 border border-red-900/40 p-3 rounded-2xl">
                 <span className="block text-[9px] font-extrabold uppercase tracking-widest text-red-500 px-1 flex items-center gap-1.5 font-sans">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
@@ -6683,10 +7125,10 @@ export default function App() {
                           activeCompanyName={activeCompanyName}
                           activeCompanySettings={activeCompanySettings}
                           currentUser={currentUser}
-                          clients={clients}
-                          invoices={invoices}
-                          employees={employees}
-                          products={products}
+                          clients={tenantClients}
+                          invoices={tenantInvoices}
+                          employees={tenantEmployees}
+                          products={tenantProducts}
                           onOpenCopilot={copilot.openChat}
                           onOpenUserGuide={() => setIsUserGuideOpen(true)}
                           onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
@@ -6696,11 +7138,11 @@ export default function App() {
 
                       {activeTab === 'executive_dashboard' && (
                         <Dashboard 
-                          clients={clients} 
-                          complaints={complaints} 
-                          invoices={invoices} 
-                          visitReports={visitReports}
-                          products={products}
+                          clients={tenantClients} 
+                          complaints={tenantComplaints} 
+                          invoices={tenantInvoices} 
+                          visitReports={tenantVisitReports}
+                          products={tenantProducts}
                           setActiveTab={setActiveTab}
                           trialState={trialState}
                           trialTimeLeftStr={trialTimeLeftStr}
@@ -6721,45 +7163,49 @@ export default function App() {
 
               {activeTab === 'steering' && (
                 <PilotageManager 
-                  clients={clients}
-                  invoices={invoices}
+                  clients={tenantClients}
+                  invoices={tenantInvoices}
                 />
               )}
 
               {activeTab === 'caisse' && (
-                <SmartPOS
-                  products={products}
-                  suppliers={suppliers}
-                  stockMovements={stockMovements}
-                  onUpdateProducts={setProducts}
-                  onUpdateStockMovements={setStockMovements}
-                  clients={clients}
-                  onUpdateClients={setClients}
-                  invoices={invoices}
-                  onUpdateInvoices={setInvoices}
-                  bankAccounts={bankAccounts}
-                  bankTransactions={bankTransactions}
-                  onUpdateBankAccounts={setBankAccounts}
-                  onUpdateBankTransactions={setBankTransactions}
-                  currentUser={currentUser}
-                  adminSettings={activeCompanySettings}
-                  collaborators={collaborators}
-                  tenantId={activeCompanyName}
-                />
+                <ErrorBoundary moduleName="Caisse Intelligente (Smart POS)">
+                  <SmartPOS
+                    products={tenantProducts}
+                    suppliers={tenantSuppliers}
+                    stockMovements={tenantStockMovements}
+                    onUpdateProducts={setProducts}
+                    onUpdateStockMovements={setStockMovements}
+                    clients={tenantClients}
+                    onUpdateClients={setClients}
+                    invoices={tenantInvoices}
+                    onUpdateInvoices={setInvoices}
+                    bankAccounts={tenantBankAccounts}
+                    bankTransactions={tenantBankTransactions}
+                    onUpdateBankAccounts={setBankAccounts}
+                    onUpdateBankTransactions={setBankTransactions}
+                    currentUser={currentUser}
+                    adminSettings={activeCompanySettings}
+                    collaborators={collaborators}
+                    tenantId={activeCompanyName}
+                  />
+                </ErrorBoundary>
               )}
 
               {activeTab === 'clients' && (
                 <ClientManager 
-                  clients={clients} 
+                  clients={tenantClients} 
                   onUpdateClients={setClients} 
                   readOnly={currentUser?.role === 'Viewer'}
+                  activeTenantId={activeCompanyName}
+                  isDemoCompany={isDemoCompany}
                 />
               )}
 
               {activeTab === 'complaints' && (
                 <ComplaintManager 
-                  complaints={complaints} 
-                  clients={clients} 
+                  complaints={tenantComplaints} 
+                  clients={tenantClients} 
                   onUpdateComplaints={setComplaints} 
                   readOnly={currentUser?.role === 'Viewer'}
                 />
@@ -6767,8 +7213,8 @@ export default function App() {
 
               {activeTab === 'billing' && (
                 <BillingManager 
-                  invoices={invoices} 
-                  clients={clients} 
+                  invoices={tenantInvoices} 
+                  clients={tenantClients} 
                   adminSettings={activeCompanySettings}
                   onUpdateAdminSettings={handleUpdateSettings}
                   onUpdateInvoices={setInvoices} 
@@ -6776,15 +7222,24 @@ export default function App() {
                   emailTemplates={emailTemplates}
                   communicationLogs={communicationLogs}
                   onUpdateCommunicationLogs={setCommunicationLogs}
+                  activeTenantId={activeCompanyName}
+                  isDemoCompany={isDemoCompany}
                 />
               )}
 
               {activeTab === 'communication' && (
                 <CommunicationHub
+                  tenantId={currentTenant?.id || activeCompanyName}
+                  activeCompanyName={activeCompanyName}
+                  employees={tenantEmployees}
+                  isDemo={!!(trialState.isTrial || isSimulationActive || isDemoCompany)}
                   smtpSettings={smtpSettings}
                   onUpdateSmtpSettings={async (settings) => {
                     setSmtpSettings(settings);
-                    localStorage.setItem('carthage_smtp_settings', JSON.stringify(settings));
+                    MailService.saveTenantSmtpSettings(activeCompanyName, settings);
+                    if (MailService.isParentCompanyTenant(activeCompanyName, activeCompanyName)) {
+                      localStorage.setItem('carthage_smtp_settings', JSON.stringify(settings));
+                    }
                     try {
                       const payload = {
                         clients,
@@ -6824,7 +7279,10 @@ export default function App() {
                   imapSettings={imapSettings}
                   onUpdateImapSettings={async (settings) => {
                     setImapSettings(settings);
-                    localStorage.setItem('carthage_imap_settings', JSON.stringify(settings));
+                    MailService.saveTenantImapSettings(activeCompanyName, settings);
+                    if (MailService.isParentCompanyTenant(activeCompanyName, activeCompanyName)) {
+                      localStorage.setItem('carthage_imap_settings', JSON.stringify(settings));
+                    }
                     try {
                       const payload = {
                         clients,
@@ -6862,28 +7320,37 @@ export default function App() {
                     }
                   }}
                   incomingEmails={incomingEmails}
-                  onUpdateIncomingEmails={setIncomingEmails}
+                  onUpdateIncomingEmails={(emails) => {
+                    setIncomingEmails(emails);
+                    MailService.saveTenantImapInbox(activeCompanyName, emails);
+                    if (MailService.isParentCompanyTenant(activeCompanyName, activeCompanyName)) {
+                      localStorage.setItem('carthage_incoming_emails', JSON.stringify(emails));
+                    }
+                  }}
                   emailTemplates={emailTemplates}
                   onUpdateEmailTemplates={setEmailTemplates}
                   communicationLogs={communicationLogs}
                   onUpdateCommunicationLogs={setCommunicationLogs}
-                  clients={clients}
-                  invoices={invoices}
+                  clients={tenantClients}
+                  invoices={tenantInvoices}
                   currentUser={currentUser}
+                  onNavigateToMobileTerrain={() => setActiveTab('mobile_terrain')}
                 />
               )}
 
               {activeTab === 'stock' && (
                 <StockManager
-                  products={products}
-                  suppliers={suppliers}
-                  stockMovements={stockMovements}
+                  products={tenantProducts}
+                  suppliers={tenantSuppliers}
+                  stockMovements={tenantStockMovements}
                   onUpdateProducts={setProducts}
                   onUpdateSuppliers={setSuppliers}
                   onUpdateStockMovements={setStockMovements}
                   readOnly={currentUser?.role === 'Viewer'}
                   companyLocations={companyLocations}
                   onUpdateCompanyLocations={setCompanyLocations}
+                  activeTenantId={activeCompanyName}
+                  isDemoCompany={isDemoCompany}
                 />
               )}
 
@@ -6896,12 +7363,12 @@ export default function App() {
 
               {activeTab === 'finance' && (
                 <FinanceManager 
-                  invoices={invoices}
-                  products={products}
-                  bankAccounts={bankAccounts}
-                  bankTransactions={bankTransactions}
-                  taxDeclarations={taxDeclarations}
-                  yearEndClosings={yearEndClosings}
+                  invoices={tenantInvoices}
+                  products={tenantProducts}
+                  bankAccounts={tenantBankAccounts}
+                  bankTransactions={tenantBankTransactions}
+                  taxDeclarations={tenantTaxDeclarations}
+                  yearEndClosings={tenantYearEndClosings}
                   onUpdateBankAccounts={setBankAccounts}
                   onUpdateBankTransactions={setBankTransactions}
                   onUpdateTaxDeclarations={setTaxDeclarations}
@@ -6916,10 +7383,10 @@ export default function App() {
 
               {activeTab === 'tej' && (
                 <TejIntegration
-                  invoices={invoices}
-                  bankAccounts={bankAccounts}
-                  bankTransactions={bankTransactions}
-                  yearEndClosings={yearEndClosings}
+                  invoices={tenantInvoices}
+                  bankAccounts={tenantBankAccounts}
+                  bankTransactions={tenantBankTransactions}
+                  yearEndClosings={tenantYearEndClosings}
                   triggerPrint={(elementId, docName) => {
                     const printContent = document.getElementById(elementId);
                     if (printContent) {
@@ -6938,35 +7405,38 @@ export default function App() {
 
               {activeTab === 'payroll' && (
                 <PayrollManager 
-                  bankAccounts={bankAccounts}
-                  bankTransactions={bankTransactions}
+                  bankAccounts={tenantBankAccounts}
+                  bankTransactions={tenantBankTransactions}
                   onUpdateBankAccounts={setBankAccounts}
                   onUpdateBankTransactions={setBankTransactions}
                   adminSettings={adminSettings}
-                  employees={employees}
+                  employees={tenantEmployees}
                   onUpdateEmployees={setEmployees}
-                  contracts={contracts}
+                  contracts={tenantContracts}
                   onUpdateContracts={setContracts}
-                  absences={absences}
+                  absences={tenantAbsences}
                   onUpdateAbsences={setAbsences}
-                  payslips={payslips}
+                  payslips={tenantPayslips}
                   onUpdatePayslips={setPayslips}
                   companyLocations={companyLocations}
                   onUpdateCompanyLocations={setCompanyLocations}
-                  missions={missions}
+                  missions={tenantMissions}
+                  isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
+                  activeCompanyName={activeCompanyName}
                 />
               )}
 
               {activeTab === 'performance_contracts' && (
                 <PerformanceManager
                   tenantId={activeCompanyName}
-                  employees={employees}
-                  invoices={invoices}
-                  deliveryTours={[]}
-                  payslips={payslips}
+                  isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
+                  employees={tenantEmployees}
+                  invoices={tenantInvoices}
+                  deliveryTours={tenantDeliveryTours}
+                  payslips={tenantPayslips}
                   onUpdatePayslips={setPayslips}
                   currentUser={currentUser}
-                  performanceContracts={performanceContracts}
+                  performanceContracts={tenantPerformanceContracts}
                   onUpdateContracts={handleUpdatePerformanceContracts}
                 />
               )}
@@ -6980,26 +7450,28 @@ export default function App() {
                   activeCompanyName={activeCompanyName}
                   isModuleUnlocked={isModuleUnlockedState}
                   smtpSettings={smtpSettings}
+                  isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
                 />
               )}
 
               {activeTab === 'attendance' && (
                 <AttendanceManager 
-                  employees={employees} 
+                  employees={tenantEmployees} 
                   collaborators={collaborators}
                   currentUser={currentUser} 
                   isSimulationActive={isSimulationActive} 
                   activeCompanyName={activeCompanyName}
                   companyLocations={companyLocations}
                   onUpdateCompanyLocations={setCompanyLocations}
+                  isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
                 />
               )}
 
               {activeTab === 'ged' && (
                 <GedManager
-                  clients={clients}
-                  employees={employees}
-                  documents={documents}
+                  clients={tenantClients}
+                  employees={tenantEmployees}
+                  documents={tenantDocuments}
                   onUpdateDocuments={setDocuments}
                   currentUserEmail={currentUser?.email}
                   readOnly={currentUser?.role === 'Viewer'}
@@ -7008,19 +7480,26 @@ export default function App() {
 
               {activeTab === 'fleet_management' && (
                 <ErrorBoundary moduleName="Gestion du Parc & Actifs">
-                  <FleetAssetManager tenantId={activeCompanyName} />
+                  <FleetAssetManager 
+                    tenantId={activeCompanyName} 
+                    isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
+                  />
                 </ErrorBoundary>
               )}
 
               {activeTab === 'warehouse_picking' && (
                 <ErrorBoundary moduleName="Espace Dépôt & Préparations">
-                  <WarehousePickingScreen tenantId={activeCompanyName} currentUser={currentUser} />
+                  <WarehousePickingScreen 
+                    tenantId={activeCompanyName} 
+                    currentUser={currentUser} 
+                    isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
+                  />
                 </ErrorBoundary>
               )}
 
               {activeTab === 'dispatch_tours' && (
                 <ErrorBoundary moduleName="Expéditions & Tournées">
-                  <DispatchManager tenantId={activeCompanyName} employees={employees} />
+                  <DispatchManager tenantId={activeCompanyName} employees={tenantEmployees} isDemoTenant={isDemoTenant} />
                 </ErrorBoundary>
               )}
 
@@ -7028,15 +7507,18 @@ export default function App() {
                 <ErrorBoundary moduleName="Parc Auto">
                   <FleetManager 
                     isSimulationActive={isSimulationActive} 
-                    vehicles={vehicles}
+                    vehicles={tenantVehicles}
                     onUpdateVehicles={setVehicles}
-                    missions={missions}
+                    missions={tenantMissions}
                     onUpdateMissions={setMissions}
-                    expenses={expenses}
+                    expenses={tenantExpenses}
                     onUpdateExpenses={setExpenses}
-                    incidents={incidents}
+                    incidents={tenantIncidents}
                     onUpdateIncidents={setIncidents}
-                    employees={employees}
+                    employees={tenantEmployees}
+                    activeTenantId={activeCompanyName}
+                    tenantId={activeCompanyName}
+                    isDemoCompany={isDemoCompany}
                   />
                 </ErrorBoundary>
               )}
@@ -7045,15 +7527,15 @@ export default function App() {
                 <TransitLogistiqueManager 
                   standaloneMode="full" 
                   isSimulationActive={isSimulationActive} 
-                  folders={importFolders}
+                  folders={tenantImportFolders}
                   onUpdateFolders={setImportFolders}
-                  lcRequests={lcRequests}
+                  lcRequests={tenantLcRequests}
                   onUpdateLcRequests={setLcRequests}
-                  bankAccounts={bankAccounts}
+                  bankAccounts={tenantBankAccounts}
                   onUpdateBankAccounts={setBankAccounts}
-                  bankTransactions={bankTransactions}
+                  bankTransactions={tenantBankTransactions}
                   onUpdateBankTransactions={setBankTransactions}
-                  manufacturingOrders={manufacturingOrders}
+                  manufacturingOrders={tenantManufacturingOrders}
                 />
               )}
 
@@ -7061,38 +7543,28 @@ export default function App() {
                 <TransitLogistiqueManager 
                   standaloneMode="lc_only" 
                   isSimulationActive={isSimulationActive} 
-                  folders={importFolders}
+                  folders={tenantImportFolders}
                   onUpdateFolders={setImportFolders}
-                  lcRequests={lcRequests}
+                  lcRequests={tenantLcRequests}
                   onUpdateLcRequests={setLcRequests}
-                  bankAccounts={bankAccounts}
+                  bankAccounts={tenantBankAccounts}
                   onUpdateBankAccounts={setBankAccounts}
-                  bankTransactions={bankTransactions}
+                  bankTransactions={tenantBankTransactions}
                   onUpdateBankTransactions={setBankTransactions}
-                  manufacturingOrders={manufacturingOrders}
+                  manufacturingOrders={tenantManufacturingOrders}
                 />
               )}
 
               {activeTab === 'investment' && (
-                <InvestmentManager
-                  bankAccounts={bankAccounts}
-                  bankTransactions={bankTransactions}
-                  taxDeclarations={taxDeclarations}
-                  yearEndClosings={yearEndClosings}
-                  onUpdateBankAccounts={setBankAccounts}
-                  onUpdateBankTransactions={setBankTransactions}
-                  onUpdateTaxDeclarations={setTaxDeclarations}
-                  onUpdateYearEndClosings={setYearEndClosings}
-                  readOnly={currentUser?.role === 'Viewer'}
-                />
+                <StockMarketManager />
               )}
 
               {activeTab === 'reports' && (
                 <ReportsManager 
-                  visitReports={visitReports}
-                  clients={clients}
-                  complaints={complaints}
-                  invoices={invoices}
+                  visitReports={tenantVisitReports}
+                  clients={tenantClients}
+                  complaints={tenantComplaints}
+                  invoices={tenantInvoices}
                   onUpdateVisitReports={setVisitReports}
                 />
               )}
@@ -7112,40 +7584,50 @@ export default function App() {
               {activeTab === 'production' && (
                 <ProductionManager
                   currentUser={currentUser}
-                  nomenclatures={nomenclatures}
+                  nomenclatures={tenantNomenclatures}
                   onUpdateNomenclatures={setNomenclatures}
-                  manufacturingOrders={manufacturingOrders}
+                  manufacturingOrders={tenantManufacturingOrders}
                   onUpdateManufacturingOrders={setManufacturingOrders}
                   isDemoCompany={isDemoCompany}
-                  importFolders={importFolders}
-                  lcRequests={lcRequests}
+                  importFolders={tenantImportFolders}
+                  lcRequests={tenantLcRequests}
                 />
               )}
 
               {activeTab === 'purchasing' && (
                 <PurchasingManager
                   currentUser={currentUser}
-                  requisitions={purchaseRequisitions}
+                  requisitions={tenantPurchaseRequisitions}
                   onUpdateRequisitions={setPurchaseRequisitions}
-                  purchaseOrders={purchaseOrders}
+                  purchaseOrders={tenantPurchaseOrders}
                   onUpdatePurchaseOrders={setPurchaseOrders}
-                  suppliersPerformance={supplierPerformance}
+                  suppliersPerformance={tenantSupplierPerformance}
                   onUpdateSuppliersPerformance={setSupplierPerformance}
                   isDemoCompany={isDemoCompany}
                 />
               )}
 
               {activeTab === 'asset' && (
-                <AssetManager
-                  currentUser={currentUser}
-                  assets={assets}
-                  onUpdateAssets={setAssets}
-                  isDemoCompany={isDemoCompany}
+                <InvestmentManager
+                  currentTenantId={activeCompanyName}
+                  isDemo={isDemoCompany}
+                  bankAccounts={tenantBankAccounts}
+                  bankTransactions={tenantBankTransactions}
+                  taxDeclarations={tenantTaxDeclarations}
+                  yearEndClosings={tenantYearEndClosings}
+                  onUpdateBankAccounts={setBankAccounts}
+                  onUpdateBankTransactions={setBankTransactions}
+                  onUpdateTaxDeclarations={setTaxDeclarations}
+                  onUpdateYearEndClosings={setYearEndClosings}
+                  readOnly={currentUser?.role === 'Viewer'}
                 />
               )}
 
               {activeTab === 'treasury' && (
-                <TreasuryManager currentUser={currentUser} />
+                <TreasuryManager 
+                  currentUser={currentUser} 
+                  isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
+                />
               )}
 
               {activeTab === 'business_plan' && (
@@ -7157,11 +7639,12 @@ export default function App() {
               )}
 
               {activeTab === 'portail_client' && (
-                <PortailClientManager clients={clients} invoices={invoices} companyName={activeCompanySettings.companyName || 'Elyssa Entreprises'} />
+                <PortailClientManager clients={tenantClients} invoices={tenantInvoices} companyName={activeCompanySettings.companyName || 'Elyssa Entreprises'} />
               )}
 
               {activeTab === 'accountant_portal' && (
                 <AccountantPortal
+                  isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
                   onSwitchCompany={(companyName, tenantId, mf) => {
                     handleSwitchToAccountantClient(companyName, tenantId, mf);
                   }}
@@ -7207,12 +7690,14 @@ export default function App() {
                   publisherClients={publisherClients}
                   onUpdatePublisherClients={rawSetPublisherClients}
                   mode="company_settings"
+                  isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
+                  isDemoTenant={isDemoTenant}
                 />
               )}
 
               {activeTab === 'mobile_terrain' && (
                 <ErrorBoundary moduleName="Flotte Mobile & Suivi Terrain">
-                  <MobileTerrainDashboard tenantId={activeCompanyName} employees={employees} vehicles={vehicles} missions={missions} />
+                  <MobileTerrainDashboard tenantId={activeCompanyName} employees={tenantEmployees} vehicles={tenantVehicles} missions={tenantMissions} isDemoTenant={isDemoTenant} />
                 </ErrorBoundary>
               )}
 
@@ -7228,6 +7713,8 @@ export default function App() {
                   publisherClients={publisherClients}
                   onUpdatePublisherClients={rawSetPublisherClients}
                   mode="admin"
+                  isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
+                  isDemoTenant={isDemoTenant}
                 />
               )}
                     </>
@@ -7502,5 +7989,15 @@ export default function App() {
         <MessageSquare className="w-6 h-6" />
       </button>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary moduleName="Elyssa ERP Suite">
+      <TenantProvider>
+        <AppMain />
+      </TenantProvider>
+    </ErrorBoundary>
   );
 }

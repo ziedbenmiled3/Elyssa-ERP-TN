@@ -151,10 +151,10 @@ export const BiometricReviewModal: React.FC<BiometricReviewModalProps> = ({
               <div className="bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center space-x-2">
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
                 <span className="text-slate-300">
-                  {new Date(alert.timestamp).toLocaleString('fr-FR', {
+                  {alert?.timestamp ? new Date(alert.timestamp).toLocaleString('fr-FR', {
                     day: '2-digit', month: '2-digit', year: 'numeric',
                     hour: '2-digit', minute: '2-digit', second: '2-digit'
-                  })}
+                  }) : 'N/A'}
                 </span>
               </div>
 
@@ -238,7 +238,7 @@ export const BiometricReviewModal: React.FC<BiometricReviewModalProps> = ({
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-500 text-center">
-                  Capturé le {new Date(alert.timestamp).toLocaleTimeString()} via PWA Terrain
+                  Capturé le {alert?.timestamp ? new Date(alert.timestamp).toLocaleTimeString() : 'N/A'} via PWA Terrain
                 </p>
               </div>
 

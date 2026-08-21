@@ -48,7 +48,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '../utils/firebase';
+import { db, cleanFirestoreData } from '../utils/firebase';
 import { MobileAccessGuard } from './mobile/MobileAccessGuard';
 import { ChantierScreen } from '../mobile/views/ChantierScreen';
 import { VanSalesScreen } from '../mobile/views/VanSalesScreen';
@@ -505,9 +505,15 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
       };
 
       try {
-        const rawMails = localStorage.getItem('carthage_incoming_emails');
+        const activeTenant = localStorage.getItem('carthage_active_company') || 'company_parent';
+        const key = `carthage_${activeTenant.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}_imap_inbox`;
+        const rawMails = localStorage.getItem(key) || localStorage.getItem('carthage_incoming_emails');
         const mailsList = rawMails ? JSON.parse(rawMails) : [];
-        localStorage.setItem('carthage_incoming_emails', JSON.stringify([hrEmailObj, ...mailsList]));
+        const updatedMails = [hrEmailObj, ...mailsList];
+        localStorage.setItem(key, JSON.stringify(updatedMails));
+        if (activeTenant.toLowerCase().includes('inter-affaires') || activeTenant === 'company_parent') {
+          localStorage.setItem('carthage_incoming_emails', JSON.stringify(updatedMails));
+        }
       } catch (err) {}
 
       try {
@@ -819,10 +825,10 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
       // Sync to Firestore
       const docId = companyParam.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
       const docRef = doc(db, 'attendance_settings', docId);
-      await setDoc(docRef, {
+      await setDoc(docRef, cleanFirestoreData({
         companyLocations: updatedLocations,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      }), { merge: true });
 
       // Update current GPS label and state
       const matchedBranch = updatedLocations.find(l => l.id === targetBranchId) || updatedLocations.find(l => l.isMaman) || updatedLocations[0];
@@ -1016,11 +1022,6 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
       const activeRef = dbRef || saved || null;
       setReferenceSelfie(activeRef);
 
-      if (activeRef && saved !== activeRef) {
-        localStorage.setItem(`elyssa_ref_selfie_${selectedEmployeeId}`, activeRef);
-        window.localStorage.setItem(`elyssa_ref_selfie_${selectedEmployeeId}`, activeRef);
-      }
-
       if (!isSimulationActive) {
         getRealGPSPosition();
       } else {
@@ -1072,10 +1073,10 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
       setEmployees(updatedEmployees);
       localStorage.setItem('carthage_employees', JSON.stringify(updatedEmployees));
 
-      await setDoc(docRef, {
+      await setDoc(docRef, cleanFirestoreData({
         employees: updatedEmployees,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      }), { merge: true });
 
       console.log(`[Firestore] Registered reference selfie for ${employeeId}`);
     } catch (e) {
@@ -1150,10 +1151,10 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
         setEmployees(updatedEmployees);
         localStorage.setItem('carthage_employees', JSON.stringify(updatedEmployees));
 
-        await setDoc(docRef, {
+        await setDoc(docRef, cleanFirestoreData({
           employees: updatedEmployees,
           updatedAt: new Date().toISOString()
-        }, { merge: true });
+        }), { merge: true });
 
         setSuccessMsg('Selfie de référence réinitialisé. Enrôlement requis pour le prochain pointage.');
         setTimeout(() => setSuccessMsg(''), 4000);
@@ -1423,7 +1424,7 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
 
         const cleanRecords: AttendanceRecord[] = records.map(r => ({
           ...r,
-          selfieUrl: (r.selfieUrl && r.selfieUrl.length > 200000) ? undefined : r.selfieUrl
+          selfieUrl: (r.selfieUrl && r.selfieUrl.length > 200000) ? '' : (r.selfieUrl || '')
         }));
 
         const syncPromises = docIdsToSync.map(async (id) => {
@@ -1439,30 +1440,30 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
               cleanRecords.forEach((r: AttendanceRecord) => { if (r && r.id) map.set(r.id, r); });
               merged = Array.from(map.values());
             }
-            await setDoc(docRef, {
+            await setDoc(docRef, cleanFirestoreData({
               records: merged,
               updatedAt: new Date().toISOString()
-            }, { merge: true });
+            }), { merge: true });
 
             // Sync company_erp_data/{id}/attendance_logs/{record.id}
             const logRef = doc(db, 'company_erp_data', id, 'attendance_logs', updatedRecord.id);
-            await setDoc(logRef, {
+            await setDoc(logRef, cleanFirestoreData({
               ...updatedRecord,
               locationStatus: "GPS_VERIFIED",
               updatedAt: new Date().toISOString()
-            }, { merge: true });
+            }), { merge: true });
 
             // Sync time_tracking
             const timeTrackRef = doc(db, 'time_tracking', updatedRecord.id);
-            await setDoc(timeTrackRef, {
+            await setDoc(timeTrackRef, cleanFirestoreData({
               ...updatedRecord,
               locationStatus: "GPS_VERIFIED",
               updatedAt: new Date().toISOString()
-            }, { merge: true });
+            }), { merge: true });
 
           } catch (e) {
             const lightRecs: AttendanceRecord[] = records.map(r => ({ ...r, selfieUrl: '' }));
-            await setDoc(docRef, { records: lightRecs, updatedAt: new Date().toISOString() }, { merge: true });
+            await setDoc(docRef, cleanFirestoreData({ records: lightRecs, updatedAt: new Date().toISOString() }), { merge: true });
           }
         });
 
@@ -2386,8 +2387,8 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
 
                         {isAbsenceHistoryExpanded && (
                           <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                            {relevantAbsences.map(abs => (
-                              <div key={abs.id} className="p-2.5 bg-slate-950/90 border border-slate-800/80 rounded-xl space-y-1 text-[9.5px]">
+                            {relevantAbsences.map((abs, idx) => (
+                              <div key={abs.id ? `pocket-abs-${abs.id}-${idx}` : `pocket-abs-${idx}`} className="p-2.5 bg-slate-950/90 border border-slate-800/80 rounded-xl space-y-1 text-[9.5px]">
                                 <div className="flex items-center justify-between">
                                   <span className="font-extrabold text-slate-200">
                                     {abs.employeeName} — <span className="text-amber-400">{getTypeLabel(abs.type)}</span>
@@ -2631,11 +2632,11 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
                                     </p>
                                   </div>
                                 ) : (
-                                  filteredRecs.map(rec => {
+                                  filteredRecs.map((rec, idx) => {
                                     const category = getRecordCategory(rec);
                                     return (
                                       <div
-                                        key={rec.id}
+                                        key={rec.id ? `pocket-rec-${rec.id}-${rec.date}-${idx}` : `pocket-rec-${idx}`}
                                         className="p-2.5 bg-[#020617] border border-slate-800/80 rounded-xl flex items-center justify-between gap-2 hover:border-slate-700 transition"
                                       >
                                         <div className="space-y-0.5 truncate">
@@ -2900,8 +2901,8 @@ Alerte transmise automatiquement via le module Pocket Attendance d'Elyssa ERP.
                                           </div>
                                         ) : (
                                           <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                                            {selectedDayRecs.map(r => (
-                                              <div key={r.id} className="p-2 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1 text-[9.5px]">
+                                            {selectedDayRecs.map((r, idx) => (
+                                              <div key={r.id ? `pocket-day-${r.id}-${r.date || ''}-${idx}` : `pocket-day-${idx}`} className="p-2 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1 text-[9.5px]">
                                                 <div className="flex items-center justify-between font-black text-slate-100">
                                                   <span>👤 {r.employeeName}</span>
                                                   <span className="text-emerald-400 font-mono font-extrabold">{r.jobTitle}</span>

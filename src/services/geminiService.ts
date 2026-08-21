@@ -43,7 +43,7 @@ ${JSON.stringify(condensedJson, null, 2)}`;
       }
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -101,7 +101,7 @@ ${JSON.stringify(clientHistoryJson, null, 2)}`;
       }
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -132,6 +132,85 @@ ${JSON.stringify(clientHistoryJson, null, 2)}`;
         analysis: "Analyse indisponible en raison de l'indisponibilité de l'API IA.",
         recommendedAction: "Veuillez vérifier manuellement le dossier client."
       };
+    }
+  }
+
+  /**
+   * Génère une réponse conversationnelle précise et contextuelle pour Elyssa Copilot
+   */
+  static async generateCopilotChatResponse(params: {
+    message: string;
+    companyId: string;
+    lightweightContext: any;
+    forecast?: any;
+    anomalies?: any[];
+    customApiKey?: string;
+  }): Promise<string> {
+    const { message, companyId, lightweightContext, forecast, anomalies, customApiKey } = params;
+
+    const systemInstruction = `Tu es Elyssa Copilot, l'assistant IA conversationnel expert intégré à Elyssa ERP (la suite ERP modulaire complète).
+Tu conseilles la direction, les directeurs financiers, DRH, et responsables d'exploitation de l'entreprise active : "${companyId}".
+
+Voici le CONTEXTE OPÉRATIONNEL & FINANCIER EN TEMPS RÉEL du tenant actif (${companyId}) :
+- Trésorerie Actuelle : ${(lightweightContext?.cashBalance || 0).toLocaleString('fr-FR')} TND
+- Factures Clients non payées : ${lightweightContext?.unpaidInvoices || 0} (Total créances : ${(lightweightContext?.totalReceivables || 0).toLocaleString('fr-FR')} TND, dont factures en retard : ${lightweightContext?.overdueInvoices || 0})
+- Dettes Fournisseurs (Achats non réglés) : ${(lightweightContext?.totalPayables || 0).toLocaleString('fr-FR')} TND
+- Valeur des Stocks : ${(lightweightContext?.inventoryValue || 0).toLocaleString('fr-FR')} TND (${lightweightContext?.outOfStockAlerts || 0} alertes de rupture stock)
+- Effectif & RH : ${lightweightContext?.employeeCount || 0} salariés déclarés | Masse salariale brute estimée : ${(lightweightContext?.totalPayroll || 0).toLocaleString('fr-FR')} TND/mois | Salariés présents aujourd'hui : ${lightweightContext?.todayPresentCount || 0}
+- Flotte & Logistique : ${lightweightContext?.availableVehiclesCount || 0}/${lightweightContext?.totalVehiclesCount || 0} véhicules disponibles | ${lightweightContext?.activeMissionsCount || 0} missions/tournées en cours
+${forecast ? `- Prévisions de trésorerie : 30 jours = ${(forecast.forecast30Days || 0).toLocaleString('fr-FR')} TND | 60 jours = ${(forecast.forecast60Days || 0).toLocaleString('fr-FR')} TND | Risque : ${forecast.riskLevel}` : ''}
+${anomalies && anomalies.length > 0 ? `- Anomalies récentes détectées : ${anomalies.map((a: any) => `${a.type} (${a.severity}): ${a.description}`).join('; ')}` : '- Aucune anomalie critique signalée'}
+
+RÈGLES ET NORMES FISCALES/COMPTABLES TUNISIENNES :
+- TVA tunisienne : Taux normal 19%, taux réduits 13% et 7%. FODEC 1% applicable sur ventes industrielles éligibles.
+- Timbre fiscal : 1.000 TND par facture.
+- Retenue à la Source (RS / TEJ) : barèmes tunisiens en vigueur (Honoraires/Commissions 10% ou 15%, Marchés 1.5%, Loyers 15%, etc.) avec déclaration dématérialisée TEJ.
+- IRPP / Barème fiscal tunisien 2026 : tranches progressives, cotisations CNSS (9.18% part salariale, 16.57% part patronale + 0.5% accident de travail).
+
+CONSIGNES DE RÉPONSE :
+1. Réponds toujours en français professionnel, précis, clair et direct.
+2. Utilise les chiffres réels ci-dessus dès que la question de l'utilisateur porte sur les finances, trésorerie, facturation, salariés, stocks ou logistique.
+3. Formate les montants en "TND" avec séparateurs de milliers.
+4. Si l'utilisateur pose une question générale sur l'ERP ou la réglementation tunisienne, fournis une réponse experte et bien structurée avec des puces Markdown si nécessaire.
+5. Sois concis et évite le bavardage inutile.`;
+
+    try {
+      const ai = getAiClient(customApiKey);
+      if (!ai) {
+        throw new Error("Clé API Gemini non configurée.");
+      }
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.6-flash',
+        contents: message,
+        config: {
+          systemInstruction,
+          temperature: 0.3,
+        }
+      });
+
+      if (response && response.text) {
+        return response.text.trim();
+      }
+      throw new Error("Réponse vide reçue de Gemini.");
+    } catch (error: any) {
+      console.warn("Gemini Copilot Chat Error:", error?.message || error);
+      
+      // Réponse de repli enrichie avec les vraies données ERP locales si quota ou erreur réseau
+      const cash = (lightweightContext?.cashBalance || 0).toLocaleString('fr-FR');
+      const rec = (lightweightContext?.totalReceivables || 0).toLocaleString('fr-FR');
+      const pay = (lightweightContext?.totalPayables || 0).toLocaleString('fr-FR');
+      const emp = lightweightContext?.employeeCount || 0;
+      
+      return `Bonjour. En consultant les données en direct d'**Elyssa ERP** pour **${companyId}** :
+
+- **Trésorerie Actuelle** : ${cash} TND
+- **Créances Clients** : ${rec} TND (${lightweightContext?.unpaidInvoices || 0} factures en attente)
+- **Dettes Fournisseurs** : ${pay} TND
+- **Salariés / Pointages** : ${emp} salariés (${lightweightContext?.todayPresentCount || 0} pointés présents)
+- **Stock & Flotte** : ${lightweightContext?.outOfStockAlerts || 0} alerte(s) stock | ${lightweightContext?.activeMissionsCount || 0} mission(s) en cours
+
+*(Note : Connexion directe sécurisée au moteur local Elyssa Analytics. Vous pouvez configurer votre clé API Gemini dans Paramètres Entreprise pour des requêtes prédictives avancées).*`;
     }
   }
 }

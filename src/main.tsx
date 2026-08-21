@@ -3,6 +3,42 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+// Global Storage Safeguard against QuotaExceededError and iFrame restrictions
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const memoryStore = new Map<string, string>();
+    const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const originalGetItem = window.localStorage.getItem.bind(window.localStorage);
+    const originalRemoveItem = window.localStorage.removeItem.bind(window.localStorage);
+
+    window.localStorage.setItem = (key: string, value: string) => {
+      memoryStore.set(key, value);
+      try {
+        originalSetItem(key, value);
+      } catch (err) {
+        console.warn(`[Storage SafeGuard] Écriture localStorage bloquée pour "${key}". L'erreur a été absorbée.`);
+      }
+    };
+
+    window.localStorage.getItem = (key: string): string | null => {
+      try {
+        const val = originalGetItem(key);
+        if (val !== null) return val;
+      } catch (_) {}
+      return memoryStore.get(key) || null;
+    };
+
+    window.localStorage.removeItem = (key: string) => {
+      memoryStore.delete(key);
+      try {
+        originalRemoveItem(key);
+      } catch (_) {}
+    };
+  }
+} catch (e) {
+  console.warn("Unable to patch window.localStorage:", e);
+}
+
 // Silence specific benign firestore internal logs (like BloomFilter errors) that trigger AI Studio alert detectors
 try {
   const originalError = console.error;
