@@ -141,6 +141,7 @@ export interface VisitReport {
   aiAnalyzed: boolean;
   aiInsights?: string;
   author: string;
+  status?: string;
 }
 
 export interface CompetitorReport {
@@ -214,7 +215,7 @@ export interface Supplier {
   phone: string;
   address: string;
   category: string; // e.g. "Matériaux", "Chimie", "Emballage", "Logistique"
-  status?: 'Active' | 'Inactive';
+  status?: 'Active' | 'Inactive' | 'active' | 'ACTIF' | string;
   createdDate?: string;
   paymentTerms?: string;
   rating?: number;
@@ -227,7 +228,7 @@ export interface Product {
   name: string;
   sku: string;
   category: string; // e.g. "Matières Premières", "Gros Œuvre", "Sanitaire", "Électricité", etc.
-  type?: 'PRODUIT_FINI' | 'MATIERE_PREMIERE' | 'COMPOSANT';
+  type?: 'PRODUIT_FABRIQUE' | 'MATIERE_IMPORTEE' | 'NEGOCE_LOCAL' | 'PRODUIT_FINI' | 'MATIERE_PREMIERE' | 'COMPOSANT' | string;
   stockLevel: number;
   minStockLevel: number; // Alerts when stockLevel <= minStockLevel
   unitPrice: number; // TND (PV HT)

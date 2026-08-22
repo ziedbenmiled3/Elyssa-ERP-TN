@@ -181,12 +181,12 @@ export default function SmartPOS({
     if (liveName && liveName !== 'Caissier' && liveName !== 'Guest' && liveName.trim() !== '') {
       return liveName;
     }
-    // 2. In demo sandbox mode: default to assigned commercial collaborator "Mohamed Ali Gharbi"
+    // 2. In demo sandbox mode: default to assigned dedicated Showroom Cashier "Mariem Mahfoudh" or "Mohamed Ali Gharbi"
     if (isDemoCompany) {
-      const demoCommercial = collaborators?.find((c: any) => c.name?.includes('Gharbi') || c.id === 'demo-emp_3');
-      return demoCommercial?.name || 'Mohamed Ali Gharbi';
+      const demoCashier = collaborators?.find((c: any) => c.name?.includes('Mahfoudh') || c.id === 'demo-emp_16' || c.name?.includes('Gharbi') || c.id === 'demo-emp_3');
+      return demoCashier?.name || 'Mariem Mahfoudh';
     }
-    return liveName || 'Mohamed Ali Gharbi';
+    return liveName || 'Mariem Mahfoudh';
   }, [currentUser, collaborators, isDemoCompany]);
 
   // Tabs for sub-sections

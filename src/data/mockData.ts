@@ -109,6 +109,31 @@ export const INITIAL_CLIENTS: Client[] = [
       }
     ],
     is_demo: true
+  },
+  {
+    id: "demo-cli_4",
+    name: "SOPAL S.A. (Sfax)",
+    email: "contact@sopal.com.tn",
+    phone: "+216 74 675 000",
+    address: "Route de Gabès Km 3.5, Sfax",
+    category: "Industrie & Équipement",
+    sector: "Robinetterie & Réseaux Fluides",
+    revenuePotential: 290000,
+    status: "Active",
+    createdDate: "2026-03-10",
+    matriculeFiscal: "0892341/D/P/000",
+    notes: "Partenaire industriel et client grand compte sur le pôle Sud Sfax.",
+    engagements: [
+      {
+        id: "demo-eng_4_1",
+        title: "Règlement encaissement en attente & approvisionnement",
+        description: "Pointage de la traite échue et validation du planning de livraison tubes.",
+        dueDate: "2026-08-25",
+        status: "Pending",
+        is_demo: true
+      }
+    ],
+    is_demo: true
   }
 ];
 
@@ -323,7 +348,9 @@ export const INITIAL_SUPPLIERS: Supplier[] = [
     address: "Baie de Sebra, Bizerte",
     category: "Matériaux de Construction",
     paymentTerms: "60 jours fin de mois",
-    rating: 4.8
+    rating: 4.8,
+    status: 'Active',
+    is_demo: true
   },
   {
     id: "demo-sup_2",
@@ -334,7 +361,9 @@ export const INITIAL_SUPPLIERS: Supplier[] = [
     address: "Zone Industrielle El Fouladh, Menzel Bourguiba",
     category: "Sidérurgie & Métallurgie",
     paymentTerms: "45 jours fin de mois",
-    rating: 4.6
+    rating: 4.6,
+    status: 'Active',
+    is_demo: true
   },
   {
     id: "demo-sup_3",
@@ -345,7 +374,9 @@ export const INITIAL_SUPPLIERS: Supplier[] = [
     address: "Zone Industrielle Megrine, Ben Arous",
     category: "Peintures & Revêtements",
     paymentTerms: "30 jours",
-    rating: 4.7
+    rating: 4.7,
+    status: 'Active',
+    is_demo: true
   },
   {
     id: "demo-sup_4",
@@ -356,7 +387,9 @@ export const INITIAL_SUPPLIERS: Supplier[] = [
     address: "Zone Industrielle Charguia I, Tunis",
     category: "Outillage Professionnel",
     paymentTerms: "30 jours fin de mois",
-    rating: 4.9
+    rating: 4.9,
+    status: 'Active',
+    is_demo: true
   },
   {
     id: "demo-sup_5",
@@ -367,7 +400,9 @@ export const INITIAL_SUPPLIERS: Supplier[] = [
     address: "Zone Industrielle Charguia II, Tunis",
     category: "Plaques & Systèmes Plâtre",
     paymentTerms: "30 jours",
-    rating: 4.8
+    rating: 4.8,
+    status: 'Active',
+    is_demo: true
   },
   {
     id: "demo-sup_6",
@@ -378,7 +413,22 @@ export const INITIAL_SUPPLIERS: Supplier[] = [
     address: "Zone Industrielle Ksar Saïd, Manouba",
     category: "Colles & Chimie du Bâtiment",
     paymentTerms: "45 jours fin de mois",
-    rating: 4.9
+    rating: 4.9,
+    status: 'Active',
+    is_demo: true
+  },
+  {
+    id: "demo-sup_import",
+    name: "Marseille Chimie & Outillage SAS",
+    contactName: "Jean-Luc Morel",
+    email: "import@marseille-chimie.fr",
+    phone: "+33 4 91 00 22 33",
+    address: "Marseille, France / Port de Radès",
+    category: "Matières Premières & Import",
+    paymentTerms: "Crédoc BIAT (L/C Confirmée)",
+    rating: 4.9,
+    status: 'Active',
+    is_demo: true
   }
 ];
 
@@ -389,10 +439,11 @@ export const INITIAL_STOCK_MOVEMENTS: StockMovement[] = [
     productName: "Ciment CPJ 45 (Sac 50kg)",
     date: "2026-08-01",
     type: "In",
-    quantity: 1200,
-    reason: "Réception bon de commande fournisseur BC-2026-001",
+    quantity: 500,
+    reason: "Réception bon de commande fournisseur local BC Les Ciments de Bizerte (PO-2026-0101)",
     reference: "BL-CIM-8812",
-    performedBy: "Hamza Ben Salem"
+    operator: "Riadh Bouazizi (Magasinier)",
+    performedBy: "Riadh Bouazizi (Magasinier)"
   },
   {
     id: "demo-sm_2",
@@ -400,38 +451,113 @@ export const INITIAL_STOCK_MOVEMENTS: StockMovement[] = [
     productName: "Rond à béton Ø12mm (Barre 12m)",
     date: "2026-08-02",
     type: "In",
-    quantity: 850,
-    reason: "Réception sidérurgie usine BC-2026-002",
+    quantity: 200,
+    reason: "Réception sidérurgie usine EL FOULADH Menzel Bourguiba (PO-2026-0102)",
     reference: "BL-FOULADH-492",
-    performedBy: "Hamza Ben Salem"
+    operator: "Riadh Bouazizi (Magasinier)",
+    performedBy: "Riadh Bouazizi (Magasinier)"
   },
   {
     id: "demo-sm_3",
+    productId: "demo-prod_7",
+    productName: "Composant Meuleuse d'Angle 230mm (MP Import)",
+    date: "2026-08-10",
+    type: "In",
+    quantity: 100,
+    reason: "Réception Dédouanement Import Marseille Chimie (Dossier IMP-RADES-2026-081 / Crédoc BIAT)",
+    reference: "DAU-RADES-8102",
+    operator: "Hamza Ben Salem (Logistique & Transit)",
+    performedBy: "Hamza Ben Salem (Logistique & Transit)"
+  },
+  {
+    id: "demo-sm_4",
+    productId: "demo-prod_7",
+    productName: "Composant Meuleuse d'Angle 230mm (MP Import)",
+    date: "2026-08-16",
+    type: "Out",
+    quantity: 45,
+    reason: "Sortie composant MP pour Ordre de Fabrication demo-mo_1 (Ligne Assemblage B)",
+    reference: "OF-2026-001",
+    operator: "Mourad Trabelsi (Chef Assemblage)",
+    performedBy: "Mourad Trabelsi (Chef Assemblage)"
+  },
+  {
+    id: "demo-sm_5",
+    productId: "demo-prod_4",
+    productName: "Outillage pro (Pack Chantier 230mm)",
+    date: "2026-08-18",
+    type: "In",
+    quantity: 45,
+    reason: "Entrée produit fini assemblé conforme OF demo-mo_1",
+    reference: "BA-PROD-2026",
+    operator: "Mourad Trabelsi (Chef Assemblage)",
+    performedBy: "Mourad Trabelsi (Chef Assemblage)"
+  },
+  {
+    id: "demo-sm_6",
     productId: "demo-prod_3",
     productName: "Peinture Blanche 15L",
     date: "2026-08-05",
     type: "In",
     quantity: 180,
-    reason: "Approvisionnement Magasin Tunis",
+    reason: "Approvisionnement Magasin Tunis - Astral Tunisie",
     reference: "BL-AST-104",
-    performedBy: "Hamza Ben Salem"
-  },
-  {
-    id: "demo-sm_4",
-    productId: "demo-prod_4",
-    productName: "Outillage pro (Meuleuse & Découpe 230mm)",
-    date: "2026-08-06",
-    type: "In",
-    quantity: 95,
-    reason: "Entrée stock outillage pro Bosch",
-    reference: "BL-BOSCH-391",
-    performedBy: "Hamza Ben Salem"
+    operator: "Riadh Bouazizi (Magasinier)",
+    performedBy: "Riadh Bouazizi (Magasinier)"
   }
 ];
 
 export const INITIAL_COMPLAINTS: Complaint[] = [];
 export const INITIAL_COMPETITORS: CompetitorReport[] = [];
-export const INITIAL_VISIT_REPORTS: VisitReport[] = [];
+export const INITIAL_VISIT_REPORTS: VisitReport[] = [
+  {
+    id: "demo-vr_1",
+    clientId: "demo-cli_1",
+    clientName: "Société Tunisienne de Construction (STC)",
+    date: "2026-08-18",
+    purpose: "Visite de suivi nouveau chantier Charguia II (10:00)",
+    summary: "Entretien avec le directeur technique. Validation des besoins sur 40 tonnes de ciment CPJ45 et 15 tonnes de fer à béton pour le chantier STC Charguia II.",
+    actionPoints: [
+      "Établir devis formel avec remise volume",
+      "Planifier première livraison fin août",
+      "Coordonner avec le service logistique pour passage camion"
+    ],
+    aiAnalyzed: true,
+    aiInsights: "Opportunité commerciale majeure validée (55T matériaux). Client historique fidèle à fort panier moyen. Risque de churn estimé < 2%.",
+    author: "Mohamed Ali Gharbi"
+  },
+  {
+    id: "demo-vr_2",
+    clientId: "demo-cli_2",
+    clientName: "Comptoir du Centre (Sousse)",
+    date: "2026-08-20",
+    purpose: "Négociation showroom & réapprovisionnement outillage (14:30)",
+    summary: "Visite et négociation au showroom de Sousse. Revue des rotations de stock outillage pro et intégration de la nouvelle gamme de peinture Astral dans les linéaires.",
+    actionPoints: [
+      "Transmettre catalogue outillage pro 2026",
+      "Programmer passage chauffeur Hamza pour tournée Sahel",
+      "Mettre en place présentoir PLV"
+    ],
+    aiAnalyzed: true,
+    aiInsights: "Client stratégique dans le Sahel. Potentiel de hausse du panier moyen de 15%. Risque de churn très faible.",
+    author: "Mohamed Ali Gharbi"
+  },
+  {
+    id: "demo-vr_3",
+    clientId: "demo-cli_4",
+    clientName: "SOPAL S.A. (Sfax)",
+    date: "2026-08-22",
+    purpose: "Relance & Recouvrement créance échue (11:00)",
+    summary: "Entretien de relance et négociation financière chez SOPAL S.A. (Sfax) pour pointage de l'encaissement en attente et validation du planning de livraison des tubes PVC haute pression.",
+    actionPoints: [
+      "Pointer encaissement en attente SOPAL avec le DAF",
+      "Arrêter échéancier de règlement à l'amiable",
+      "Coordonner avec Dépôt Sfax pour déblocage des commandes"
+    ],
+    aiAnalyzed: false,
+    author: "Mohamed Ali Gharbi"
+  }
+];
 export const INITIAL_EMAIL_TEMPLATES: EmailTemplate[] = [];
 export const INITIAL_COMMUNICATION_LOGS: CommunicationLog[] = [];
 

@@ -45,7 +45,7 @@ export const DEMO_VEHICLES: Vehicle[] = [
   { 
     id: 'demo-v_2', 
     brand: 'Isuzu', 
-    model: 'D-Max', 
+    model: 'D-Max Double Cabine', 
     registrationNumber: '240 TN 8812', 
     purchaseDate: '2024-02-10', 
     purchasePrice: 72000.000, 
@@ -65,6 +65,18 @@ export const DEMO_VEHICLES: Vehicle[] = [
     assignedToEmployeeId: 'demo-emp_3', 
     assignedEmployeeName: 'Mohamed Ali Gharbi',
     is_demo: true
+  },
+  { 
+    id: 'demo-v_4', 
+    brand: 'Iveco', 
+    model: 'Eurocargo 120E (Poids Lourd 12T)', 
+    registrationNumber: '248 TN 3390', 
+    purchaseDate: '2023-07-20', 
+    purchasePrice: 165000.000, 
+    status: 'Active', 
+    assignedToEmployeeId: 'demo-emp_19', 
+    assignedEmployeeName: 'Bilal Zouari',
+    is_demo: true
   }
 ];
 
@@ -79,7 +91,7 @@ export const DEMO_MISSIONS: MissionOrder[] = [
     vehicleLabel: 'Isuzu D-Max (240 TN 8812)', 
     transportType: 'CompanyCar',
     destination: 'Tunis / Sfax', 
-    purpose: 'Livraison Client Poulina - Tunis/Sfax', 
+    purpose: 'Livraison Client Poulina - Tunis/Sfax (Validation Nader Chaabane)', 
     departureDateTime: '2026-08-10T07:30', 
     returnDateTime: '2026-08-10T19:00', 
     status: 'Approved',
@@ -97,7 +109,7 @@ export const DEMO_MISSIONS: MissionOrder[] = [
     vehicleLabel: 'Citroën C-Élysée (215 TN 9811)', 
     transportType: 'CompanyCar',
     destination: 'Sousse', 
-    purpose: 'Prospection Sousse', 
+    purpose: 'Prospection Sousse & Sahel', 
     departureDateTime: '2026-08-10T08:00', 
     returnDateTime: '2026-08-10T18:00', 
     status: 'Approved',
@@ -105,6 +117,24 @@ export const DEMO_MISSIONS: MissionOrder[] = [
     is_demo: true,
     expenses: [
       { id: 'demo-me_mo2_1', category: 'Food', description: 'Déjeuner client prospection commerciale Sousse', amount: 30.000, invoiceNumber: 'RE_SOUSSE_12', date: '2026-08-10' }
+    ]
+  },
+  { 
+    id: 'demo-mo_3', 
+    employeeId: 'demo-emp_19', 
+    employeeName: 'Bilal Zouari', 
+    vehicleId: 'demo-v_4', 
+    vehicleLabel: 'Iveco Eurocargo 120E (248 TN 3390)', 
+    transportType: 'CompanyCar',
+    destination: 'Sfax / Gabès', 
+    purpose: 'Acheminement Poids Lourds Matériaux Usine Sfax vers Dépôt Sud (Dispatching Nader Chaabane)', 
+    departureDateTime: '2026-08-12T06:00', 
+    returnDateTime: '2026-08-12T20:00', 
+    status: 'Approved',
+    allowancesGranted: 75.000,
+    is_demo: true,
+    expenses: [
+      { id: 'demo-me_mo3_1', category: 'Food', description: 'Restauration trajet Sud Gabès', amount: 40.000, invoiceNumber: 'REST_GAB_44', date: '2026-08-12' }
     ]
   }
 ];

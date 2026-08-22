@@ -1,6 +1,7 @@
 import { db } from '../utils/firebase';
 import { doc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
-import { PerformanceContract, KPIItem, Payslip, Invoice, DeliveryTour, TripartiteWeightingConfig, TripartiteBreakdown } from '../types';
+import { PerformanceContract, KPIItem, Payslip, Invoice, DeliveryTour, TripartiteWeightingConfig, TripartiteBreakdown, Employee } from '../types';
+import { getEmployeePole, getPoleInfo, matchPoleKey, DEMO_HR_EMPLOYEES } from './hrSyncService';
 
 export const DEFAULT_TRIPARTITE_CONFIG: TripartiteWeightingConfig = {
   weight_entreprise: 70,
@@ -29,7 +30,7 @@ export const DEMO_MPO_MANAGERS: MPOManager[] = [
   }
 ];
 
-export const DEFAULT_DEMO_PERFORMANCE_CONTRACTS: PerformanceContract[] = generateTenantDemoPerformanceContracts('MD');
+export const DEFAULT_DEMO_PERFORMANCE_CONTRACTS: PerformanceContract[] = generateTenantDemoPerformanceContracts('company_demo');
 
 /**
  * Returns dynamic MPO managers based on the active user session and tenant employees
@@ -39,7 +40,7 @@ export function getTenantMpoManagers(
   currentUser?: { email?: string; name?: string; role?: string; department?: string; structure?: string } | null,
   employees: any[] = []
 ): MPOManager[] {
-  const isMD = tenantId === 'MD' || tenantId?.toLowerCase().includes('md');
+  const isMD = tenantId === 'MD' || tenantId?.toLowerCase().includes('md') || tenantId === 'company_demo';
   const defaultAdminName = isMD ? 'Meriam Doudou' : (tenantId === 'Inter-Affaires' ? 'MED ZIED BEN MILED' : 'Direction Générale');
   
   const currentMgrName = currentUser?.name || defaultAdminName;
@@ -76,7 +77,8 @@ export function getTenantMpoManagers(
         else if (dept.includes('RH') || dept.includes('Ressour') || job.includes('rh')) pin = '555111';
         else if (dept.includes('Vente') || dept.includes('Commer') || job.includes('commer')) pin = '333333';
         else if (dept.includes('Logist') || job.includes('livreur') || job.includes('logist')) pin = '444444';
-        else if (dept.includes('Achat') || dept.includes('Prod')) pin = '666111';
+        else if (dept.includes('Prod') || dept.includes('GPAO') || dept.includes('Atelier') || job.includes('équipe')) pin = '666111';
+        else if (dept.includes('Achat')) pin = '666111';
 
         list.push({
           id: `MGR-EMP-${emp.id}`,
@@ -93,10 +95,11 @@ export function getTenantMpoManagers(
   // Fallback defaults if no departmental managers found
   if (list.length === 1) {
     list.push(
-      { id: 'MGR-FIN', name: 'Ines Dridi', role: 'Responsable Pôle Finance', department: 'Finance', pin_code: '222333' },
-      { id: 'MGR-RH', name: 'Amel Ben Soltane', role: 'Responsable Pôle RH', department: 'RH', pin_code: '555111' },
-      { id: 'MGR-COM', name: 'Mohamed Ali Gharbi', role: 'Responsable Pôle Commercial', department: 'Ventes', pin_code: '333333' },
-      { id: 'MGR-LOG', name: 'Hamza Ben Salem', role: 'Responsable Pôle Logistique', department: 'Logistique', pin_code: '444444' }
+      { id: 'MGR-FIN', name: 'Ines Dridi', role: 'Responsable Pôle Finance', department: 'Finance & Compta', pin_code: '222333' },
+      { id: 'MGR-RH', name: 'Amel Ben Soltane', role: 'Responsable Pôle RH', department: 'RH & Social', pin_code: '555111' },
+      { id: 'MGR-COM', name: 'Mohamed Ali Gharbi', role: 'Responsable Pôle Commercial', department: 'Ventes & Commerce', pin_code: '333333' },
+      { id: 'MGR-LOG', name: 'Hamza Ben Salem', role: 'Responsable Pôle Logistique', department: 'Logistique & Transport', pin_code: '444444' },
+      { id: 'MGR-PROD', name: 'Jalel Ben Ali', role: 'Responsable Pôle Production', department: 'Production & Industrie', pin_code: '666111' }
     );
   }
 
@@ -104,270 +107,281 @@ export function getTenantMpoManagers(
 }
 
 /**
+ * Generate default KPIs tailored by pole and job role
+ */
+export function generateDefaultKPIsForEmp(emp: any, poleKey: string, dept: string, job: string): KPIItem[] {
+  const nameLower = (emp.name || '').toLowerCase();
+  const jobLower = (job || '').toLowerCase();
+  const deptLower = (dept || '').toLowerCase();
+  const id = emp.id || `emp_${Date.now()}`;
+
+  if (poleKey === 'PRODUCTION_INDUSTRIE' || deptLower.includes('prod') || deptLower.includes('gpao') || deptLower.includes('atelier') || deptLower.includes('industrie')) {
+    if (nameLower.includes('jalel') || nameLower.includes('extrusion') || jobLower.includes('extrusion')) {
+      return [
+        { id: `kpi-${id}-1`, title: 'Respect Planning GPAO & Ordres de Fabrication Extrusion (%)', weight_percent: 60, target_value: 100, current_value: 96, unit: '%', data_source: 'manual_manager' },
+        { id: `kpi-${id}-2`, title: 'Réduction du Taux de Rebuts & Chutes Matières (%)', weight_percent: 40, target_value: 2.0, current_value: 1.8, unit: '%', data_source: 'manual_manager' }
+      ];
+    }
+    if (nameLower.includes('mourad') || nameLower.includes('assemblage') || jobLower.includes('assemblage')) {
+      return [
+        { id: `kpi-${id}-1`, title: 'Rendement & Productivité Ligne d’Assemblage (%)', weight_percent: 60, target_value: 100, current_value: 97, unit: '%', data_source: 'manual_manager' },
+        { id: `kpi-${id}-2`, title: 'Zéro Non-Conformité Qualité & Respect Normes Sécurité', weight_percent: 40, target_value: 100, current_value: 99, unit: '%', data_source: 'manual_manager' }
+      ];
+    }
+    if (nameLower.includes('sofiene') || nameLower.includes('nuit') || jobLower.includes('nuit')) {
+      return [
+        { id: `kpi-${id}-1`, title: 'Continuité de Marche & Cadence Poste de Nuit (%)', weight_percent: 60, target_value: 100, current_value: 95, unit: '%', data_source: 'manual_manager' },
+        { id: `kpi-${id}-2`, title: 'Sécurité Postes & Pointage Équipe Nuit (%)', weight_percent: 40, target_value: 100, current_value: 98, unit: '%', data_source: 'manual_manager' }
+      ];
+    }
+    return [
+      { id: `kpi-${id}-1`, title: 'Respect des Délais de Fabrication & Ordres GPAO (%)', weight_percent: 60, target_value: 100, current_value: 96, unit: '%', data_source: 'manual_manager' },
+      { id: `kpi-${id}-2`, title: 'Conformité Qualité & Taux de Disponibilité Machines (%)', weight_percent: 40, target_value: 98, current_value: 97, unit: '%', data_source: 'manual_manager' }
+    ];
+  }
+
+  if (poleKey === 'LOGISTIQUE_TRANSPORT' || deptLower.includes('logis') || deptLower.includes('exped') || deptLower.includes('stock') || jobLower.includes('livr') || jobLower.includes('chauf') || jobLower.includes('magasin')) {
+    if (nameLower.includes('riadh') || nameLower.includes('bouazizi') || jobLower.includes('magasin') || jobLower.includes('stock') || jobLower.includes('picking')) {
+      return [
+        { id: `kpi-${id}-1`, title: 'Vitesse & Exactitude Préparation Commandes Picking (%)', weight_percent: 70, target_value: 100, current_value: 98, unit: '%', data_source: 'manual_manager' },
+        { id: `kpi-${id}-2`, title: 'Inventaire Tournant & Zéro Écart de Stock (%)', weight_percent: 30, target_value: 100, current_value: 97, unit: '%', data_source: 'manual_manager' }
+      ];
+    }
+    if (nameLower.includes('hamza') || nameLower.includes('salem') || jobLower.includes('livr') || jobLower.includes('chauff')) {
+      return [
+        { id: `kpi-${id}-1`, title: 'Livraisons Réussies sans Réclamation (Livraisons)', weight_percent: 80, target_value: 30, current_value: 28, unit: 'Livraisons', data_source: 'auto_deliveries' },
+        { id: `kpi-${id}-2`, title: 'Ponctualité & Éco-conduite Flotte (%)', weight_percent: 20, target_value: 100, current_value: 96, unit: '%', data_source: 'manual_manager' }
+      ];
+    }
+    return [
+      { id: `kpi-${id}-1`, title: 'Taux de Service Logistique & Respect Délais (%)', weight_percent: 70, target_value: 100, current_value: 97, unit: '%', data_source: 'manual_manager' },
+      { id: `kpi-${id}-2`, title: 'Conformité Réception & Rangement Stock (%)', weight_percent: 30, target_value: 100, current_value: 96, unit: '%', data_source: 'manual_manager' }
+    ];
+  }
+
+  if (poleKey === 'VENTES_COMMERCE' || deptLower.includes('vent') || deptLower.includes('commer') || jobLower.includes('commer') || jobLower.includes('chargé clientèle')) {
+    return [
+      { id: `kpi-${id}-1`, title: "Chiffre d'Affaires Ventes Facturées (TND)", weight_percent: 70, target_value: 25000, current_value: 24850, unit: 'TND', data_source: 'auto_pos_sales' },
+      { id: `kpi-${id}-2`, title: 'Prospection Nouveaux Clients Terrain (Clients)', weight_percent: 30, target_value: 10, current_value: 9, unit: 'Clients', data_source: 'manual_manager' }
+    ];
+  }
+
+  if (poleKey === 'FINANCE_COMPTA' || deptLower.includes('finan') || deptLower.includes('compta') || jobLower.includes('financ') || jobLower.includes('rapproch')) {
+    if (nameLower.includes('khaled') || jobLower.includes('directeur')) {
+      return [
+        { id: `kpi-${id}-1`, title: 'Taux de Recouvrement Factures Échues (%)', weight_percent: 60, target_value: 95, current_value: 94, unit: '%', data_source: 'manual_manager' },
+        { id: `kpi-${id}-2`, title: 'Rapprochement Bancaire & Justification Soldes (%)', weight_percent: 40, target_value: 100, current_value: 98, unit: '%', data_source: 'manual_manager' }
+      ];
+    }
+    return [
+      { id: `kpi-${id}-1`, title: 'Pointage & Lettrage Factures Fournisseurs (%)', weight_percent: 60, target_value: 100, current_value: 98, unit: '%', data_source: 'manual_manager' },
+      { id: `kpi-${id}-2`, title: 'Zéro Écart Journalier de Caisse (Jours)', weight_percent: 40, target_value: 30, current_value: 29, unit: 'Jours', data_source: 'manual_manager' }
+    ];
+  }
+
+  if (poleKey === 'RH_SOCIAL' || deptLower.includes('rh') || deptLower.includes('ressour') || jobLower.includes('rh') || jobLower.includes('paie')) {
+    return [
+      { id: `kpi-${id}-1`, title: 'Clôture Paie & Déclarations CNSS dans les Délais (Jours)', weight_percent: 60, target_value: 3, current_value: 2, unit: 'Jours', data_source: 'manual_manager' },
+      { id: `kpi-${id}-2`, title: 'Conformité Contrats & Registre RH (%)', weight_percent: 40, target_value: 100, current_value: 99, unit: '%', data_source: 'manual_manager' }
+    ];
+  }
+
+  if (nameLower.includes('meriam') || jobLower.includes('gérante') || jobLower.includes('générale')) {
+    return [
+      { id: `kpi-${id}-1`, title: 'Croissance Chiffre d’Affaires & Marge Nette Global (%)', weight_percent: 60, target_value: 20, current_value: 19.2, unit: '%', data_source: 'manual_manager' },
+      { id: `kpi-${id}-2`, title: 'Taux de Rétention & Satisfaction Grands Comptes (%)', weight_percent: 40, target_value: 98, current_value: 98.5, unit: '%', data_source: 'manual_manager' }
+    ];
+  }
+
+  if (nameLower.includes('sami') || jobLower.includes('dev') || jobLower.includes('dsi') || jobLower.includes('it')) {
+    return [
+      { id: `kpi-${id}-1`, title: 'Disponibilité & Stabilité Infrastructure ERP (%)', weight_percent: 60, target_value: 99.5, current_value: 99.9, unit: '%', data_source: 'manual_manager' },
+      { id: `kpi-${id}-2`, title: 'Déploiement & Automatisation Modules MPO (Modules)', weight_percent: 40, target_value: 5, current_value: 5, unit: 'Modules', data_source: 'manual_manager' }
+    ];
+  }
+
+  return [
+    { id: `kpi-${id}-1`, title: 'Objectif Opérationnel de Service (%)', weight_percent: 60, target_value: 100, current_value: 96, unit: '%', data_source: 'manual_manager' },
+    { id: `kpi-${id}-2`, title: 'Qualité d’Exécution & Rigueur Procédures (%)', weight_percent: 40, target_value: 100, current_value: 98, unit: '%', data_source: 'manual_manager' }
+  ];
+}
+
+/**
+ * Automatically creates or synchronizes an MPO/OKR contract for a single employee
+ */
+export function syncEmployeeWithMpoContract(
+  emp: Employee | any,
+  existingContracts: PerformanceContract[] = [],
+  tenantId: string = 'company_demo'
+): { contract: PerformanceContract; isNew: boolean } {
+  const currentYear = new Date().getFullYear();
+  const existing = existingContracts.find(
+    c => c.employee_id === emp.id || (c.employee_name && c.employee_name.toLowerCase() === (emp.name || '').toLowerCase())
+  );
+
+  const poleKey = getEmployeePole(emp);
+  const poleInfo = getPoleInfo(poleKey);
+  const shortPole = poleInfo.shortName;
+  const dept = emp.department || poleInfo.departments[0];
+  const jobTitle = emp.jobTitle || 'Collaborateur Elyssa ERP';
+
+  if (existing) {
+    // Already has a contract, ensure pole and department are harmonized
+    const healedContract: PerformanceContract = {
+      ...existing,
+      pole: existing.pole || shortPole,
+      department: existing.department || dept,
+      status: existing.status || 'valide_signe'
+    };
+    return { contract: healedContract, isNew: false };
+  }
+
+  // Calculate target bonus: ~15% to 20% of gross salary
+  const brut = Number(emp.baseSalary || 1500) + 
+               Number(emp.transportAllowance || 0) + 
+               Number(emp.presenceAllowance || 0) + 
+               Number(emp.otherAllowances || 0);
+  
+  const primeTarget = Math.max(250, Math.round((brut * 0.18) / 10) * 10);
+  const kpis = generateDefaultKPIsForEmp(emp, poleKey, dept, jobTitle);
+
+  // Calculate individual weighted rate
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+  kpis.forEach(k => {
+    const target = k.target_value > 0 ? k.target_value : 1;
+    const rate = k.current_value / target;
+    const kpiRatePercent = Math.min(rate * 100, 150);
+    totalWeightedScore += (kpiRatePercent * (k.weight_percent / 100));
+    totalWeight += k.weight_percent;
+  });
+  const indRate = totalWeight > 0 ? Math.round(totalWeightedScore * 100) / 100 : 96.0;
+
+  const tripartite = computeTripartiteBreakdown(
+    primeTarget,
+    indRate,
+    dept,
+    DEFAULT_TRIPARTITE_CONFIG
+  );
+
+  const newContract: PerformanceContract = {
+    id: `perf-${emp.id}-${currentYear}-08`,
+    tenantId: tenantId || emp.tenantId || 'company_demo',
+    employee_id: emp.id,
+    employee_name: emp.name,
+    department: dept,
+    pole: shortPole,
+    role: jobTitle,
+    period: 'mensuel',
+    year: currentYear,
+    month: 8,
+    month_name: 'Août 2026',
+    kpis,
+    prime_target_tnd: primeTarget,
+    calculated_prime_tnd: tripartite.calculated_prime_tnd,
+    achievement_rate: tripartite.overall_achievement_rate,
+    tripartite_config: tripartite.tripartite_config,
+    tripartite_breakdown: tripartite.tripartite_breakdown,
+    status: 'valide_signe',
+    signed_at: new Date(Date.now() - 86400000 * 5).toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    notes: `Contrat MPO/OKR généré automatiquement par la passerelle RH Elyssa ERP pour ${emp.name} (${jobTitle}).`,
+    is_demo: true,
+    is_demo_data: true
+  };
+
+  return { contract: newContract, isNew: true };
+}
+
+/**
+ * Synchronizes all employees with MPO contracts, creating missing ones automatically
+ */
+export function syncAllEmployeesWithMpoContracts(
+  employees: Employee[] = [],
+  existingContracts: PerformanceContract[] = [],
+  tenantId: string = 'company_demo'
+): { contracts: PerformanceContract[]; updatedCount: number } {
+  let updatedCount = 0;
+  const contractsMap = new Map<string, PerformanceContract>();
+
+  // Load existing contracts
+  (existingContracts || []).forEach(c => {
+    if (c.employee_id) contractsMap.set(c.employee_id, c);
+  });
+
+  const sourceEmployees = (Array.isArray(employees) && employees.length > 0)
+    ? employees
+    : DEMO_HR_EMPLOYEES;
+
+  sourceEmployees.forEach(emp => {
+    const existing = contractsMap.get(emp.id);
+    if (!existing) {
+      const { contract } = syncEmployeeWithMpoContract(emp, existingContracts, tenantId);
+      contractsMap.set(emp.id, contract);
+      updatedCount++;
+    } else {
+      const poleKey = getEmployeePole(emp);
+      const poleInfo = getPoleInfo(poleKey);
+      if (!existing.pole || existing.pole !== poleInfo.shortName) {
+        contractsMap.set(emp.id, {
+          ...existing,
+          pole: poleInfo.shortName,
+          department: existing.department || poleInfo.departments[0]
+        });
+        updatedCount++;
+      }
+    }
+  });
+
+  return {
+    contracts: Array.from(contractsMap.values()),
+    updatedCount
+  };
+}
+
+/**
  * Dynamically generates realistic MPO/OKR demo contracts assigned directly to tenant collaborators
  */
 export function generateTenantDemoPerformanceContracts(
-  tenantId: string = 'MD',
+  tenantId: string = 'company_demo',
   employees: any[] = [],
   _activeManagerName?: string
 ): PerformanceContract[] {
-  // If no employees are provided, use standard 7 collaborators for the tenant
   const targetEmployees = (Array.isArray(employees) && employees.length > 0)
     ? employees
-    : [
-        { id: 'demo-emp_0', name: 'Meriam Doudou', jobTitle: 'Gérante / Direction Générale', department: 'Direction & IT', pole: 'Direction & IT' },
-        { id: 'demo-emp_1', name: 'Khaled Ben Amor', jobTitle: 'Directeur Financier & Recouvrement', department: 'Finance', pole: 'Finance' },
-        { id: 'demo-emp_2', name: 'Ines Dridi', jobTitle: 'Responsable Rapprochement', department: 'Finance', pole: 'Finance' },
-        { id: 'demo-emp_3', name: 'Mohamed Ali Gharbi', jobTitle: 'Chargé Clientèle / Ventes', department: 'Ventes', pole: 'Ventes' },
-        { id: 'demo-emp_4', name: 'Amel Ben Soltane', jobTitle: 'Responsable Ressources Humaines', department: 'RH', pole: 'RH' },
-        { id: 'demo-emp_5', name: 'Sami Mansour', jobTitle: 'Développeur ERP Principal', department: 'Direction & IT', pole: 'Direction & IT' },
-        { id: 'demo-emp_6', name: 'Hamza Ben Salem', jobTitle: 'Chauffeur Livreur / Logistique', department: 'Logistique', pole: 'Logistique' }
-      ];
+    : DEMO_HR_EMPLOYEES;
 
   const contracts: PerformanceContract[] = [];
 
   targetEmployees.forEach((emp, index) => {
+    const poleKey = getEmployeePole(emp);
+    const poleInfo = getPoleInfo(poleKey);
+    const shortPole = poleInfo.shortName;
+    const assignedDept = emp.department || poleInfo.departments[0];
+    const jobTitle = emp.jobTitle || 'Collaborateur';
+
+    let primeTarget = 350;
     const nameLower = (emp.name || '').toLowerCase();
-    const deptLower = (emp.department || '').toLowerCase();
-    const jobLower = (emp.jobTitle || '').toLowerCase();
 
-    let primeTarget = 450;
-    let kpis: KPIItem[] = [];
-    let status: 'brouillon' | 'en_attente_signature' | 'valide_signe' = 'valide_signe';
-    let signedAt: string | undefined = new Date(Date.now() - (index + 1) * 86400000 * 3).toISOString();
-
-    let assignedPole = 'Direction & IT';
-    let assignedDept = 'Direction & IT';
-
-    if (nameLower.includes('meriam') || nameLower.includes('doudou') || jobLower.includes('gérante') || jobLower.includes('direction générale')) {
-      assignedPole = 'Direction & IT';
-      assignedDept = 'Direction Générale';
-      primeTarget = 650;
-      kpis = [
-        {
-          id: `kpi-${emp.id}-1`,
-          title: 'Croissance Chiffre d’Affaires & Marge Nette Global (%)',
-          weight_percent: 60,
-          target_value: 20,
-          current_value: 19.2,
-          unit: '%',
-          data_source: 'manual_manager'
-        },
-        {
-          id: `kpi-${emp.id}-2`,
-          title: 'Taux de Rétention & Satisfaction Grands Comptes',
-          weight_percent: 40,
-          target_value: 98,
-          current_value: 98.5,
-          unit: '%',
-          data_source: 'manual_manager'
-        }
-      ];
-      status = 'valide_signe';
-    } else if (nameLower.includes('khaled') || nameLower.includes('amor') || jobLower.includes('directeur financier') || (deptLower.includes('finan') && jobLower.includes('directeur'))) {
-      assignedPole = 'Finance';
-      assignedDept = 'Finance';
-      primeTarget = 500;
-      kpis = [
-        {
-          id: `kpi-${emp.id}-1`,
-          title: 'Taux de Recouvrement Factures Échues (%)',
-          weight_percent: 60,
-          target_value: 95,
-          current_value: 94,
-          unit: '%',
-          data_source: 'manual_manager'
-        },
-        {
-          id: `kpi-${emp.id}-2`,
-          title: 'Rapprochement Bancaire & Justification Soldes',
-          weight_percent: 40,
-          target_value: 100,
-          current_value: 98,
-          unit: '%',
-          data_source: 'manual_manager'
-        }
-      ];
-      status = 'valide_signe';
-    } else if (nameLower.includes('ines') || nameLower.includes('dridi') || jobLower.includes('rapprochement') || (deptLower.includes('finan') && !jobLower.includes('directeur'))) {
-      assignedPole = 'Finance';
-      assignedDept = 'Finance';
-      primeTarget = 350;
-      kpis = [
-        {
-          id: `kpi-${emp.id}-1`,
-          title: 'Pointage & Lettrage Factures Fournisseurs',
-          weight_percent: 60,
-          target_value: 100,
-          current_value: 98,
-          unit: '%',
-          data_source: 'manual_manager'
-        },
-        {
-          id: `kpi-${emp.id}-2`,
-          title: 'Zéro Écart Journalier de Caisse',
-          weight_percent: 40,
-          target_value: 30,
-          current_value: 29,
-          unit: 'Jours',
-          data_source: 'manual_manager'
-        }
-      ];
-      status = 'valide_signe';
-    } else if (nameLower.includes('amel') || nameLower.includes('soltane') || deptLower.includes('rh') || deptLower.includes('ressour') || jobLower.includes('rh')) {
-      assignedPole = 'RH';
-      assignedDept = 'RH';
-      primeTarget = 400;
-      kpis = [
-        {
-          id: `kpi-${emp.id}-1`,
-          title: 'Clôture Paie & Déclarations CNSS dans les Délais',
-          weight_percent: 60,
-          target_value: 3,
-          current_value: 2,
-          unit: 'Jours',
-          data_source: 'manual_manager'
-        },
-        {
-          id: `kpi-${emp.id}-2`,
-          title: 'Conformité Contrats & Registre RH',
-          weight_percent: 40,
-          target_value: 100,
-          current_value: 99,
-          unit: '%',
-          data_source: 'manual_manager'
-        }
-      ];
-      status = 'valide_signe';
-    } else if (nameLower.includes('gharbi') || nameLower.includes('cherif') || nameLower.includes('mohamed') || deptLower.includes('vente') || deptLower.includes('commer') || jobLower.includes('commer')) {
-      assignedPole = 'Ventes';
-      assignedDept = 'Ventes';
-      primeTarget = 450;
-      kpis = [
-        {
-          id: `kpi-${emp.id}-1`,
-          title: "Chiffre d'Affaires Ventes Facturées (TND)",
-          weight_percent: 70,
-          target_value: 25000,
-          current_value: 24850,
-          unit: 'TND',
-          data_source: 'auto_pos_sales'
-        },
-        {
-          id: `kpi-${emp.id}-2`,
-          title: 'Prospection Nouveaux Clients Terrain',
-          weight_percent: 30,
-          target_value: 10,
-          current_value: 9,
-          unit: 'Clients',
-          data_source: 'manual_manager'
-        }
-      ];
-      status = index % 2 === 0 ? 'en_attente_signature' : 'valide_signe';
-      if (status === 'en_attente_signature') signedAt = undefined;
-    } else if (nameLower.includes('mansour') || nameLower.includes('sami') || deptLower.includes('tech') || deptLower.includes('it') || jobLower.includes('dév') || jobLower.includes('dev')) {
-      assignedPole = 'Direction & IT';
-      assignedDept = 'Direction & IT';
-      primeTarget = 500;
-      kpis = [
-        {
-          id: `kpi-${emp.id}-1`,
-          title: 'Disponibilité & Stabilité Infrastructure ERP',
-          weight_percent: 60,
-          target_value: 99.5,
-          current_value: 99.9,
-          unit: '%',
-          data_source: 'manual_manager'
-        },
-        {
-          id: `kpi-${emp.id}-2`,
-          title: 'Déploiement & Automatisation Modules MPO',
-          weight_percent: 40,
-          target_value: 5,
-          current_value: 5,
-          unit: 'Modules',
-          data_source: 'manual_manager'
-        }
-      ];
-      status = 'valide_signe';
-    } else if (nameLower.includes('salem') || nameLower.includes('hamza') || nameLower.includes('trad') || deptLower.includes('logis') || deptLower.includes('exped') || jobLower.includes('livr') || jobLower.includes('chauff')) {
-      assignedPole = 'Logistique';
-      assignedDept = 'Logistique';
-      primeTarget = 300;
-      kpis = [
-        {
-          id: `kpi-${emp.id}-1`,
-          title: 'Livraisons Réussies sans Réclamation',
-          weight_percent: 80,
-          target_value: 30,
-          current_value: 28,
-          unit: 'Livraisons',
-          data_source: 'auto_deliveries'
-        },
-        {
-          id: `kpi-${emp.id}-2`,
-          title: 'Ponctualité & Entretien Véhicule',
-          weight_percent: 20,
-          target_value: 100,
-          current_value: 96,
-          unit: '%',
-          data_source: 'manual_manager'
-        }
-      ];
-      status = 'valide_signe';
-    } else if (deptLower.includes('achat') || deptLower.includes('prod') || jobLower.includes('achat')) {
-      assignedPole = 'Achats';
-      assignedDept = 'Achats';
-      primeTarget = 450;
-      kpis = [
-        {
-          id: `kpi-${emp.id}-1`,
-          title: 'Optimisation Coûts Achats & RFA (%)',
-          weight_percent: 60,
-          target_value: 8,
-          current_value: 8.2,
-          unit: '%',
-          data_source: 'manual_manager'
-        },
-        {
-          id: `kpi-${emp.id}-2`,
-          title: 'Conformité Délais Commandes Fournisseurs',
-          weight_percent: 40,
-          target_value: 98,
-          current_value: 97,
-          unit: '%',
-          data_source: 'manual_manager'
-        }
-      ];
-      status = 'valide_signe';
-    } else {
-      assignedPole = emp.pole || emp.department || 'Direction & IT';
-      assignedDept = emp.department || assignedPole;
-      primeTarget = 350;
-      kpis = [
-        {
-          id: `kpi-${emp.id}-1`,
-          title: 'Objectif Opérationnel de Service',
-          weight_percent: 60,
-          target_value: 100,
-          current_value: 96,
-          unit: '%',
-          data_source: 'manual_manager'
-        },
-        {
-          id: `kpi-${emp.id}-2`,
-          title: 'Qualité d’Exécution & Rigueur Procédures',
-          weight_percent: 40,
-          target_value: 100,
-          current_value: 98,
-          unit: '%',
-          data_source: 'manual_manager'
-        }
-      ];
-      status = 'valide_signe';
+    if (nameLower.includes('meriam')) primeTarget = 650;
+    else if (nameLower.includes('khaled')) primeTarget = 500;
+    else if (nameLower.includes('sami')) primeTarget = 600;
+    else if (nameLower.includes('amel')) primeTarget = 400;
+    else if (nameLower.includes('ines')) primeTarget = 350;
+    else if (nameLower.includes('gharbi')) primeTarget = 450;
+    else if (nameLower.includes('jalel')) primeTarget = 350;
+    else if (nameLower.includes('mourad')) primeTarget = 350;
+    else if (nameLower.includes('sofiene')) primeTarget = 350;
+    else if (nameLower.includes('salem')) primeTarget = 250;
+    else if (nameLower.includes('bouazizi')) primeTarget = 250;
+    else {
+      const base = Number(emp.baseSalary || 1500);
+      primeTarget = Math.max(250, Math.round((base * 0.18) / 10) * 10);
     }
 
-    // Compute individual rate
+    const kpis = generateDefaultKPIsForEmp(emp, poleKey, assignedDept, jobTitle);
+
     let totalWeightedScore = 0;
     let totalWeight = 0;
     kpis.forEach(k => {
@@ -377,7 +391,7 @@ export function generateTenantDemoPerformanceContracts(
       totalWeightedScore += (kpiRatePercent * (k.weight_percent / 100));
       totalWeight += k.weight_percent;
     });
-    const individualRate = totalWeight > 0 ? Math.round(totalWeightedScore * 100) / 100 : 0;
+    const individualRate = totalWeight > 0 ? Math.round(totalWeightedScore * 100) / 100 : 96.0;
 
     const tripartite = computeTripartiteBreakdown(
       primeTarget,
@@ -386,14 +400,16 @@ export function generateTenantDemoPerformanceContracts(
       DEFAULT_TRIPARTITE_CONFIG
     );
 
+    const signedAt = new Date(Date.now() - (index + 1) * 86400000 * 2).toISOString();
+
     const contractObj: PerformanceContract = {
       id: `perf-${emp.id}-2026-08`,
       tenantId,
       employee_id: emp.id,
       employee_name: emp.name,
       department: assignedDept,
-      pole: assignedPole,
-      role: emp.jobTitle || 'Collaborateur',
+      pole: shortPole,
+      role: jobTitle,
       period: 'mensuel',
       year: 2026,
       month: 8,
@@ -404,8 +420,8 @@ export function generateTenantDemoPerformanceContracts(
       achievement_rate: tripartite.overall_achievement_rate,
       tripartite_config: tripartite.tripartite_config,
       tripartite_breakdown: tripartite.tripartite_breakdown,
-      status,
-      ...(signedAt ? { signed_at: signedAt } : {}),
+      status: 'valide_signe',
+      signed_at: signedAt,
       created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
       updated_at: new Date().toISOString(),
       is_demo: true,
@@ -445,12 +461,13 @@ export function computeTripartiteBreakdown(
     const deptLower = (department || '').toLowerCase();
     if (deptLower.includes('vent') || deptLower.includes('commer')) rateDir = 93.6;
     else if (deptLower.includes('finan') || deptLower.includes('compta')) rateDir = 95.0;
-    else if (deptLower.includes('rh') || deptLower.includes('ressour')) rateDir = 98.0;
+    else if (deptLower.includes('rh') || deptLower.includes('ressour') || deptLower.includes('social')) rateDir = 98.0;
     else if (deptLower.includes('it') || deptLower.includes('direct') || deptLower.includes('tech')) rateDir = 99.0;
-    else if (deptLower.includes('logis') || deptLower.includes('exped')) rateDir = 91.0;
+    else if (deptLower.includes('logis') || deptLower.includes('exped') || deptLower.includes('transport')) rateDir = 91.0;
+    else if (deptLower.includes('prod') || deptLower.includes('gpao') || deptLower.includes('atelier') || deptLower.includes('industrie')) rateDir = 94.0;
     else if (deptLower.includes('achat') || deptLower.includes('appro')) rateDir = 90.0;
     else if (deptLower.includes('magasin') || deptLower.includes('pos') || deptLower.includes('caisse')) rateDir = 92.0;
-    else rateDir = 90.0;
+    else rateDir = 93.0;
   }
 
   const rateInd = Math.round(individualRate * 100) / 100;

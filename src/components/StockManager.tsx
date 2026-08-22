@@ -68,7 +68,7 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     sku: "CIM-CPJ45",
     name: "Ciment CPJ 45 (Sac 50kg)",
     category: "Gros Œuvre",
-    type: "PRODUIT_FINI",
+    type: "NEGOCE_LOCAL",
     unitPrice: 14.500,
     costPrice: 11.200,
     marginPercentage: 29.46,
@@ -78,8 +78,11 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     supplierId: "demo-sup_1",
     supplierName: "Les Ciments de Bizerte",
     createdDate: "2026-01-15",
-    warehouseId: "WH-RADES-01",
+    warehouseId: "loc-depot-rades",
     warehouse_location: "Dépôt Central Radès",
+    aisle: "Allée A",
+    shelf: "Rayon 01 - Étagère 1",
+    bin: "Casier C-01",
     is_demo: true
   },
   {
@@ -87,7 +90,7 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     sku: "FER-BETON-12",
     name: "Rond à béton Ø12mm (Barre 12m)",
     category: "Gros Œuvre",
-    type: "PRODUIT_FINI",
+    type: "NEGOCE_LOCAL",
     unitPrice: 28.000,
     costPrice: 21.000,
     marginPercentage: 33.33,
@@ -97,8 +100,11 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     supplierId: "demo-sup_2",
     supplierName: "EL FOULADH Menzel Bourguiba",
     createdDate: "2026-01-15",
-    warehouseId: "WH-RADES-01",
+    warehouseId: "loc-depot-rades",
     warehouse_location: "Dépôt Central Radès",
+    aisle: "Zone Extérieure",
+    shelf: "Parc Ferraille",
+    bin: "Rack F-12",
     is_demo: true
   },
   {
@@ -106,7 +112,7 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     sku: "PNT-BLA-15L",
     name: "Peinture Blanche 15L",
     category: "Finition & Décoration",
-    type: "PRODUIT_FINI",
+    type: "NEGOCE_LOCAL",
     unitPrice: 85.000,
     costPrice: 62.000,
     marginPercentage: 37.10,
@@ -116,16 +122,19 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     supplierId: "demo-sup_3",
     supplierName: "Astral Tunisie",
     createdDate: "2026-02-01",
-    warehouseId: "WH-TUNIS-02",
+    warehouseId: "loc-siege-tunis",
     warehouse_location: "Magasin Principal Tunis",
+    aisle: "Allée B",
+    shelf: "Rayon 03 - Étagère 2",
+    bin: "Casier P-04",
     is_demo: true
   },
   {
     id: "demo-prod_4",
     sku: "OUT-PRO-230",
-    name: "Outillage pro (Meuleuse & Découpe 230mm)",
+    name: "Outillage pro (Pack Chantier 230mm)",
     category: "Outillage Pro",
-    type: "PRODUIT_FINI",
+    type: "PRODUIT_FABRIQUE",
     unitPrice: 145.000,
     costPrice: 105.000,
     marginPercentage: 38.10,
@@ -135,8 +144,11 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     supplierId: "demo-sup_4",
     supplierName: "Bosch Tunisie Tools",
     createdDate: "2026-02-10",
-    warehouseId: "WH-TUNIS-02",
+    warehouseId: "loc-siege-tunis",
     warehouse_location: "Magasin Principal Tunis",
+    aisle: "Allée C",
+    shelf: "Rayon 02 - Étagère 3",
+    bin: "Casier O-23",
     is_demo: true
   },
   {
@@ -144,7 +156,7 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     sku: "PLA-BA13-30",
     name: "Plaques de Plâtre BA13 Standard (120x300cm)",
     category: "Gros Œuvre",
-    type: "PRODUIT_FINI",
+    type: "NEGOCE_LOCAL",
     unitPrice: 26.000,
     costPrice: 18.500,
     marginPercentage: 40.54,
@@ -154,8 +166,11 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     supplierId: "demo-sup_5",
     supplierName: "Knauf Tunisie",
     createdDate: "2026-03-01",
-    warehouseId: "WH-CHARGUIA-02",
-    warehouse_location: "Entrepôt Central - Charguia II",
+    warehouseId: "loc-charguia",
+    warehouse_location: "Entrepôt Charguia II - Tunis",
+    aisle: "Allée D",
+    shelf: "Rayon 01 - Zone Plaques",
+    bin: "Casier K-01",
     is_demo: true
   },
   {
@@ -163,7 +178,7 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     sku: "COL-CAR-25",
     name: "Mortier Colle C2TE Haute Performance (Sac 25kg)",
     category: "Finition & Décoration",
-    type: "PRODUIT_FINI",
+    type: "NEGOCE_LOCAL",
     unitPrice: 21.000,
     costPrice: 14.200,
     marginPercentage: 47.89,
@@ -173,8 +188,77 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     supplierId: "demo-sup_6",
     supplierName: "Sika Tunisie",
     createdDate: "2026-03-10",
-    warehouseId: "WH-SFAX-01",
+    warehouseId: "loc-depot-sfax",
     warehouse_location: "Dépôt Régional - Sfax",
+    aisle: "Allée S",
+    shelf: "Rayon 02 - Étagère 1",
+    bin: "Casier S-10",
+    is_demo: true
+  },
+  {
+    id: "demo-prod_7",
+    sku: "MP-IMP-MEUL-230",
+    name: "Composant Meuleuse d'Angle 230mm (MP Import)",
+    category: "Matières Premières",
+    type: "MATIERE_IMPORTEE",
+    unitPrice: 110.000,
+    costPrice: 75.000,
+    marginPercentage: 46.67,
+    stockLevel: 55,
+    minStockLevel: 20,
+    unit: "Unité",
+    supplierId: "demo-sup_import",
+    supplierName: "Marseille Chimie & Outillage SAS",
+    createdDate: "2026-03-15",
+    warehouseId: "loc-siege-tunis",
+    warehouse_location: "Magasin Principal Tunis",
+    aisle: "Quai MP",
+    shelf: "Rayon I1",
+    bin: "Casier MP-01",
+    is_demo: true
+  },
+  {
+    id: "demo-prod_8",
+    sku: "MP-PVC-S67",
+    name: "Résine PVC Grade S-67 (Sac 25kg)",
+    category: "Matières Premières",
+    type: "MATIERE_IMPORTEE",
+    unitPrice: 45.000,
+    costPrice: 32.000,
+    marginPercentage: 40.63,
+    stockLevel: 400,
+    minStockLevel: 100,
+    unit: "Sac",
+    supplierId: "demo-sup_import",
+    supplierName: "Marseille Chimie & Outillage SAS",
+    createdDate: "2026-03-15",
+    warehouseId: "loc-depot-sfax",
+    warehouse_location: "Dépôt Régional - Sfax",
+    aisle: "Silo & Quai MP",
+    shelf: "Rayon P01",
+    bin: "Silo S-03",
+    is_demo: true
+  },
+  {
+    id: "demo-prod_9",
+    sku: "FAB-PVC-PN16-63",
+    name: "Tube PVC Haute Pression PN16 D63 (Barre 4m)",
+    category: "Plomberie & Réseaux",
+    type: "PRODUIT_FABRIQUE",
+    unitPrice: 34.000,
+    costPrice: 22.500,
+    marginPercentage: 51.11,
+    stockLevel: 120,
+    minStockLevel: 30,
+    unit: "Barre",
+    supplierId: "demo-sup_4",
+    supplierName: "Elyssa Fabrication Interne",
+    createdDate: "2026-03-20",
+    warehouseId: "loc-depot-sfax",
+    warehouse_location: "Dépôt Régional - Sfax",
+    aisle: "Rack Extrusion",
+    shelf: "Rayon Tubulure",
+    bin: "Casier TP-16",
     is_demo: true
   }
 ];
@@ -549,7 +633,7 @@ export default function StockManager({
       setSupPhone(s.phone);
       setSupAddress(s.address);
       setSupCategory(s.category);
-      setSupStatus(s.status);
+      setSupStatus(s.status?.toLowerCase() === 'inactive' ? 'Inactive' : 'Active');
     } else {
       setEditingSupplier(null);
       setSupName('');
@@ -1014,7 +1098,7 @@ export default function StockManager({
   // Calculate high level metrics
   const totalStockValue = products.reduce((acc, p) => acc + ((p.stockLevel ?? 0) * (p.costPrice ?? 0)), 0);
   const lowStockProductsCount = products.filter(p => (p.stockLevel ?? 0) <= (p.minStockLevel ?? 0)).length;
-  const activeSuppliersCount = suppliers.filter(s => s.status === 'Active').length;
+  const activeSuppliersCount = suppliers.filter(s => s.status === 'Active' || s.status === 'active' || s.status === 'ACTIF' || !s.status || s.status === undefined).length;
 
   // Custom high-contrast tooltip for safety stock chart
   const CustomTooltip = ({ active, payload }: any) => {
@@ -1194,11 +1278,15 @@ export default function StockManager({
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 flex items-center justify-between">
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 flex items-center justify-between shadow-xs">
           <div className="space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">Fournisseurs Actifs</span>
-            <div className="text-xl font-black text-slate-900">
-              {activeSuppliersCount} <span className="text-xs font-semibold text-slate-500">Sociétés</span>
+            <div className="text-xl font-black text-slate-900 flex items-center space-x-2">
+              <span>{activeSuppliersCount}</span>
+              <span className="text-xs font-semibold text-slate-500">Sociétés</span>
+              <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-100 uppercase tracking-wider">
+                Actifs
+              </span>
             </div>
           </div>
           <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600">
@@ -1761,8 +1849,11 @@ export default function StockManager({
                         <td className="py-4 px-6 font-semibold text-slate-600">
                           {m.reference}
                         </td>
-                        <td className="py-4 px-6 text-slate-500 font-mono text-[11px]">
-                          {m.operator}
+                        <td className="py-4 px-6 text-slate-700 font-semibold font-mono text-[11px]">
+                          <div className="flex items-center space-x-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            <span>{m.operator || m.performedBy || '—'}</span>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1798,7 +1889,7 @@ export default function StockManager({
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {filteredSuppliers.map(sup => {
                     const countProducts = products.filter(p => p.supplierId === sup.id).length;
-                    const isActive = sup.status === 'Active';
+                    const isActive = sup.status === 'Active' || sup.status === 'active' || sup.status === 'ACTIF' || !sup.status;
                     
                     return (
                       <tr key={sup.id} className="hover:bg-slate-50/25 transition">

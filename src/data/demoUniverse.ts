@@ -87,7 +87,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
   tenantId: DEMO_TENANT_ID,
   is_demo: true,
 
-  // 1. PRODUCTS (6 articles clés dont 2 en alerte critique / rupture)
+  // 1. PRODUCTS (Articles typés avec emplacements précis)
   products: [
     {
       id: "demo-prod_1",
@@ -95,7 +95,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       sku: "CIM-CPJ45",
       name: "Ciment CPJ 45 (Sac 50kg)",
       category: "Gros Œuvre",
-      type: "PRODUIT_FINI",
+      type: "NEGOCE_LOCAL",
       stockLevel: 1200,
       stockQuantity: 1200,
       minStockLevel: 300,
@@ -106,8 +106,11 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       supplierId: "demo-sup_1",
       supplierName: "Les Ciments de Bizerte",
       createdDate: "2026-01-15",
-      warehouseId: "WH-RADES-01",
+      warehouseId: "loc-depot-rades",
       warehouse_location: "Dépôt Central Radès",
+      aisle: "Allée A",
+      shelf: "Rayon 01 - Étagère 1",
+      bin: "Casier C-01",
       is_demo: true
     },
     {
@@ -116,7 +119,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       sku: "FER-BETON-12",
       name: "Rond à béton Ø12mm (Barre 12m)",
       category: "Gros Œuvre",
-      type: "PRODUIT_FINI",
+      type: "NEGOCE_LOCAL",
       stockLevel: 850,
       stockQuantity: 850,
       minStockLevel: 200,
@@ -127,8 +130,11 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       supplierId: "demo-sup_2",
       supplierName: "EL FOULADH Menzel Bourguiba",
       createdDate: "2026-01-15",
-      warehouseId: "WH-RADES-01",
+      warehouseId: "loc-depot-rades",
       warehouse_location: "Dépôt Central Radès",
+      aisle: "Zone Extérieure",
+      shelf: "Parc Ferraille",
+      bin: "Rack F-12",
       is_demo: true
     },
     {
@@ -137,7 +143,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       sku: "PNT-BLA-15L",
       name: "Peinture Blanche 15L",
       category: "Finition & Décoration",
-      type: "PRODUIT_FINI",
+      type: "NEGOCE_LOCAL",
       stockLevel: 180,
       stockQuantity: 180,
       minStockLevel: 40,
@@ -148,17 +154,20 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       supplierId: "demo-sup_3",
       supplierName: "Astral Tunisie",
       createdDate: "2026-02-01",
-      warehouseId: "WH-TUNIS-02",
+      warehouseId: "loc-siege-tunis",
       warehouse_location: "Magasin Principal Tunis",
+      aisle: "Allée B",
+      shelf: "Rayon 03 - Étagère 2",
+      bin: "Casier P-04",
       is_demo: true
     },
     {
       id: "demo-prod_4",
       tenantId: DEMO_TENANT_ID,
       sku: "OUT-PRO-230",
-      name: "Outillage pro (Meuleuse & Découpe 230mm)",
+      name: "Outillage pro (Pack Chantier 230mm)",
       category: "Outillage Pro",
-      type: "PRODUIT_FINI",
+      type: "PRODUIT_FABRIQUE",
       stockLevel: 95,
       stockQuantity: 95,
       minStockLevel: 20,
@@ -169,8 +178,11 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       supplierId: "demo-sup_4",
       supplierName: "Bosch Tunisie Tools",
       createdDate: "2026-02-10",
-      warehouseId: "WH-TUNIS-02",
+      warehouseId: "loc-siege-tunis",
       warehouse_location: "Magasin Principal Tunis",
+      aisle: "Allée C",
+      shelf: "Rayon 02 - Étagère 3",
+      bin: "Casier O-23",
       is_demo: true
     },
     {
@@ -179,7 +191,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       sku: "PLA-BA13-30",
       name: "Plaques de Plâtre BA13 Standard (120x300cm)",
       category: "Gros Œuvre",
-      type: "PRODUIT_FINI",
+      type: "NEGOCE_LOCAL",
       stockLevel: 0,
       stockQuantity: 0,
       minStockLevel: 50,
@@ -190,8 +202,11 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       supplierId: "demo-sup_5",
       supplierName: "Knauf Tunisie",
       createdDate: "2026-03-01",
-      warehouseId: "WH-CHARGUIA-02",
-      warehouse_location: "Entrepôt Central - Charguia II",
+      warehouseId: "loc-charguia",
+      warehouse_location: "Entrepôt Charguia II - Tunis",
+      aisle: "Allée D",
+      shelf: "Rayon 01 - Zone Plaques",
+      bin: "Casier K-01",
       is_demo: true
     },
     {
@@ -200,7 +215,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       sku: "COL-CAR-25",
       name: "Mortier Colle C2TE Haute Performance (Sac 25kg)",
       category: "Finition & Décoration",
-      type: "PRODUIT_FINI",
+      type: "NEGOCE_LOCAL",
       stockLevel: 12,
       stockQuantity: 12,
       minStockLevel: 40,
@@ -211,8 +226,83 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       supplierId: "demo-sup_6",
       supplierName: "Sika Tunisie",
       createdDate: "2026-03-10",
-      warehouseId: "WH-SFAX-01",
+      warehouseId: "loc-depot-sfax",
       warehouse_location: "Dépôt Régional - Sfax",
+      aisle: "Allée S",
+      shelf: "Rayon 02 - Étagère 1",
+      bin: "Casier S-10",
+      is_demo: true
+    },
+    {
+      id: "demo-prod_7",
+      tenantId: DEMO_TENANT_ID,
+      sku: "MP-IMP-MEUL-230",
+      name: "Composant Meuleuse d'Angle 230mm (MP Import)",
+      category: "Matières Premières",
+      type: "MATIERE_IMPORTEE",
+      stockLevel: 55,
+      stockQuantity: 55,
+      minStockLevel: 20,
+      unitPrice: 110.000,
+      costPrice: 75.000,
+      marginPercentage: 46.67,
+      unit: "Unité",
+      supplierId: "demo-sup_import",
+      supplierName: "Marseille Chimie & Outillage SAS",
+      createdDate: "2026-03-15",
+      warehouseId: "loc-siege-tunis",
+      warehouse_location: "Magasin Principal Tunis",
+      aisle: "Quai MP",
+      shelf: "Rayon I1",
+      bin: "Casier MP-01",
+      is_demo: true
+    },
+    {
+      id: "demo-prod_8",
+      tenantId: DEMO_TENANT_ID,
+      sku: "MP-PVC-S67",
+      name: "Résine PVC Grade S-67 (Sac 25kg)",
+      category: "Matières Premières",
+      type: "MATIERE_IMPORTEE",
+      stockLevel: 400,
+      stockQuantity: 400,
+      minStockLevel: 100,
+      unitPrice: 45.000,
+      costPrice: 32.000,
+      marginPercentage: 40.63,
+      unit: "Sac",
+      supplierId: "demo-sup_import",
+      supplierName: "Marseille Chimie & Outillage SAS",
+      createdDate: "2026-03-15",
+      warehouseId: "loc-depot-sfax",
+      warehouse_location: "Dépôt Régional - Sfax",
+      aisle: "Silo & Quai MP",
+      shelf: "Rayon P01",
+      bin: "Silo S-03",
+      is_demo: true
+    },
+    {
+      id: "demo-prod_9",
+      tenantId: DEMO_TENANT_ID,
+      sku: "FAB-PVC-PN16-63",
+      name: "Tube PVC Haute Pression PN16 D63 (Barre 4m)",
+      category: "Plomberie & Réseaux",
+      type: "PRODUIT_FABRIQUE",
+      stockLevel: 120,
+      stockQuantity: 120,
+      minStockLevel: 30,
+      unitPrice: 34.000,
+      costPrice: 22.500,
+      marginPercentage: 51.11,
+      unit: "Barre",
+      supplierId: "demo-sup_4",
+      supplierName: "Elyssa Fabrication Interne",
+      createdDate: "2026-03-20",
+      warehouseId: "loc-depot-sfax",
+      warehouse_location: "Dépôt Régional - Sfax",
+      aisle: "Rack Extrusion",
+      shelf: "Rayon Tubulure",
+      bin: "Casier TP-16",
       is_demo: true
     }
   ],
@@ -295,6 +385,33 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
           description: "Règlement échelonné prévu fin de mois.",
           dueDate: "2026-07-01",
           status: "Delayed",
+          is_demo: true
+        }
+      ],
+      is_demo: true
+    },
+    {
+      id: "demo-cli_4",
+      tenantId: DEMO_TENANT_ID,
+      name: "SOPAL S.A. (Sfax)",
+      email: "contact@sopal.com.tn",
+      phone: "+216 74 675 000",
+      address: "Route de Gabès Km 3.5, Sfax",
+      category: "Industrie & Équipement",
+      sector: "Robinetterie & Réseaux Fluides",
+      revenuePotential: 290000,
+      status: "Active",
+      createdDate: "2026-03-10",
+      matriculeFiscal: "0892341/D/P/000",
+      notes: "Partenaire industriel et client grand compte sur le pôle Sud Sfax.",
+      engagements: [
+        {
+          id: "demo-eng_4_1",
+          tenantId: DEMO_TENANT_ID,
+          title: "Règlement encaissement en attente & approvisionnement",
+          description: "Pointage de la traite échue et validation du planning de livraison tubes.",
+          dueDate: "2026-08-25",
+          status: "Pending",
           is_demo: true
         }
       ],
@@ -687,8 +804,9 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
     }
   ],
 
-  // 9. COLLABORATORS (7 collaborateurs démo clés)
+  // 9. COLLABORATORS (22 collaborateurs démo sur 6 pôles)
   collaborators: [
+    // Pôle 1: Direction Générale & IT (3)
     {
       id: "demo-emp_0",
       tenantId: DEMO_TENANT_ID,
@@ -717,13 +835,58 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       isDemo: true
     },
     {
+      id: "demo-emp_5",
+      tenantId: DEMO_TENANT_ID,
+      name: "Sami Mansour",
+      email: "s.mansour@elyssa-erp.tn",
+      role: "Manager",
+      status: "Active",
+      jobTitle: "DSI / Lead Dév ERP",
+      matricule: "EMP-0005",
+      phone: "+216 71 862 105",
+      structureType: "Direction",
+      structureName: "Direction IT & DSI",
+      createdDate: "2025-01-10",
+      assignedTasks: [
+        {
+          id: "task-5-1",
+          tenantId: DEMO_TENANT_ID,
+          title: "Maintenance et monitoring de la plateforme",
+          description: "Contrôle de l'intégrité des bases et synchronisation temps réel.",
+          dueDate: "2026-08-30",
+          priority: "Low",
+          status: "In_Progress",
+          createdDate: "2026-08-01"
+        }
+      ],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_11",
+      tenantId: DEMO_TENANT_ID,
+      name: "Yassine Ayari",
+      email: "y.ayari@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Technicien Support IT & Réseaux",
+      matricule: "EMP-0011",
+      phone: "+216 71 862 111",
+      structureType: "Service",
+      structureName: "Support & Infrastructure IT",
+      createdDate: "2025-03-01",
+      assignedTasks: [],
+      isDemo: true
+    },
+
+    // Pôle 2: Finance, Trésorerie & Fiscalité (3)
+    {
       id: "demo-emp_1",
       tenantId: DEMO_TENANT_ID,
       name: "Khaled Ben Amor",
       email: "k.benamor@elyssa-erp.tn",
       role: "Director",
       status: "Active",
-      jobTitle: "Directeur Financier & Recouvrement",
+      jobTitle: "Directeur Financier / DAF",
       matricule: "EMP-0001",
       phone: "+216 71 862 101",
       structureType: "Direction",
@@ -750,7 +913,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       email: "i.dridi@elyssa-erp.tn",
       role: "Manager",
       status: "Active",
-      jobTitle: "Responsable Rapprochement & Trésorerie",
+      jobTitle: "Comptable & Trésorière / Rapprochement",
       matricule: "EMP-0002",
       phone: "+216 71 862 102",
       structureType: "Service",
@@ -771,32 +934,23 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       isDemo: true
     },
     {
-      id: "demo-emp_3",
+      id: "demo-emp_12",
       tenantId: DEMO_TENANT_ID,
-      name: "Mohamed Ali Gharbi",
-      email: "m.gharbi@elyssa-erp.tn",
+      name: "Cyrine Khelifi",
+      email: "c.khelifi@elyssa-erp.tn",
       role: "Agent",
       status: "Active",
-      jobTitle: "Chargé Clientèle / Ventes Grands Comptes",
-      matricule: "EMP-0003",
-      phone: "+216 71 862 103",
+      jobTitle: "Aide-Comptable / Facturation & Fournisseurs",
+      matricule: "EMP-0012",
+      phone: "+216 71 862 112",
       structureType: "Service",
-      structureName: "Service Commercial",
-      createdDate: "2025-06-18",
-      assignedTasks: [
-        {
-          id: "task-3-1",
-          tenantId: DEMO_TENANT_ID,
-          title: "Prospection région Sousse & Sahel",
-          description: "Visites commerciales et préparation des devis.",
-          dueDate: "2026-08-26",
-          priority: "Medium",
-          status: "In_Progress",
-          createdDate: "2026-08-12"
-        }
-      ],
+      structureName: "Service Comptabilité & Facturation",
+      createdDate: "2025-02-01",
+      assignedTasks: [],
       isDemo: true
     },
+
+    // Pôle 3: Ressources Humaines & Social (2)
     {
       id: "demo-emp_4",
       tenantId: DEMO_TENANT_ID,
@@ -804,7 +958,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       email: "a.bensoltane@elyssa-erp.tn",
       role: "Manager",
       status: "Active",
-      jobTitle: "Responsable Ressources Humaines",
+      jobTitle: "Responsable RH & Juridique Social",
       matricule: "EMP-0004",
       phone: "+216 71 862 104",
       structureType: "Direction",
@@ -825,30 +979,146 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       isDemo: true
     },
     {
-      id: "demo-emp_5",
+      id: "demo-emp_13",
       tenantId: DEMO_TENANT_ID,
-      name: "Sami Mansour",
-      email: "s.mansour@elyssa-erp.tn",
-      role: "Manager",
+      name: "Tarek Mabrouk",
+      email: "t.mabrouk@elyssa-erp.tn",
+      role: "Agent",
       status: "Active",
-      jobTitle: "Développeur ERP Principal & IT",
-      matricule: "EMP-0005",
-      phone: "+216 71 862 105",
+      jobTitle: "Gestionnaire Paie, Pointage & HSE",
+      matricule: "EMP-0013",
+      phone: "+216 71 862 113",
       structureType: "Service",
-      structureName: "Support & Infrastructure IT",
-      createdDate: "2025-01-10",
+      structureName: "Service Paie & Pointage",
+      createdDate: "2025-01-15",
+      assignedTasks: [],
+      isDemo: true
+    },
+
+    // Pôle 4: Force de Vente, ADV & Caisse POS (4)
+    {
+      id: "demo-emp_3",
+      tenantId: DEMO_TENANT_ID,
+      name: "Mohamed Ali Gharbi",
+      email: "m.gharbi@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Responsable Ventes Terrain & Grands Comptes",
+      matricule: "EMP-0003",
+      phone: "+216 71 862 103",
+      structureType: "Agence",
+      structureName: "Agence Commerciale Sousse",
+      createdDate: "2025-06-18",
       assignedTasks: [
         {
-          id: "task-5-1",
+          id: "task-3-1",
           tenantId: DEMO_TENANT_ID,
-          title: "Maintenance et monitoring de la plateforme",
-          description: "Contrôle de l'intégrité des bases et synchronisation temps réel.",
-          dueDate: "2026-08-30",
-          priority: "Low",
+          title: "Prospection région Sousse & Sahel",
+          description: "Visites commerciales et préparation des devis.",
+          dueDate: "2026-08-26",
+          priority: "Medium",
           status: "In_Progress",
-          createdDate: "2026-08-01"
+          createdDate: "2026-08-12"
         }
       ],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_14",
+      tenantId: DEMO_TENANT_ID,
+      name: "Anis Jlassi",
+      email: "a.jlassi@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Commercial B2B Régional Sahel",
+      matricule: "EMP-0014",
+      phone: "+216 73 862 114",
+      structureType: "Agence",
+      structureName: "Agence Commerciale Sousse",
+      createdDate: "2025-02-01",
+      assignedTasks: [],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_15",
+      tenantId: DEMO_TENANT_ID,
+      name: "Olfa Belhadj",
+      email: "o.belhadj@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Chargée ADV & Relations Clients",
+      matricule: "EMP-0015",
+      phone: "+216 71 862 115",
+      structureType: "Service",
+      structureName: "Service ADV & Facturation",
+      createdDate: "2024-09-01",
+      assignedTasks: [],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_16",
+      tenantId: DEMO_TENANT_ID,
+      name: "Mariem Mahfoudh",
+      email: "m.mahfoudh@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Hôtesse de Caisse & Vente Showroom",
+      matricule: "EMP-0016",
+      phone: "+216 71 862 116",
+      structureType: "Succursale",
+      structureName: "Showroom & Caisse POS Tunis",
+      createdDate: "2025-01-05",
+      assignedTasks: [],
+      isDemo: true
+    },
+
+    // Pôle 5: Supply Chain, Quai & Flotte Automobile (5)
+    {
+      id: "demo-emp_17",
+      tenantId: DEMO_TENANT_ID,
+      name: "Nader Chaabane",
+      email: "n.chaabane@elyssa-erp.tn",
+      role: "Manager",
+      status: "Active",
+      jobTitle: "Responsable Logistique, Flotte & Dispatching",
+      matricule: "EMP-0017",
+      phone: "+216 74 862 117",
+      structureType: "Entrepôt",
+      structureName: "Plateforme Logistique Sfax",
+      createdDate: "2023-04-01",
+      assignedTasks: [],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_10",
+      tenantId: DEMO_TENANT_ID,
+      name: "Riadh Bouazizi",
+      email: "r.bouazizi@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Chef de Quai & Magasinier Principal",
+      matricule: "EMP-0010",
+      phone: "+216 74 862 110",
+      structureType: "Entrepôt",
+      structureName: "Dépôt Central Sfax",
+      createdDate: "2024-05-01",
+      assignedTasks: [],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_18",
+      tenantId: DEMO_TENANT_ID,
+      name: "Karim Zribi",
+      email: "k.zribi@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Agent Préparateur de Commandes / Picking",
+      matricule: "EMP-0018",
+      phone: "+216 74 862 118",
+      structureType: "Entrepôt",
+      structureName: "Dépôt Central Sfax",
+      createdDate: "2025-01-10",
+      assignedTasks: [],
       isDemo: true
     },
     {
@@ -858,24 +1128,122 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       email: "h.bensalem@elyssa-erp.tn",
       role: "Agent",
       status: "Active",
-      jobTitle: "Chauffeur Livreur / Logistique & Flotte",
+      jobTitle: "Chauffeur-Livreur Principal / Isuzu D-Max",
       matricule: "EMP-0006",
       phone: "+216 71 862 106",
       structureType: "Entrepôt",
-      structureName: "Entrepôt Central Radès",
-      createdDate: "2025-02-01",
+      structureName: "Plateforme Logistique Tunis",
+      createdDate: "2024-02-15",
       assignedTasks: [
         {
           id: "task-6-1",
           tenantId: DEMO_TENANT_ID,
-          title: "Tournée livraison Radès - Sfax",
-          description: "Livraison matériaux sur chantiers clients.",
+          title: "Tournée livraison Tunis - Sousse - Sfax",
+          description: "Livraison matériaux et outillage sur chantiers clients.",
           dueDate: "2026-08-24",
           priority: "Medium",
           status: "Completed",
           createdDate: "2026-08-10"
         }
       ],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_19",
+      tenantId: DEMO_TENANT_ID,
+      name: "Bilal Zouari",
+      email: "b.zouari@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Chauffeur-Livreur Poids Lourds / Tournées Régionales",
+      matricule: "EMP-0019",
+      phone: "+216 74 862 119",
+      structureType: "Entrepôt",
+      structureName: "Plateforme Logistique Sfax",
+      createdDate: "2024-07-01",
+      assignedTasks: [],
+      isDemo: true
+    },
+
+    // Pôle 6: Production Usine, GPAO & Maintenance (5)
+    {
+      id: "demo-emp_7",
+      tenantId: DEMO_TENANT_ID,
+      name: "Jalel Ben Ali",
+      email: "j.benali@elyssa-erp.tn",
+      role: "Manager",
+      status: "Active",
+      jobTitle: "Responsable Usine & Chef Ligne Extrusion",
+      matricule: "EMP-0007",
+      phone: "+216 74 862 107",
+      structureType: "Usine",
+      structureName: "Usine Extrusion Sfax",
+      createdDate: "2023-05-01",
+      assignedTasks: [],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_8",
+      tenantId: DEMO_TENANT_ID,
+      name: "Mourad Trabelsi",
+      email: "m.trabelsi@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Chef d'Atelier Assemblage Outillage",
+      matricule: "EMP-0008",
+      phone: "+216 71 862 108",
+      structureType: "Usine",
+      structureName: "Atelier Assemblage Tunis",
+      createdDate: "2023-09-01",
+      assignedTasks: [],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_9",
+      tenantId: DEMO_TENANT_ID,
+      name: "Sofiene Sassi",
+      email: "s.sassi@elyssa-erp.tn",
+      role: "Manager",
+      status: "Active",
+      jobTitle: "Superviseur Équipe Nuit Extrusion",
+      matricule: "EMP-0009",
+      phone: "+216 74 862 109",
+      structureType: "Usine",
+      structureName: "Usine Extrusion Sfax",
+      createdDate: "2024-01-15",
+      assignedTasks: [],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_20",
+      tenantId: DEMO_TENANT_ID,
+      name: "Bilel Hamdi",
+      email: "b.hamdi@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Opérateur Machine Extrusion & Plasturgie",
+      matricule: "EMP-0020",
+      phone: "+216 74 862 120",
+      structureType: "Usine",
+      structureName: "Usine Extrusion Sfax",
+      createdDate: "2025-01-20",
+      assignedTasks: [],
+      isDemo: true
+    },
+    {
+      id: "demo-emp_21",
+      tenantId: DEMO_TENANT_ID,
+      name: "Hassen Gharbi",
+      email: "h.gharbi@elyssa-erp.tn",
+      role: "Agent",
+      status: "Active",
+      jobTitle: "Technicien Maintenance Industrielle & Étalonnage",
+      matricule: "EMP-0021",
+      phone: "+216 74 862 121",
+      structureType: "Usine",
+      structureName: "Service Maintenance Sfax",
+      createdDate: "2024-06-15",
+      assignedTasks: [],
       isDemo: true
     }
   ],
@@ -893,6 +1261,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       category: "Matériaux de Construction",
       paymentTerms: "60 jours fin de mois",
       rating: 4.8,
+      status: "Active",
       is_demo: true
     },
     {
@@ -906,6 +1275,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       category: "Sidérurgie & Métallurgie",
       paymentTerms: "45 jours fin de mois",
       rating: 4.6,
+      status: "Active",
       is_demo: true
     },
     {
@@ -919,6 +1289,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       category: "Peintures & Revêtements",
       paymentTerms: "30 jours",
       rating: 4.7,
+      status: "Active",
       is_demo: true
     },
     {
@@ -932,6 +1303,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       category: "Outillage Professionnel",
       paymentTerms: "30 jours fin de mois",
       rating: 4.9,
+      status: "Active",
       is_demo: true
     },
     {
@@ -945,6 +1317,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       category: "Plaques & Systèmes Plâtre",
       paymentTerms: "30 jours",
       rating: 4.8,
+      status: "Active",
       is_demo: true
     },
     {
@@ -958,6 +1331,21 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       category: "Colles & Chimie du Bâtiment",
       paymentTerms: "45 jours fin de mois",
       rating: 4.9,
+      status: "Active",
+      is_demo: true
+    },
+    {
+      id: "demo-sup_import",
+      tenantId: DEMO_TENANT_ID,
+      name: "Marseille Chimie & Outillage SAS",
+      contactName: "Jean-Luc Morel",
+      email: "import@marseille-chimie.fr",
+      phone: "+33 4 91 00 22 33",
+      address: "Marseille, France / Port de Radès",
+      category: "Matières Premières & Import",
+      paymentTerms: "Crédoc BIAT (L/C Confirmée)",
+      rating: 4.9,
+      status: "Active",
       is_demo: true
     }
   ],
@@ -1208,33 +1596,49 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       tenantId: DEMO_TENANT_ID,
       clientId: "demo-cli_1",
       clientName: "Société Tunisienne de Construction (STC)",
-      date: "2026-08-12",
-      purpose: "Négociation approvisionnement nouveau chantier Charguia II",
-      summary: "Entretien avec le directeur technique. Validation des besoins sur 40 tonnes de ciment CPJ45 et 15 tonnes de fer à béton.",
+      date: "2026-08-18",
+      purpose: "Visite de suivi nouveau chantier Charguia II (10:00)",
+      summary: "Entretien avec le directeur technique. Validation des besoins sur 40 tonnes de ciment CPJ45 et 15 tonnes de fer à béton pour le chantier STC Charguia II.",
       actionPoints: [
         "Établir devis formel avec remise volume",
         "Planifier première livraison fin août",
         "Coordonner avec le service logistique pour passage camion"
       ],
       aiAnalyzed: true,
-      aiInsights: "Opportunité commerciale à forte rentabilité. Client historique fidèle.",
+      aiInsights: "Opportunité commerciale majeure validée (55T matériaux). Client historique fidèle à fort panier moyen. Risque de churn estimé < 2%.",
       author: "Mohamed Ali Gharbi"
     },
     {
       id: "demo-vr_2",
       tenantId: DEMO_TENANT_ID,
       clientId: "demo-cli_2",
-      clientName: "Comptoir du Centre",
-      date: "2026-08-14",
-      purpose: "Revue de stock quincaillerie et présentation gamme peinture Astral",
-      summary: "Visite du dépôt central à Sousse. Réapprovisionnement régulier outillage pro et intégration des peintures dans le showroom.",
+      clientName: "Comptoir du Centre (Sousse)",
+      date: "2026-08-20",
+      purpose: "Négociation showroom & réapprovisionnement outillage (14:30)",
+      summary: "Visite et négociation au showroom de Sousse. Revue des rotations de stock outillage pro et intégration de la nouvelle gamme de peinture Astral dans les linéaires.",
       actionPoints: [
         "Transmettre catalogue outillage pro 2026",
         "Programmer passage chauffeur Hamza pour tournée Sahel",
         "Mettre en place présentoir PLV"
       ],
       aiAnalyzed: true,
-      aiInsights: "Client stratégique dans le Sahel. Potentiel de hausse du panier moyen de 15%.",
+      aiInsights: "Client stratégique dans le Sahel. Potentiel de hausse du panier moyen de 15%. Risque de churn très faible.",
+      author: "Mohamed Ali Gharbi"
+    },
+    {
+      id: "demo-vr_3",
+      tenantId: DEMO_TENANT_ID,
+      clientId: "demo-cli_4",
+      clientName: "SOPAL S.A. (Sfax)",
+      date: "2026-08-22",
+      purpose: "Relance & Recouvrement créance échue (11:00)",
+      summary: "Entretien de relance et négociation financière chez SOPAL S.A. (Sfax) pour pointage de l'encaissement en attente et validation du planning de livraison des tubes PVC haute pression.",
+      actionPoints: [
+        "Pointer encaissement en attente SOPAL avec le DAF",
+        "Arrêter échéancier de règlement à l'amiable",
+        "Coordonner avec Dépôt Sfax pour déblocage des commandes"
+      ],
+      aiAnalyzed: false,
       author: "Mohamed Ali Gharbi"
     }
   ],
@@ -1682,6 +2086,88 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       approvalDate: "2026-08-13",
       approvedBy: "Khaled Ben Amor",
       is_demo: true
+    }
+  ],
+
+  // 17. STOCK MOVEMENTS (Historique complet réceptions, sorties matière et production)
+  stockMovements: [
+    {
+      id: "demo-sm_1",
+      tenantId: DEMO_TENANT_ID,
+      productId: "demo-prod_1",
+      productName: "Ciment CPJ 45 (Sac 50kg)",
+      date: "2026-08-01",
+      type: "In",
+      quantity: 500,
+      reason: "Réception bon de commande fournisseur local BC Les Ciments de Bizerte (PO-2026-0101)",
+      reference: "BL-CIM-8812",
+      operator: "Riadh Bouazizi (Magasinier)",
+      performedBy: "Riadh Bouazizi (Magasinier)"
+    },
+    {
+      id: "demo-sm_2",
+      tenantId: DEMO_TENANT_ID,
+      productId: "demo-prod_2",
+      productName: "Rond à béton Ø12mm (Barre 12m)",
+      date: "2026-08-02",
+      type: "In",
+      quantity: 200,
+      reason: "Réception sidérurgie usine EL FOULADH Menzel Bourguiba (PO-2026-0102)",
+      reference: "BL-FOULADH-492",
+      operator: "Riadh Bouazizi (Magasinier)",
+      performedBy: "Riadh Bouazizi (Magasinier)"
+    },
+    {
+      id: "demo-sm_3",
+      tenantId: DEMO_TENANT_ID,
+      productId: "demo-prod_7",
+      productName: "Composant Meuleuse d'Angle 230mm (MP Import)",
+      date: "2026-08-10",
+      type: "In",
+      quantity: 100,
+      reason: "Réception Dédouanement Import Marseille Chimie (Dossier IMP-RADES-2026-081 / Crédoc BIAT)",
+      reference: "DAU-RADES-8102",
+      operator: "Hamza Ben Salem (Logistique & Transit)",
+      performedBy: "Hamza Ben Salem (Logistique & Transit)"
+    },
+    {
+      id: "demo-sm_4",
+      tenantId: DEMO_TENANT_ID,
+      productId: "demo-prod_7",
+      productName: "Composant Meuleuse d'Angle 230mm (MP Import)",
+      date: "2026-08-16",
+      type: "Out",
+      quantity: 45,
+      reason: "Sortie composant MP pour Ordre de Fabrication demo-mo_1 (Ligne Assemblage B)",
+      reference: "OF-2026-001",
+      operator: "Mourad Trabelsi (Chef Assemblage)",
+      performedBy: "Mourad Trabelsi (Chef Assemblage)"
+    },
+    {
+      id: "demo-sm_5",
+      tenantId: DEMO_TENANT_ID,
+      productId: "demo-prod_4",
+      productName: "Outillage pro (Pack Chantier 230mm)",
+      date: "2026-08-18",
+      type: "In",
+      quantity: 45,
+      reason: "Entrée produit fini assemblé conforme OF demo-mo_1",
+      reference: "BA-PROD-2026",
+      operator: "Mourad Trabelsi (Chef Assemblage)",
+      performedBy: "Mourad Trabelsi (Chef Assemblage)"
+    },
+    {
+      id: "demo-sm_6",
+      tenantId: DEMO_TENANT_ID,
+      productId: "demo-prod_3",
+      productName: "Peinture Blanche 15L",
+      date: "2026-08-05",
+      type: "In",
+      quantity: 180,
+      reason: "Approvisionnement Magasin Tunis - Astral Tunisie",
+      reference: "BL-AST-104",
+      operator: "Riadh Bouazizi (Magasinier)",
+      performedBy: "Riadh Bouazizi (Magasinier)"
     }
   ]
 };

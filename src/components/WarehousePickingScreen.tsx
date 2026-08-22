@@ -108,11 +108,32 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
     }));
   }, [internalLocations]);
 
-  // Strict Business Filtering: ONLY Logistics, Picking, Warehouse, Drivers, Production Operators
+  // Strict Business Filtering: ONLY Logistics, Picking, Warehouse & Drivers profiles (Hamza Ben Salem, Riadh Bouazizi)
   // Strictly excludes Management, Finance, Accounting, HR, and IT/Developers
   const warehouseStaff = useMemo(() => {
     if (!Array.isArray(employees) || employees.length === 0) return [];
-    return employees.filter(emp => emp && isWarehouseOrPicking(emp));
+    return employees.filter(emp => {
+      if (!emp) return false;
+      const pole = (emp.pole || '').toString().toUpperCase();
+      const job = (emp.jobTitle || '').toLowerCase();
+      const dept = (emp.department || '').toLowerCase();
+      
+      // Specifically Logistics & Transport or Warehouse/Picking job titles
+      const isLogisticsProfile = 
+        pole === 'LOGISTIQUE_TRANSPORT' || 
+        job.includes('magasinier') || 
+        job.includes('préparateur') || 
+        job.includes('preparateur') || 
+        job.includes('chauffeur') || 
+        job.includes('livreur') || 
+        job.includes('dépôt') || 
+        job.includes('picking') ||
+        dept.includes('magasin') ||
+        dept.includes('picking') ||
+        dept.includes('logistique');
+        
+      return isLogisticsProfile && isWarehouseOrPicking(emp);
+    });
   }, [employees]);
 
   // Helper to match an employee to a company location / site

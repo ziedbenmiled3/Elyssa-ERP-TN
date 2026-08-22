@@ -2050,94 +2050,98 @@ export default function PayrollManager({
                 </div>
 
                 {/* Compact DataGrid */}
-                <div className="border border-slate-150 rounded-xl overflow-hidden bg-white shadow-3xs">
-                  <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[10.5px] font-black text-slate-500 uppercase tracking-wider">
-                        <tr>
-                          <th className="py-2.5 px-3">Collaborateur</th>
-                          <th className="py-2.5 px-3">Pôle / Structure</th>
-                          <th className="py-2.5 px-3 text-right">Salaire Brut</th>
-                          <th className="py-2.5 px-3 text-right">CNSS Sal. (9.18%)</th>
-                          <th className="py-2.5 px-3 text-right">IRPP / Ret.</th>
-                          <th className="py-2.5 px-3 text-right font-black text-indigo-900">Net à Payer</th>
-                          <th className="py-2.5 px-3 text-center">Statut</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                        {employees
-                          .filter(emp => {
-                            if (remunSearchQuery.trim()) {
-                              const q = remunSearchQuery.toLowerCase().trim();
-                              const matchesName = (emp.name || '').toLowerCase().includes(q);
-                              const matchesTitle = (emp.jobTitle || '').toLowerCase().includes(q);
-                              const matchesMat = (emp.matricule || '').toLowerCase().includes(q);
-                              if (!matchesName && !matchesTitle && !matchesMat) return false;
-                            }
-                            if (remunPoleFilter !== 'all') {
-                              const empPoleKey = getEmployeePole(emp);
-                              if (empPoleKey !== remunPoleFilter && getEmpPole(emp) !== remunPoleFilter) return false;
-                            }
-                            return true;
-                          })
-                          .map((emp) => {
-                            const calc = getPayrollCalculations(emp);
-                            const pole = getEmpPole(emp);
-                            return (
-                              <tr key={emp.id} className="hover:bg-indigo-50/30 transition-colors">
-                                <td className="py-2 px-3">
-                                  <div className="font-bold text-slate-850 truncate max-w-[160px]">{emp.name}</div>
-                                  <div className="text-[10px] text-slate-400 truncate max-w-[160px]">{emp.jobTitle}</div>
-                                </td>
-                                <td className="py-2 px-3">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                    {pole}
-                                  </span>
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono text-slate-800">
-                                  {calc.grossSalary.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono text-rose-600">
-                                  {calc.cnssEmployee.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono text-amber-600">
-                                  {calc.irpp.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono font-black text-indigo-700 bg-indigo-50/40">
-                                  {calc.netSalary.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
-                                </td>
-                                <td className="py-2 px-3 text-center">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                    {emp.status === 'Active' ? 'Actif' : emp.status}
-                                  </span>
+                {(() => {
+                  const filteredRemunEmployees = employees.filter(emp => {
+                    if (remunSearchQuery.trim()) {
+                      const q = remunSearchQuery.toLowerCase().trim();
+                      const matchesName = (emp.name || '').toLowerCase().includes(q);
+                      const matchesTitle = (emp.jobTitle || '').toLowerCase().includes(q);
+                      const matchesMat = (emp.matricule || '').toLowerCase().includes(q);
+                      if (!matchesName && !matchesTitle && !matchesMat) return false;
+                    }
+                    if (remunPoleFilter !== 'all') {
+                      const empPoleKey = getEmployeePole(emp);
+                      const poleShort = getEmpPole(emp);
+                      if (empPoleKey !== remunPoleFilter && poleShort !== remunPoleFilter) return false;
+                    }
+                    return true;
+                  });
+
+                  return (
+                    <div className="border border-slate-150 rounded-xl overflow-hidden bg-white shadow-3xs">
+                      <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 text-[10.5px] font-black text-slate-500 uppercase tracking-wider">
+                            <tr>
+                              <th className="py-2.5 px-3">Collaborateur</th>
+                              <th className="py-2.5 px-3">Pôle / Structure</th>
+                              <th className="py-2.5 px-3 text-right">Salaire Brut</th>
+                              <th className="py-2.5 px-3 text-right">CNSS Sal. (9.18%)</th>
+                              <th className="py-2.5 px-3 text-right">IRPP / Ret.</th>
+                              <th className="py-2.5 px-3 text-right font-black text-indigo-900">Net à Payer</th>
+                              <th className="py-2.5 px-3 text-center">Statut</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                            {filteredRemunEmployees.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} className="py-8 text-center text-slate-400 font-mono text-xs">
+                                  Aucun collaborateur ne correspond aux critères de recherche.
                                 </td>
                               </tr>
-                            );
-                          })}
-                      </tbody>
-                    </table>
-                  </div>
+                            ) : (
+                              filteredRemunEmployees.map((emp) => {
+                                const calc = getPayrollCalculations(emp);
+                                const pole = getEmpPole(emp);
+                                return (
+                                  <tr key={emp.id} className="hover:bg-indigo-50/30 transition-colors">
+                                    <td className="py-2 px-3">
+                                      <div className="font-bold text-slate-850 truncate max-w-[160px]">{emp.name}</div>
+                                      <div className="text-[10px] text-slate-400 truncate max-w-[160px]">{emp.jobTitle}</div>
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                        {pole}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-800">
+                                      {calc.grossSalary.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono text-rose-600">
+                                      {calc.cnssEmployee.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono text-amber-600">
+                                      {calc.irpp.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono font-black text-indigo-700 bg-indigo-50/40">
+                                      {calc.netSalary.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                        {emp.status === 'Active' ? 'Actif' : emp.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
 
-                  {/* Summary Bar */}
-                  <div className="bg-slate-50 border-t border-slate-200 p-2.5 px-3.5 flex flex-wrap items-center justify-between text-xs text-slate-600 font-semibold gap-2">
-                    <span>
-                      Total Collaborateurs affichés : <strong className="text-slate-900">{employees.filter(emp => {
-                        if (remunSearchQuery.trim()) {
-                          const q = remunSearchQuery.toLowerCase().trim();
-                          const matchesName = (emp.name || '').toLowerCase().includes(q);
-                          const matchesTitle = (emp.jobTitle || '').toLowerCase().includes(q);
-                          if (!matchesName && !matchesTitle) return false;
-                        }
-                        if (remunPoleFilter !== 'all' && getEmpPole(emp) !== remunPoleFilter) return false;
-                        return true;
-                      }).length}</strong>
-                    </span>
-                    <div className="flex items-center gap-4 text-[11px] font-mono">
-                      <span>Masse Brute : <strong className="text-slate-900">{employees.reduce((acc, emp) => acc + getPayrollCalculations(emp).grossSalary, 0).toLocaleString('fr-TN', { maximumFractionDigits: 3 })} TND</strong></span>
-                      <span>Total Net : <strong className="text-indigo-700">{employees.reduce((acc, emp) => acc + getPayrollCalculations(emp).netSalary, 0).toLocaleString('fr-TN', { maximumFractionDigits: 3 })} TND</strong></span>
+                      {/* Summary Bar */}
+                      <div className="bg-slate-50 border-t border-slate-200 p-2.5 px-3.5 flex flex-wrap items-center justify-between text-xs text-slate-600 font-semibold gap-2">
+                        <span>
+                          Total Collaborateurs affichés : <strong className="text-slate-900">{filteredRemunEmployees.length}</strong>
+                        </span>
+                        <div className="flex items-center gap-4 text-[11px] font-mono">
+                          <span>Masse Brute : <strong className="text-slate-900">{filteredRemunEmployees.reduce((acc, emp) => acc + getPayrollCalculations(emp).grossSalary, 0).toLocaleString('fr-TN', { maximumFractionDigits: 3 })} TND</strong></span>
+                          <span>Total Net : <strong className="text-indigo-700">{filteredRemunEmployees.reduce((acc, emp) => acc + getPayrollCalculations(emp).netSalary, 0).toLocaleString('fr-TN', { maximumFractionDigits: 3 })} TND</strong></span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Payroll Information Alert panel */}

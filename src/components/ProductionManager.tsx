@@ -135,7 +135,7 @@ export default function ProductionManager({
       startDate: "2026-08-15",
       endDate: "2026-08-30",
       assignedLine: "Ligne Assemblage B (Tunis)",
-      assignedTeam: "Équipe Matin (Chef : J. Ben Ali)",
+      assignedTeam: "Équipe Assemblage B (Chef : Mourad Trabelsi)",
       status: "En cours",
       importFolderId: "demo-imp_1",
       notes: "OF Actif Outillage pro (Pack Chantier 230mm) - 45% d'avancement, 45 unités terminées, 2 rebuts. Liaison transit IMP-RADES-2026-081.",
@@ -152,7 +152,7 @@ export default function ProductionManager({
       startDate: "2026-08-25",
       endDate: "2026-09-05",
       assignedLine: "Ligne Extrusion A (Sfax)",
-      assignedTeam: "Équipe Après-midi (Chef : M. Trabelsi)",
+      assignedTeam: "Équipe Extrusion A (Chef : Jalel Ben Ali)",
       status: "Planifié",
       notes: "OF Planifié Tube PVC PN16 D63 (Barre 4m) - Début prévu le 25/08/2026. Dépendance matière : Résine PVC S-67."
     }
@@ -192,9 +192,10 @@ export default function ProductionManager({
   ];
 
   const DEFAULT_TEAMS = [
-    "Équipe Matin (Chef : J. Ben Ali)",
-    "Équipe Après-midi (Chef : M. Trabelsi)",
-    "Équipe Nuit (Chef : S. Sassi)"
+    "Équipe Extrusion A (Chef : Jalel Ben Ali)",
+    "Équipe Assemblage B (Chef : Mourad Trabelsi)",
+    "Équipe Nuit Extrusion (Superviseur : Sofiene Sassi)",
+    "Équipe Maintenance Usine (Tech : Hassen Gharbi)"
   ];
 
   const DEFAULT_CATEGORIES = [

@@ -16,6 +16,8 @@ import {
   DEFAULT_TRIPARTITE_CONFIG,
   getTenantMpoManagers,
   generateTenantDemoPerformanceContracts,
+  syncAllEmployeesWithMpoContracts,
+  syncEmployeeWithMpoContract,
   MPOManager
 } from '../services/performanceContractService';
 import { 
@@ -144,58 +146,45 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
     }
   }, [availableManagers]);
 
-  // Automatic Seed in Trial Mode or healing missing poles
+  // Automatic Synchronization of HR Employees to MPO / OKR contracts
   useEffect(() => {
-    if (isTrial && (!performanceContracts || performanceContracts.length === 0)) {
-      const managerName = activeManager?.name || currentUser?.name || (tenantId === 'MD' ? 'Meriam Doudou' : 'Direction Générale');
-      const demoContracts = generateTenantDemoPerformanceContracts(tenantId, employees, managerName);
-      demoContracts.forEach(c => savePerformanceContract(tenantId, c));
-      onUpdateContracts(demoContracts);
-    } else if (performanceContracts && performanceContracts.length > 0) {
-      let needsHeal = false;
-      const healed = performanceContracts.map(c => {
-        let assignedPole = c.pole;
-        let assignedDept = c.department;
-        const nameLower = (c.employee_name || '').toLowerCase();
-        
-        if (!assignedPole || assignedPole === 'Finance & Comptabilité' || assignedPole === 'Ressources Humaines' || assignedPole === 'Ventes & Commercial Terrain' || assignedPole === 'Logistique & Expéditions') {
-          if (nameLower.includes('khaled') || nameLower.includes('amor') || nameLower.includes('ines') || nameLower.includes('dridi')) {
-            assignedPole = 'Finance';
-            assignedDept = 'Finance';
-            needsHeal = true;
-          } else if (nameLower.includes('amel') || nameLower.includes('soltane')) {
-            assignedPole = 'RH';
-            assignedDept = 'RH';
-            needsHeal = true;
-          } else if (nameLower.includes('gharbi') || nameLower.includes('cherif') || nameLower.includes('mohamed')) {
-            assignedPole = 'Ventes';
-            assignedDept = 'Ventes';
-            needsHeal = true;
-          } else if (nameLower.includes('mansour') || nameLower.includes('sami')) {
-            assignedPole = 'Direction & IT';
-            assignedDept = 'Direction & IT';
-            needsHeal = true;
-          } else if (nameLower.includes('salem') || nameLower.includes('hamza') || nameLower.includes('trad')) {
-            assignedPole = 'Logistique';
-            assignedDept = 'Logistique';
-            needsHeal = true;
-          } else if (!assignedPole) {
-            assignedPole = assignedDept || 'Direction & IT';
-            needsHeal = true;
-          }
-        }
-        return {
-          ...c,
-          pole: assignedPole,
-          department: assignedDept
-        };
-      });
-
-      if (needsHeal) {
-        onUpdateContracts(healed);
-      }
+    const synced = syncAllEmployeesWithMpoContracts(employees, performanceContracts, tenantId);
+    if (!performanceContracts || performanceContracts.length === 0 || synced.updatedCount > 0 || synced.contracts.length !== (performanceContracts?.length || 0)) {
+      synced.contracts.forEach(c => savePerformanceContract(tenantId, c));
+      onUpdateContracts(synced.contracts);
     }
-  }, [isTrial, tenantId, employees, activeManager, currentUser, performanceContracts, onUpdateContracts]);
+  }, [tenantId, employees, performanceContracts, onUpdateContracts]);
+
+  // Real-time Event Listeners for HR synchronization
+  useEffect(() => {
+    const handleMpoCreated = (e: any) => {
+      const newContract = e.detail;
+      if (newContract) {
+        const list = performanceContracts || [];
+        const idx = list.findIndex(c => c.employee_id === newContract.employee_id || c.id === newContract.id);
+        if (idx >= 0) {
+          const copy = [...list];
+          copy[idx] = { ...copy[idx], ...newContract };
+          onUpdateContracts(copy);
+        } else {
+          onUpdateContracts([newContract, ...list]);
+        }
+      }
+    };
+
+    const handleHrSynced = () => {
+      const synced = syncAllEmployeesWithMpoContracts(employees, performanceContracts, tenantId);
+      onUpdateContracts(synced.contracts);
+    };
+
+    window.addEventListener('elyssa_mpo_contract_created', handleMpoCreated);
+    window.addEventListener('elyssa_hr_employee_synced', handleHrSynced);
+
+    return () => {
+      window.removeEventListener('elyssa_mpo_contract_created', handleMpoCreated);
+      window.removeEventListener('elyssa_hr_employee_synced', handleHrSynced);
+    };
+  }, [employees, performanceContracts, tenantId, onUpdateContracts]);
 
   // Tripartite Weighting Settings State
   const [tripartiteConfig, setTripartiteConfig] = useState<TripartiteWeightingConfig>({
