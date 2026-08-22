@@ -34,7 +34,7 @@ export const DEMO_VEHICLES: Vehicle[] = [
     id: 'demo-v_1', 
     brand: 'Peugeot', 
     model: 'Partner', 
-    registrationNumber: '228 TUN 4091', 
+    registrationNumber: '228 TN 4091', 
     purchaseDate: '2024-03-12', 
     purchasePrice: 62000.000, 
     status: 'Active', 
@@ -58,7 +58,7 @@ export const DEMO_VEHICLES: Vehicle[] = [
     id: 'demo-v_3', 
     brand: 'Citroën', 
     model: 'C-Élysée', 
-    registrationNumber: '215 TUN 9811', 
+    registrationNumber: '215 TN 9811', 
     purchaseDate: '2023-01-15', 
     purchasePrice: 48000.000, 
     status: 'Active', 
@@ -94,7 +94,7 @@ export const DEMO_MISSIONS: MissionOrder[] = [
     employeeId: 'demo-emp_3', 
     employeeName: 'Mohamed Ali Gharbi', 
     vehicleId: 'demo-v_3', 
-    vehicleLabel: 'Citroën C-Élysée (215 TUN 9811)', 
+    vehicleLabel: 'Citroën C-Élysée (215 TN 9811)', 
     transportType: 'CompanyCar',
     destination: 'Sousse', 
     purpose: 'Prospection Sousse', 
@@ -113,8 +113,8 @@ export const DEFAULT_DEMO_MISSIONS = DEMO_MISSIONS;
 
 export const DEMO_EXPENSES: FleetExpense[] = [
   { id: 'demo-exp_1', date: '2026-08-01', vehicleId: 'demo-v_2', vehicleLabel: 'Isuzu D-Max (240 TN 8812)', category: 'GasolineBonus', amount: 450.000, invoiceNb: 'BON_TOT_450', providerName: 'TotalEnergies', description: 'Carburant TotalEnergies - Tournée livraison Sud' },
-  { id: 'demo-exp_2', date: '2026-08-03', vehicleId: 'demo-v_1', vehicleLabel: 'Peugeot Partner (228 TUN 4091)', category: 'MechanicLabor', amount: 280.000, invoiceNb: 'FACT_VID_280', providerName: 'Atelier Central Service', description: 'Entretien vidange complète et remplacement filtres' },
-  { id: 'demo-exp_3', date: '2026-08-05', vehicleId: 'demo-v_3', vehicleLabel: 'Citroën C-Élysée (215 TUN 9811)', category: 'Insurance', amount: 650.000, invoiceNb: 'VIG_ASSUR_650', providerName: 'Assurances STAR / Recette Finances', description: 'Vignette fiscale & Assurance flotte annuelle' }
+  { id: 'demo-exp_2', date: '2026-08-03', vehicleId: 'demo-v_1', vehicleLabel: 'Peugeot Partner (228 TN 4091)', category: 'MechanicLabor', amount: 280.000, invoiceNb: 'FACT_VID_280', providerName: 'Atelier Central Service', description: 'Entretien vidange complète et remplacement filtres' },
+  { id: 'demo-exp_3', date: '2026-08-05', vehicleId: 'demo-v_3', vehicleLabel: 'Citroën C-Élysée (215 TN 9811)', category: 'Insurance', amount: 650.000, invoiceNb: 'VIG_ASSUR_650', providerName: 'Assurances STAR / Recette Finances', description: 'Vignette fiscale & Assurance flotte annuelle' }
 ];
 
 export const DEFAULT_DEMO_EXPENSES = DEMO_EXPENSES;

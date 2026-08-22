@@ -182,16 +182,20 @@ export type FleetDeviceStatus = 'Available' | 'Assigned' | 'Maintenance' | 'Deco
 export interface FleetInventoryItem {
   id: string;
   tenantId: string;
-  category?: string; // e.g. "Terminal Mobile", "Véhicule", "Outillage Chantier", "Informatique", etc.
+  category?: string; // e.g. "Terminal Mobile", "Infrastructure IT", "Machine Industrielle / GPAO", "Véhicule", "Outillage Chantier", "Informatique", etc.
   fleet_park: string; // e.g. "Flotte Commerciale & Vente", "Flotte Chantiers", "Flotte Logistique", "Stock Réserve"
   device_name: string; // Nom / Marque / Modèle
   serial_reference: string; // Référence Unique / N° de Série / VIN / IMEI
   status: FleetDeviceStatus;
-  assignedTo?: string; // Agent auquel l'appareil est loué / attribué
+  assignedTo?: string; // Agent / Responsable auquel l'appareil est loué / attribué
   assignedDriver?: string;
   registeredAt: string;
   mileage?: number;
   maxPayloadKg?: number;
+  acquisitionCost?: number;
+  sceAccount?: string;
+  immobCode?: string;
+  location?: string;
 }
 
 export interface MobileDevice {

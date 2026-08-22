@@ -404,6 +404,10 @@ export function useMobileAdmin(tenantIdParam?: string, isDemoTenantParam?: boole
     serial_reference: string;
     status?: FleetDeviceStatus;
     assignedTo?: string;
+    acquisitionCost?: number;
+    sceAccount?: string;
+    immobCode?: string;
+    location?: string;
   }) => {
     const fleetId = `mdm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const nowIso = new Date().toISOString();
@@ -417,6 +421,10 @@ export function useMobileAdmin(tenantIdParam?: string, isDemoTenantParam?: boole
       serial_reference: newItem.serial_reference,
       status: newItem.status || 'Available',
       assignedTo: newItem.assignedTo,
+      acquisitionCost: newItem.acquisitionCost,
+      sceAccount: newItem.sceAccount,
+      immobCode: newItem.immobCode,
+      location: newItem.location,
       registeredAt: nowIso
     };
 

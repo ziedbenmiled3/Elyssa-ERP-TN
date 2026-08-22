@@ -231,7 +231,7 @@ export const TRIAL_ATTENDANCE_RECORDS: AttendanceRecord[] = [
 ];
 
 // ==========================================
-// 2. FLOTTE & TERMINAUX MOBILES (2 Terminaux Démo)
+// 2. FLOTTE & PARC D'ACTIFS (4 Actifs Démo : 2 Terminaux + 1 Serveur IT + 1 Ligne Industrielle)
 // ==========================================
 export const TRIAL_FLEET_INVENTORY: FleetInventoryItem[] = [
   {
@@ -246,7 +246,11 @@ export const TRIAL_FLEET_INVENTORY: FleetInventoryItem[] = [
     assignedDriver: 'Mohamed Ali Gharbi',
     registeredAt: '2026-01-15',
     mileage: 0,
-    maxPayloadKg: 0
+    maxPayloadKg: 0,
+    acquisitionCost: 1850.000,
+    sceAccount: '222',
+    immobCode: 'IMM-2026-008',
+    location: 'Flotte Commerciale & Vente'
   },
   {
     id: 'trial-fleet-dev-2',
@@ -260,7 +264,47 @@ export const TRIAL_FLEET_INVENTORY: FleetInventoryItem[] = [
     assignedDriver: 'Hamza Ben Salem',
     registeredAt: '2026-02-10',
     mileage: 0,
-    maxPayloadKg: 0
+    maxPayloadKg: 0,
+    acquisitionCost: 2400.000,
+    sceAccount: '222',
+    immobCode: 'IMM-2026-009',
+    location: 'Flotte Logistique'
+  },
+  {
+    id: 'trial-fleet-srv-3',
+    tenantId: 'Inter-Affaires',
+    category: 'Infrastructure IT',
+    fleet_park: 'Parc Siège & IT',
+    device_name: 'Serveurs Dell PowerEdge & Baie SAN',
+    serial_reference: 'SRV-DELL-PE-SAN-2025',
+    status: 'Assigned',
+    assignedTo: 'Sami Mansour (DSI)',
+    assignedDriver: 'Sami Mansour (DSI)',
+    registeredAt: '2025-01-20',
+    mileage: 0,
+    maxPayloadKg: 0,
+    acquisitionCost: 28500.000,
+    sceAccount: '222',
+    immobCode: 'IMM-2025-001',
+    location: 'Siège Tunis Charguia'
+  },
+  {
+    id: 'trial-fleet-mach-4',
+    tenantId: 'Inter-Affaires',
+    category: 'Machine Industrielle / GPAO',
+    fleet_park: 'Parc Industriel Usine',
+    device_name: 'Ligne de Conditionnement Semi-Automatique',
+    serial_reference: 'LCOND-GPAO-TUNIS-01',
+    status: 'Assigned',
+    assignedTo: 'Chef d\'Atelier',
+    assignedDriver: 'Chef d\'Atelier',
+    registeredAt: '2023-09-15',
+    mileage: 0,
+    maxPayloadKg: 0,
+    acquisitionCost: 145000.000,
+    sceAccount: '223',
+    immobCode: 'IMM-2023-004',
+    location: 'Atelier Usine Tunis'
   }
 ];
 

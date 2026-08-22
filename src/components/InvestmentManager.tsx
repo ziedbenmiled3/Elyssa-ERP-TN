@@ -94,7 +94,7 @@ const CATEGORY_LABELS: Record<AssetCategory, { label: string; color: string; def
 
 const STORAGE_KEY = 'carthage_assets_immobilisations';
 
-// Initial Tunisian Demo Assets
+// Initial Tunisian Demo Assets (Synchronisés avec le Parc Flotte SCE 224 & Équipements)
 const SEED_ASSETS: Asset[] = [
   {
     id: 'ast-inv-1',
@@ -111,26 +111,26 @@ const SEED_ASSETS: Asset[] = [
     amortizationMethod: 'LINEAIRE',
     supplier: 'Dell Technologies Tunisie',
     invoiceRef: 'FACT-DELL-9921',
-    location: 'Salle Serveurs siège Charguia II',
+    location: 'Siège Tunis Charguia',
     notes: 'Infrastructures SI et sauvegarde centrale cloud'
   },
   {
     id: 'ast-inv-2',
     companyId: 'Inter-Affaires',
     code: 'IMM-2024-002',
-    name: 'Fourgon Isuzu D-Max Camionette Commerciale',
+    name: 'Fourgon Isuzu D-Max (240 TN 8812)',
     category: 'CORPORELLE',
     accountCode: '224',
-    acquisitionDate: '2024-03-01',
-    commissioningDate: '2024-03-15',
-    acquisitionCost: 78000.000,
+    acquisitionDate: '2024-02-10',
+    commissioningDate: '2024-02-10',
+    acquisitionCost: 72000.000,
     salvageValue: 5000.000,
     durationYears: 5,
     amortizationMethod: 'LINEAIRE',
     supplier: 'Afrique Auto S.A. Isuzu',
     invoiceRef: 'AA-2024-0412',
     location: 'Parc Automobile - Ben Arous',
-    notes: 'Véhicule de livraison Van Sales régional'
+    notes: 'Véhicule utilitaire - Matricule 240 TN 8812'
   },
   {
     id: 'ast-inv-3',
@@ -165,8 +165,8 @@ const SEED_ASSETS: Asset[] = [
     amortizationMethod: 'DEGRESSIF',
     supplier: 'Bizerte Industrie & Outillages',
     invoiceRef: 'BIO-2023-112',
-    location: 'Usine de Production - Nabeul',
-    notes: 'Amortissement dégressif fiscal (Coeff 2.5)'
+    location: 'Atelier Usine Tunis',
+    notes: 'Amortissement dégressif fiscal (Coeff 2.5) - GPAO'
   },
   {
     id: 'ast-inv-5',
@@ -185,6 +185,42 @@ const SEED_ASSETS: Asset[] = [
     invoiceRef: 'MAC-2026-009',
     location: 'Compte Titres BVMT',
     notes: 'Placements stratégiques non amortissables'
+  },
+  {
+    id: 'ast-inv-6',
+    companyId: 'Inter-Affaires',
+    code: 'IMM-2024-006',
+    name: 'Peugeot Partner Utilitaire (228 TN 4091)',
+    category: 'CORPORELLE',
+    accountCode: '224',
+    acquisitionDate: '2024-03-12',
+    commissioningDate: '2024-03-12',
+    acquisitionCost: 62000.000,
+    salvageValue: 5000.000,
+    durationYears: 5,
+    amortizationMethod: 'LINEAIRE',
+    supplier: 'Stafim Peugeot Tunisie',
+    invoiceRef: 'STAF-2024-118',
+    location: 'Parc Automobile - Tunis',
+    notes: 'Véhicule utilitaire - Matricule 228 TN 4091'
+  },
+  {
+    id: 'ast-inv-7',
+    companyId: 'Inter-Affaires',
+    code: 'IMM-2023-007',
+    name: 'Citroën C-Élysée Berline (215 TN 9811)',
+    category: 'CORPORELLE',
+    accountCode: '224',
+    acquisitionDate: '2023-01-15',
+    commissioningDate: '2023-01-15',
+    acquisitionCost: 48000.000,
+    salvageValue: 4000.000,
+    durationYears: 5,
+    amortizationMethod: 'LINEAIRE',
+    supplier: 'Aures Auto Citroën',
+    invoiceRef: 'AUR-2023-045',
+    location: 'Parc Automobile - Sousse',
+    notes: 'Véhicule commercial - Matricule 215 TN 9811'
   }
 ];
 

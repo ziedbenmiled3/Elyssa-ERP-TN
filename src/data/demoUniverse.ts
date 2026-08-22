@@ -77,6 +77,8 @@ export interface DemoUniverseType {
   lcRequests?: LCRequest[];
   deliveryTours?: DeliveryTour[];
   pickingOrders?: PickingOrder[];
+  assets?: any[];
+  fleetInventory?: any[];
 }
 
 export const DEMO_UNIVERSE: DemoUniverseType = {
@@ -410,14 +412,14 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
     }
   ],
 
-  // 4. VEHICLES (3 véhicules du parc)
+  // 4. VEHICLES (3 véhicules du parc synchronisés SCE compte 224)
   vehicles: [
     {
       id: "demo-v_1",
       tenantId: DEMO_TENANT_ID,
       brand: "Peugeot",
       model: "Partner",
-      registrationNumber: "228 TUN 4091",
+      registrationNumber: "228 TN 4091",
       purchaseDate: "2024-03-12",
       purchasePrice: 62000.000,
       status: "Active",
@@ -443,7 +445,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       tenantId: DEMO_TENANT_ID,
       brand: "Citroën",
       model: "C-Élysée",
-      registrationNumber: "215 TUN 9811",
+      registrationNumber: "215 TN 9811",
       purchaseDate: "2023-01-15",
       purchasePrice: 48000.000,
       status: "Active",
@@ -491,7 +493,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       employeeId: "demo-emp_3",
       employeeName: "Mohamed Ali Gharbi",
       vehicleId: "demo-v_3",
-      vehicleLabel: "Citroën C-Élysée (215 TUN 9811)",
+      vehicleLabel: "Citroën C-Élysée (215 TN 9811)",
       transportType: "CompanyCar",
       destination: "Sousse",
       purpose: "Prospection Sousse & Négociation Grands Comptes",
@@ -1356,5 +1358,211 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
   workContracts: DEMO_HR_WORK_CONTRACTS,
   absences: DEMO_HR_ABSENCES,
   payslips: DEMO_HR_PAYSLIPS,
-  companyLocations: DEMO_HR_COMPANY_LOCATIONS
+  companyLocations: DEMO_HR_COMPANY_LOCATIONS,
+
+  // 13. IMMOBILISATIONS & AMORTISSEMENTS (SCE - NCT Tunisie)
+  assets: [
+    {
+      id: "ast-inv-1",
+      companyId: DEMO_TENANT_ID,
+      code: "IMM-2025-001",
+      name: "Serveurs Dell PowerEdge & Baie de Stockage SAN",
+      category: "CORPORELLE",
+      accountCode: "222",
+      acquisitionDate: "2025-01-15",
+      commissioningDate: "2025-01-20",
+      acquisitionCost: 28500.000,
+      salvageValue: 0,
+      durationYears: 3,
+      amortizationMethod: "LINEAIRE",
+      supplier: "Dell Technologies Tunisie",
+      invoiceRef: "FACT-DELL-9921",
+      location: "Siège Tunis Charguia",
+      notes: "Infrastructure IT et baie SAN"
+    },
+    {
+      id: "ast-inv-2",
+      companyId: DEMO_TENANT_ID,
+      code: "IMM-2024-002",
+      name: "Fourgon Isuzu D-Max (240 TN 8812)",
+      category: "CORPORELLE",
+      accountCode: "224",
+      acquisitionDate: "2024-02-10",
+      commissioningDate: "2024-02-10",
+      acquisitionCost: 72000.000,
+      salvageValue: 5000.000,
+      durationYears: 5,
+      amortizationMethod: "LINEAIRE",
+      supplier: "Afrique Auto S.A. Isuzu",
+      invoiceRef: "AA-2024-0412",
+      location: "Parc Automobile - Ben Arous",
+      notes: "Véhicule utilitaire - Matricule 240 TN 8812"
+    },
+    {
+      id: "ast-inv-3",
+      companyId: DEMO_TENANT_ID,
+      code: "IMM-2024-003",
+      name: "Progiciel ERP Elyssa (Licence Perpétuelle & Spécifications)",
+      category: "INCORPORELLE",
+      accountCode: "212",
+      acquisitionDate: "2024-06-10",
+      commissioningDate: "2024-07-01",
+      acquisitionCost: 18000.000,
+      salvageValue: 0,
+      durationYears: 3,
+      amortizationMethod: "LINEAIRE",
+      supplier: "Elyssa Software Technologies",
+      invoiceRef: "EST-2024-0819",
+      location: "Licence Logicielle Cloud",
+      notes: "Agrément et digitalisation des processus métiers"
+    },
+    {
+      id: "ast-inv-4",
+      companyId: DEMO_TENANT_ID,
+      code: "IMM-2023-004",
+      name: "Ligne de Conditionnement Semi-Automatique",
+      category: "CORPORELLE",
+      accountCode: "223",
+      acquisitionDate: "2023-09-01",
+      commissioningDate: "2023-09-15",
+      acquisitionCost: 145000.000,
+      salvageValue: 10000.000,
+      durationYears: 7,
+      amortizationMethod: "DEGRESSIF",
+      supplier: "Bizerte Industrie & Outillages",
+      invoiceRef: "BIO-2023-112",
+      location: "Atelier Usine Tunis",
+      notes: "Amortissement dégressif fiscal (Coeff 2.5) - GPAO"
+    },
+    {
+      id: "ast-inv-5",
+      companyId: DEMO_TENANT_ID,
+      code: "IMM-2026-005",
+      name: "Titres de Participation - Portefeuille BIAT / SFBT",
+      category: "FINANCIERE",
+      accountCode: "251",
+      acquisitionDate: "2026-02-01",
+      commissioningDate: "2026-02-01",
+      acquisitionCost: 50000.000,
+      salvageValue: 50000.000,
+      durationYears: 0,
+      amortizationMethod: "LINEAIRE",
+      supplier: "Intermédiaire en Bourse MAC SA",
+      invoiceRef: "MAC-2026-009",
+      location: "Compte Titres BVMT",
+      notes: "Placements stratégiques non amortissables"
+    },
+    {
+      id: "ast-inv-6",
+      companyId: DEMO_TENANT_ID,
+      code: "IMM-2024-006",
+      name: "Peugeot Partner Utilitaire (228 TN 4091)",
+      category: "CORPORELLE",
+      accountCode: "224",
+      acquisitionDate: "2024-03-12",
+      commissioningDate: "2024-03-12",
+      acquisitionCost: 62000.000,
+      salvageValue: 5000.000,
+      durationYears: 5,
+      amortizationMethod: "LINEAIRE",
+      supplier: "Stafim Peugeot Tunisie",
+      invoiceRef: "STAF-2024-118",
+      location: "Parc Automobile - Tunis",
+      notes: "Véhicule utilitaire - Matricule 228 TN 4091"
+    },
+    {
+      id: "ast-inv-7",
+      companyId: DEMO_TENANT_ID,
+      code: "IMM-2023-007",
+      name: "Citroën C-Élysée Berline (215 TN 9811)",
+      category: "CORPORELLE",
+      accountCode: "224",
+      acquisitionDate: "2023-01-15",
+      commissioningDate: "2023-01-15",
+      acquisitionCost: 48000.000,
+      salvageValue: 4000.000,
+      durationYears: 5,
+      amortizationMethod: "LINEAIRE",
+      supplier: "Aures Auto Citroën",
+      invoiceRef: "AUR-2023-045",
+      location: "Parc Automobile - Sousse",
+      notes: "Véhicule commercial - Matricule 215 TN 9811"
+    }
+  ],
+
+  // 14. PARC & ACTIFS MATÉRIELS (`fleet_inventory` - 4 actifs synchronisés)
+  fleetInventory: [
+    {
+      id: "trial-fleet-dev-1",
+      tenantId: DEMO_TENANT_ID,
+      category: "Terminal Mobile",
+      fleet_park: "Flotte Commerciale & Vente",
+      device_name: "Samsung Galaxy Tab Active 4 Pro",
+      serial_reference: "SAM-TAB4-TN-00345",
+      status: "Assigned",
+      assignedTo: "Mohamed Ali Gharbi",
+      assignedDriver: "Mohamed Ali Gharbi",
+      registeredAt: "2026-01-15",
+      mileage: 0,
+      maxPayloadKg: 0,
+      acquisitionCost: 1850.000,
+      sceAccount: "222",
+      immobCode: "IMM-2026-008",
+      location: "Flotte Commerciale & Vente"
+    },
+    {
+      id: "trial-fleet-dev-2",
+      tenantId: DEMO_TENANT_ID,
+      category: "Terminal Mobile",
+      fleet_park: "Flotte Logistique",
+      device_name: "Zebra TC57 Touch Computer",
+      serial_reference: "ZEB-TC57-TN-00812",
+      status: "Assigned",
+      assignedTo: "Hamza Ben Salem",
+      assignedDriver: "Hamza Ben Salem",
+      registeredAt: "2026-02-10",
+      mileage: 0,
+      maxPayloadKg: 0,
+      acquisitionCost: 2400.000,
+      sceAccount: "222",
+      immobCode: "IMM-2026-009",
+      location: "Flotte Logistique"
+    },
+    {
+      id: "trial-fleet-srv-3",
+      tenantId: DEMO_TENANT_ID,
+      category: "Infrastructure IT",
+      fleet_park: "Parc Siège & IT",
+      device_name: "Serveurs Dell PowerEdge & Baie SAN",
+      serial_reference: "SRV-DELL-PE-SAN-2025",
+      status: "Assigned",
+      assignedTo: "Sami Mansour (DSI)",
+      assignedDriver: "Sami Mansour (DSI)",
+      registeredAt: "2025-01-20",
+      mileage: 0,
+      maxPayloadKg: 0,
+      acquisitionCost: 28500.000,
+      sceAccount: "222",
+      immobCode: "IMM-2025-001",
+      location: "Siège Tunis Charguia"
+    },
+    {
+      id: "trial-fleet-mach-4",
+      tenantId: DEMO_TENANT_ID,
+      category: "Machine Industrielle / GPAO",
+      fleet_park: "Parc Industriel Usine",
+      device_name: "Ligne de Conditionnement Semi-Automatique",
+      serial_reference: "LCOND-GPAO-TUNIS-01",
+      status: "Assigned",
+      assignedTo: "Chef d'Atelier",
+      assignedDriver: "Chef d'Atelier",
+      registeredAt: "2023-09-15",
+      mileage: 0,
+      maxPayloadKg: 0,
+      acquisitionCost: 145000.000,
+      sceAccount: "223",
+      immobCode: "IMM-2023-004",
+      location: "Atelier Usine Tunis"
+    }
+  ]
 };

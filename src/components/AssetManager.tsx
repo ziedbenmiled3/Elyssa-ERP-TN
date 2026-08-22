@@ -57,7 +57,7 @@ interface AssetManagerProps {
   isDemoCompany?: boolean;
 }
 
-// --- Default Tunisian Company Demo Assets ---
+// --- Default Tunisian Company Demo Assets (Synchronisés avec la Flotte SCE 224 & Équipements) ---
 const DEFAULT_DEMO_ASSETS: Immobilisation[] = [
   {
     id: 'ast-imm-1',
@@ -71,10 +71,10 @@ const DEFAULT_DEMO_ASSETS: Immobilisation[] = [
   },
   {
     id: 'ast-imm-2',
-    name: 'Fourgon Isuzu D-Max Camionette Commerciale',
+    name: 'Fourgon Isuzu D-Max (240 TN 8812)',
     category: 'Matériel de Transport',
-    purchaseDate: '2024-03-01',
-    initialValue: 78000.000,
+    purchaseDate: '2024-02-10',
+    initialValue: 72000.000,
     usefulLifeYears: 5,
     amortizationType: 'Linéaire',
     location: 'Dépôt de Sousse'
@@ -101,13 +101,33 @@ const DEFAULT_DEMO_ASSETS: Immobilisation[] = [
   },
   {
     id: 'ast-imm-5',
-    name: 'Bâtiment Industriel & Zone d\'Entreposage',
-    category: 'Bâtiments & Locaux',
-    purchaseDate: '2020-01-10',
-    initialValue: 250000.000,
-    usefulLifeYears: 20,
+    name: 'Titres de Participation - Portefeuille BIAT / SFBT',
+    category: 'Matériel Industriel',
+    purchaseDate: '2026-02-01',
+    initialValue: 50000.000,
+    usefulLifeYears: 10,
     amortizationType: 'Linéaire',
-    location: 'Entrepôt Gabès'
+    location: 'Siège Social Tunis'
+  },
+  {
+    id: 'ast-imm-6',
+    name: 'Peugeot Partner Utilitaire (228 TN 4091)',
+    category: 'Matériel de Transport',
+    purchaseDate: '2024-03-12',
+    initialValue: 62000.000,
+    usefulLifeYears: 5,
+    amortizationType: 'Linéaire',
+    location: 'Siège Social Tunis'
+  },
+  {
+    id: 'ast-imm-7',
+    name: 'Citroën C-Élysée Berline (215 TN 9811)',
+    category: 'Matériel de Transport',
+    purchaseDate: '2023-01-15',
+    initialValue: 48000.000,
+    usefulLifeYears: 5,
+    amortizationType: 'Linéaire',
+    location: 'Dépôt de Sousse'
   }
 ];
 
