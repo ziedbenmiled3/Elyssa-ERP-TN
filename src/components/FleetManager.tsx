@@ -299,7 +299,15 @@ export default function FleetManager({
 
   // Add Modals states
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
-  const [newVehicle, setNewVehicle] = useState({ brand: '', model: '', registrationNumber: '', purchaseDate: '', purchasePrice: 0, status: 'Active' as 'Active' | 'UnderRepair' });
+  const [newVehicle, setNewVehicle] = useState({ 
+    brand: '', 
+    model: '', 
+    registrationNumber: '', 
+    purchaseDate: '', 
+    purchasePrice: 0, 
+    status: 'Active' as 'Active' | 'UnderRepair',
+    assignedToEmployeeId: ''
+  });
   const [sellingVehicleId, setSellingVehicleId] = useState<string | null>(null);
   const [saleDate, setSaleDate] = useState('');
   const [salePrice, setSalePrice] = useState<number>(0);
@@ -519,6 +527,7 @@ export default function FleetManager({
     e.preventDefault();
     if (!newVehicle.brand || !newVehicle.model || !newVehicle.registrationNumber) return;
 
+    const assignedEmp = employees.find(e => e.id === newVehicle.assignedToEmployeeId);
     const toSave: Vehicle = {
       id: `v_${Date.now()}`,
       brand: newVehicle.brand,
@@ -526,12 +535,14 @@ export default function FleetManager({
       registrationNumber: newVehicle.registrationNumber,
       purchaseDate: newVehicle.purchaseDate || new Date().toISOString().split('T')[0],
       purchasePrice: Number(newVehicle.purchasePrice) || 0,
-      status: newVehicle.status
+      status: newVehicle.status,
+      assignedToEmployeeId: newVehicle.assignedToEmployeeId || undefined,
+      assignedEmployeeName: assignedEmp ? assignedEmp.name : undefined
     };
 
     setVehicles([...vehicles, toSave]);
     setIsVehicleModalOpen(false);
-    setNewVehicle({ brand: '', model: '', registrationNumber: '', purchaseDate: '', purchasePrice: 0, status: 'Active' });
+    setNewVehicle({ brand: '', model: '', registrationNumber: '', purchaseDate: '', purchasePrice: 0, status: 'Active', assignedToEmployeeId: '' });
   };
 
   const processVehicleSaleSubmit = (e: React.FormEvent) => {
@@ -2131,6 +2142,22 @@ export default function FleetManager({
                 >
                   <option value="Active">En circulation opérationnelle</option>
                   <option value="UnderRepair">Au garage pour diagnostic / Entretien</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Chauffeur / Agent attitré (Optionnel)</label>
+                <select
+                  className="w-full text-xs p-2 border border-slate-200 rounded bg-white"
+                  value={newVehicle.assignedToEmployeeId}
+                  onChange={e => setNewVehicle({ ...newVehicle, assignedToEmployeeId: e.target.value })}
+                >
+                  <option value="">-- Aucun chauffeur attitré (Véhicule de pool) --</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.jobTitle || 'Collaborateur'})
+                    </option>
+                  ))}
                 </select>
               </div>
 

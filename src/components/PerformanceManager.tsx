@@ -18,6 +18,13 @@ import {
   generateTenantDemoPerformanceContracts,
   MPOManager
 } from '../services/performanceContractService';
+import { 
+  UNIFIED_RH_POLES, 
+  UNIFIED_RH_POLES_LIST, 
+  getPoleInfo, 
+  matchPoleKey, 
+  getEmployeePole 
+} from '../services/hrSyncService';
 
 interface PerformanceManagerProps {
   tenantId?: string;
@@ -285,79 +292,15 @@ export const PerformanceManager: React.FC<PerformanceManagerProps> = ({
     return activeManager.department;
   }, [activeManager]);
 
-  // Dynamically extract departments and poles from RH repository & contracts
+  // Unified 6 RH Poles & Departments reference list
   const dynamicDepartments = useMemo(() => {
-    const deptsFromStorage: string[] = [];
-    try {
-      const raw = localStorage.getItem(`carthage_${tenantId}_departments`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((d: any) => {
-            const name = typeof d === 'string' ? d : d?.name || d?.label;
-            if (name && typeof name === 'string' && name.trim()) {
-              deptsFromStorage.push(name.trim());
-            }
-          });
-        }
-      }
-    } catch (e) {
-      console.error('Error reading tenant departments:', e);
-    }
-
-    // Extract from contracts (both pole and department)
-    const fromContracts: string[] = [];
-    (performanceContracts || []).forEach(c => {
-      if (c.pole && c.pole.trim()) fromContracts.push(c.pole.trim());
-      if (c.department && c.department.trim()) fromContracts.push(c.department.trim());
-    });
-
-    // Extract from employees
-    const fromEmployees: string[] = [];
-    (employees || []).forEach(e => {
-      const empPole = (e as any).pole;
-      if (empPole && typeof empPole === 'string' && empPole.trim()) fromEmployees.push(empPole.trim());
-      if (e.department && typeof e.department === 'string' && e.department.trim()) fromEmployees.push(e.department.trim());
-    });
-
-    // Combine uniquely while keeping clean display
-    const set = new Set<string>();
-    [...deptsFromStorage, ...fromContracts, ...fromEmployees].forEach(item => {
-      if (item && item !== 'ALL' && item !== 'Tous pôles' && item !== 'Direction Générale') {
-        set.add(item);
-      }
-    });
-
-    // Fallback if empty
-    if (set.size === 0) {
-      return ['Finance', 'RH', 'Ventes', 'Logistique', 'Direction & IT'];
-    }
-
-    return Array.from(set);
-  }, [tenantId, performanceContracts, employees]);
+    return UNIFIED_RH_POLES_LIST.map(p => p.shortName);
+  }, []);
 
   // Helper for pole badge visual identity
   const getPoleBadgeStyle = (pole?: string) => {
-    const p = (pole || '').toLowerCase();
-    if (p.includes('finan')) {
-      return 'bg-emerald-50 text-emerald-700 border-emerald-300';
-    }
-    if (p.includes('rh') || p.includes('ressour')) {
-      return 'bg-purple-50 text-purple-700 border-purple-300';
-    }
-    if (p.includes('vent') || p.includes('commer')) {
-      return 'bg-sky-50 text-sky-700 border-sky-300';
-    }
-    if (p.includes('direct') || p.includes('it') || p.includes('tech')) {
-      return 'bg-rose-50 text-rose-700 border-rose-300';
-    }
-    if (p.includes('logis') || p.includes('exped') || p.includes('trans')) {
-      return 'bg-amber-50 text-amber-700 border-amber-300';
-    }
-    if (p.includes('achat') || p.includes('appro')) {
-      return 'bg-indigo-50 text-indigo-700 border-indigo-300';
-    }
-    return 'bg-slate-100 text-slate-700 border-slate-300';
+    const poleInfo = getPoleInfo(pole);
+    return poleInfo.borderBadge || 'bg-slate-100 text-slate-700 border-slate-300';
   };
 
   // All contracts currently stored

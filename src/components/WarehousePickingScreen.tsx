@@ -10,6 +10,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 import { PickingOrder, PickingOrderStatus } from '../types/mobileTerrain';
+import { Employee } from '../types';
+import { isWarehouseOrPicking } from '../services/hrSyncService';
 import { TRIAL_PICKING_ORDERS } from '../data/mockTrialData';
 import { 
   Warehouse, 
@@ -34,16 +36,28 @@ import {
 interface WarehousePickingScreenProps {
   tenantId: string;
   currentUser?: any;
+  employees?: Employee[];
   isTrial?: boolean;
 }
 
 export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
   tenantId,
   currentUser,
+  employees = [],
   isTrial = false
 }) => {
   const [pickingOrders, setPickingOrders] = useState<PickingOrder[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Dynamic Warehouse Picking Staff from HR
+  const warehouseStaff = useMemo(() => {
+    if (!Array.isArray(employees) || employees.length === 0) return [];
+    const list = employees.filter(emp => emp && isWarehouseOrPicking(emp));
+    if (list.length > 0) return list;
+    return employees;
+  }, [employees]);
+
+  const [activePreparateur, setActivePreparateur] = useState<string>(currentUser?.name || '');
 
   // Filters
   const [selectedWarehouseFilter, setSelectedWarehouseFilter] = useState<string>('ALL');
@@ -138,7 +152,7 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
   // Status Change Handler
   const handleUpdateStatus = async (pickingOrder: PickingOrder, newStatus: PickingOrderStatus) => {
     try {
-      const operator = currentUser?.name || 'Chef de Dépôt';
+      const operator = activePreparateur || currentUser?.name || 'Chef de Dépôt';
       const defaultDock = pickingOrder.dockNumber && pickingOrder.dockNumber !== 'Quai Non Attribué'
         ? pickingOrder.dockNumber 
         : `Quai ${Math.floor(Math.random() * 3) + 1} - ${pickingOrder.warehouseName}`;
@@ -155,9 +169,9 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
       await updateDoc(doc(db, 'company_erp_data', tenantId, 'picking_orders', pickingOrder.id), updateData);
 
       if (newStatus === 'pret_chargement') {
-        showToast(`🟢 Order ${pickingOrder.id} validé "Prêt au Quai" (${defaultDock}) par ${operator}!`, 'success');
+        showToast(`🟢 Commande ${pickingOrder.id} validée "Prêt au Quai" (${defaultDock}) par ${operator}!`, 'success');
       } else if (newStatus === 'en_cours') {
-        showToast(`⚙️ Démarrage de la préparation pour ${pickingOrder.id}`, 'info');
+        showToast(`⚙️ Démarrage du colisage pour ${pickingOrder.id} (Opérateur: ${operator})`, 'info');
       }
     } catch (err) {
       console.error('Error updating picking status:', err);
@@ -429,11 +443,11 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
       {/* Filter Toolbar */}
       <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-4">
         
-        {/* Row 1: Warehouse & Search */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Row 1: Warehouse, Preparateur & Search */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           
           {/* Warehouse Selector */}
-          <div className="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0">
+          <div className="flex items-center space-x-2 overflow-x-auto pb-1 lg:pb-0">
             <span className="text-xs font-bold text-slate-400 flex items-center space-x-1 shrink-0">
               <Warehouse className="w-4 h-4 text-amber-400" />
               <span>Dépôt:</span>
@@ -465,16 +479,38 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
             ))}
           </div>
 
-          {/* Search Box */}
-          <div className="relative w-full md:w-64">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher bon, facture, client..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-            />
+          {/* Preparateur Agent Selector & Search Box */}
+          <div className="flex flex-wrap items-center gap-2">
+            {warehouseStaff.length > 0 && (
+              <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs">
+                <UserCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-slate-400 font-bold text-[11px] whitespace-nowrap">Agent Dépôt :</span>
+                <select
+                  value={activePreparateur}
+                  onChange={(e) => setActivePreparateur(e.target.value)}
+                  className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
+                >
+                  <option value="" className="bg-slate-900 text-white">Sélectionner préparateur...</option>
+                  {warehouseStaff.map(emp => (
+                    <option key={emp.id} value={emp.name} className="bg-slate-900 text-white">
+                      {emp.name} ({emp.jobTitle || 'Magasinier'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Search Box */}
+            <div className="relative w-full sm:w-60">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Rechercher bon, facture, client..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+              />
+            </div>
           </div>
 
         </div>

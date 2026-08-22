@@ -29,10 +29,12 @@ import {
   Info
 } from 'lucide-react';
 
-import { RawMaterial, Nomenclature, ManufacturingOrder, ImportFolder, LCRequest } from '../types';
+import { RawMaterial, Nomenclature, ManufacturingOrder, ImportFolder, LCRequest, Employee } from '../types';
+import { isProductionOrWorkshop } from '../services/hrSyncService';
 
 interface ProductionManagerProps {
   currentUser: any;
+  employees?: Employee[];
   nomenclatures?: Nomenclature[];
   onUpdateNomenclatures?: (nomenclatures: Nomenclature[]) => void;
   manufacturingOrders?: ManufacturingOrder[];
@@ -44,6 +46,7 @@ interface ProductionManagerProps {
 
 export default function ProductionManager({ 
   currentUser,
+  employees = [],
   nomenclatures: propNomenclatures = [],
   onUpdateNomenclatures = () => {},
   manufacturingOrders: propManufacturingOrders = [],
@@ -1585,15 +1588,26 @@ export default function ProductionManager({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-slate-500 block">Équipe assignée :</label>
+                    <label className="text-slate-500 block">Équipe / Chef d'Atelier assigné :</label>
                     <select
                       value={formAssignedTeam}
                       onChange={(e) => setFormAssignedTeam(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 outline-none focus:border-indigo-500 cursor-pointer text-slate-800"
                     >
-                      {productionTeams.map(team => (
-                        <option key={team} value={team}>{team}</option>
-                      ))}
+                      <optgroup label="Équipes d'Atelier / Shifts">
+                        {productionTeams.map(team => (
+                          <option key={team} value={team}>{team}</option>
+                        ))}
+                      </optgroup>
+                      {employees.filter(emp => emp && isProductionOrWorkshop(emp)).length > 0 && (
+                        <optgroup label="Collaborateurs Production & Chefs d'Atelier">
+                          {employees.filter(emp => emp && isProductionOrWorkshop(emp)).map(emp => (
+                            <option key={emp.id} value={`${emp.name} (${emp.jobTitle || 'Chef Atelier'})`}>
+                              {emp.name} - {emp.jobTitle || 'Production'}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                   </div>
                 </div>

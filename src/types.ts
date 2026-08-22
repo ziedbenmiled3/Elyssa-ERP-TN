@@ -54,6 +54,8 @@ export interface Client {
   notes: string;
   createdDate: string;
   matriculeFiscal?: string;
+  assignedCommercialId?: string;
+  assignedCommercialName?: string;
   is_demo?: boolean;
 }
 
@@ -429,6 +431,14 @@ export interface YearEndClosing {
   isLocked: boolean; // Locks editing in that fiscal year
 }
 
+export type RHPoleKey = 
+  | 'DIRECTION_IT'
+  | 'FINANCE_COMPTA'
+  | 'VENTES_COMMERCE'
+  | 'RH_SOCIAL'
+  | 'LOGISTIQUE_TRANSPORT'
+  | 'PRODUCTION_INDUSTRIE';
+
 export interface Employee {
   id: string;
   tenantId?: string;
@@ -456,6 +466,8 @@ export interface Employee {
   hiringDate?: string;
   hireDate?: string;
   branchId?: string; // Pointing to CompanyLocation id
+  locationId?: string; // Alias to branchId
+  pole?: RHPoleKey | string;
   department?: string;
   company?: string;
   company_id?: string;
@@ -472,6 +484,11 @@ export interface CompanyLocation {
   lng: number;
   radius: number; // in meters
   isMaman?: boolean; // True if it's the headquarters (Connexion Mère)
+  type?: 'HQ' | 'Warehouse' | 'Agency' | 'Branch' | 'Store';
+  code?: string;
+  address?: string;
+  managerName?: string;
+  is_demo?: boolean;
 }
 
 export interface TripartiteWeightingConfig {

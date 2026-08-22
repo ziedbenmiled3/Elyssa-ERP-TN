@@ -750,6 +750,8 @@ export default function SaaSConfig({
     return saved === null ? true : saved === 'true';
   });
   const [isOnlineCardActive, setIsOnlineCardActive] = useState(() => {
+    const onlineSaved = localStorage.getItem('online_payment_enabled');
+    if (onlineSaved !== null) return onlineSaved === 'true';
     const saved = localStorage.getItem('carthage_pm_online_card_active');
     return saved === null ? false : saved === 'true';
   });
@@ -817,9 +819,13 @@ export default function SaaSConfig({
           setIsWafacashActive(config.isWafacashActive);
           localStorage.setItem('carthage_pm_wafacash_active', String(config.isWafacashActive));
         }
-        if (config.isOnlineCardActive !== undefined) {
-          setIsOnlineCardActive(config.isOnlineCardActive);
-          localStorage.setItem('carthage_pm_online_card_active', String(config.isOnlineCardActive));
+        const activeOnline = config.online_payment_enabled !== undefined 
+          ? config.online_payment_enabled 
+          : config.isOnlineCardActive;
+        if (activeOnline !== undefined) {
+          setIsOnlineCardActive(activeOnline);
+          localStorage.setItem('online_payment_enabled', String(activeOnline));
+          localStorage.setItem('carthage_pm_online_card_active', String(activeOnline));
         }
       }
     });
@@ -1232,20 +1238,20 @@ export default function SaaSConfig({
                     ? `Module : ${ALL_MODULES_METADATA.find(m => m.id === finalPackId)?.name || finalPackId}`
                     : `Forfait : ${PACKS_DEFINITIONS.find(p => p.id === finalPackId)?.name || finalPackId}`);
                 
-              addAdminAlert(`Règlement Flouci Réussi : l'entreprise "${activeCompanyName}" a acquis le pack "${planTitle}" (${finalInterval === 'monthly' ? 'Mensuel' : finalInterval === 'quarterly' ? 'Trimestriel' : 'Annuel'}) via Flouci (${finalPrice} TND). ID: ${targetPaymentId}`, 'acquisition');
+              addAdminAlert(`Règlement en ligne Réussi : l'entreprise "${activeCompanyName}" a acquis le pack "${planTitle}" (${finalInterval === 'monthly' ? 'Mensuel' : finalInterval === 'quarterly' ? 'Trimestriel' : 'Annuel'}) via Paiement en ligne (Carte Bancaire) (${finalPrice} TND). ID: ${targetPaymentId}`, 'acquisition');
 
               triggerLiveVisualNotification({
                 type: 'approved',
-                title: '🎉 Paiement Flouci Réussi !',
-                message: `Votre licence "${planTitle}" a été activée instantanément.`
+                title: '🎉 Paiement en ligne Réussi !',
+                message: `Votre licence "${planTitle}" a été activée instantanément par carte bancaire.`
               });
               
               localStorage.removeItem('carthage_pending_payment');
             } else {
               triggerLiveVisualNotification({
                 type: 'warning',
-                title: '❌ Échec Flouci',
-                message: "La transaction Flouci n'a pas pu être validée par la banque centrale."
+                title: '❌ Échec du Paiement en ligne',
+                message: "La transaction de paiement par carte n'a pas pu être validée par la banque centrale."
               });
             }
           })
@@ -1254,7 +1260,7 @@ export default function SaaSConfig({
             triggerLiveVisualNotification({
               type: 'warning',
               title: '❌ Erreur de Validation',
-              message: "Une erreur s'est produite lors de la validation de votre règlement Flouci."
+              message: "Une erreur s'est produite lors de la validation de votre règlement en ligne (Carte Bancaire)."
             });
           })
           .finally(() => {
@@ -1264,8 +1270,8 @@ export default function SaaSConfig({
       } else if (flouciStatus === 'fail') {
         triggerLiveVisualNotification({
           type: 'warning',
-          title: '❌ Paiement Flouci Annulé',
-          message: "La transaction de paiement Flouci a été annulée ou a échoué."
+          title: '❌ Paiement en ligne Annulé',
+          message: "La transaction de paiement en ligne (Carte Bancaire) a été annulée ou a échoué."
         });
         const cleanUrl = window.location.pathname;
         window.history.replaceState({}, document.title, cleanUrl);
@@ -1540,12 +1546,12 @@ export default function SaaSConfig({
         if (data.success && data.result?.link) {
           window.location.href = data.result.link;
         } else {
-          throw new Error(data.error || "La passerelle Flouci n'a pas retourné de session valide.");
+          throw new Error(data.error || "La passerelle de paiement en ligne n'a pas retourné de session valide.");
         }
       })
       .catch(err => {
-        console.error("Flouci cart checkout redirect generation error:", err);
-        setFlouciError(err.message || "Impossible d'initier la passerelle Flouci.");
+        console.error("Cart checkout redirect generation error:", err);
+        setFlouciError(err.message || "Impossible d'initier la passerelle de paiement en ligne.");
         setCartCheckoutStep('details');
       });
       return;
@@ -1730,12 +1736,12 @@ export default function SaaSConfig({
         if (data.success && data.result?.link) {
           window.location.href = data.result.link;
         } else {
-          throw new Error(data.error || "La passerelle Flouci n'a pas retourné de session valide.");
+          throw new Error(data.error || "La passerelle de paiement en ligne n'a pas retourné de session valide.");
         }
       })
       .catch(err => {
-        console.error("Flouci redirect generation error:", err);
-        setFlouciError(err.message || "Impossible d'initier la passerelle Flouci.");
+        console.error("Payment redirect generation error:", err);
+        setFlouciError(err.message || "Impossible d'initier la passerelle de paiement en ligne.");
         setPaymentStep('form');
       });
       return;
@@ -4568,8 +4574,8 @@ export default function SaaSConfig({
                                 ? 'Virement' 
                                 : client.paymentGateway === 'Versement' 
                                 ? 'Versement' 
-                                : client.paymentGateway === 'FLOUCI' 
-                                ? 'FLOUCI ⏱️' 
+                                : (client.paymentGateway === 'FLOUCI' || client.paymentGateway === 'Flouci')
+                                ? 'Carte Bancaire 💳' 
                                 : client.paymentGateway}
                             </span>
                           )}
@@ -4683,6 +4689,7 @@ export default function SaaSConfig({
           localStorage.setItem('carthage_pm_versement_active', String(isVersementActive));
           localStorage.setItem('carthage_pm_wafacash_active', String(isWafacashActive));
           localStorage.setItem('carthage_pm_online_card_active', String(isOnlineCardActive));
+          localStorage.setItem('online_payment_enabled', String(isOnlineCardActive));
           
           saveSaaSBankConfig({
             bankName,
@@ -4696,7 +4703,8 @@ export default function SaaSConfig({
             isVirementActive,
             isVersementActive,
             isWafacashActive,
-            isOnlineCardActive
+            isOnlineCardActive,
+            online_payment_enabled: isOnlineCardActive
           });
 
           setSimulationAlert("Configurations des modes de paiement enregistrées avec succès et synchronisées !");
@@ -4765,24 +4773,69 @@ export default function SaaSConfig({
                 </span>
               </button>
 
-              {/* Online Gateways */}
-              <button
-                type="button"
-                onClick={() => setIsOnlineCardActive(!isOnlineCardActive)}
-                className={`p-3 rounded-xl border text-left transition flex justify-between items-center cursor-pointer ${
+              {/* PAIEMENT PAR CARTE / PAIEMENT EN LIGNE - Dynamic Switch Toggle */}
+              <div
+                onClick={() => {
+                  const nextState = !isOnlineCardActive;
+                  setIsOnlineCardActive(nextState);
+                  localStorage.setItem('online_payment_enabled', String(nextState));
+                  localStorage.setItem('carthage_pm_online_card_active', String(nextState));
+                  saveSaaSBankConfig({
+                    bankName,
+                    bankOwner,
+                    bankRib,
+                    bankAgency,
+                    wafacashBeneficiary,
+                    wafacashCin,
+                    wafacashPhone,
+                    wafacashCity,
+                    isVirementActive,
+                    isVersementActive,
+                    isWafacashActive,
+                    isOnlineCardActive: nextState,
+                    online_payment_enabled: nextState
+                  });
+                  setSimulationAlert(nextState ? "Paiement en ligne (Carte Bancaire) activé avec succès !" : "Paiement en ligne (Carte Bancaire) désactivé.");
+                  setTimeout(() => setSimulationAlert(null), 4000);
+                }}
+                className={`p-3 rounded-xl border text-left transition-all duration-200 flex justify-between items-center cursor-pointer select-none ${
                   isOnlineCardActive 
-                    ? 'bg-indigo-950/20 border-indigo-500/50 text-indigo-300' 
-                    : 'bg-slate-900/50 border-slate-850 text-slate-500'
+                    ? 'bg-emerald-950/20 border-emerald-500/50 text-emerald-300 shadow-xs' 
+                    : 'bg-slate-900/50 border-slate-850 text-slate-500 hover:border-slate-700'
                 }`}
               >
                 <div className="space-y-0.5">
-                  <span className="text-[10px] font-black uppercase block">Paiement par Carte</span>
-                  <span className="text-[8.5px] font-semibold text-slate-400 block">Paiement en ligne, e-DINAR, etc.</span>
+                  <div className="flex items-center gap-1.5">
+                    <CreditCard className={`w-3.5 h-3.5 ${isOnlineCardActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                    <span className="text-[10px] font-black uppercase block">Paiement par Carte</span>
+                  </div>
+                  <span className="text-[8.5px] font-semibold text-slate-400 block">Paiement en ligne (Carte Bancaire)</span>
                 </div>
-                <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded ${isOnlineCardActive ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-950 text-slate-500'}`}>
-                  {isOnlineCardActive ? 'ACTIF' : 'INACTIF'}
-                </span>
-              </button>
+
+                <div className="flex items-center gap-2">
+                  <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded flex items-center gap-1 ${
+                    isOnlineCardActive 
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                      : 'bg-slate-950 text-slate-500 border border-slate-800'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isOnlineCardActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                    {isOnlineCardActive ? 'ACTIF' : 'INACTIF'}
+                  </span>
+
+                  {/* Switch toggle control */}
+                  <div
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      isOnlineCardActive ? 'bg-emerald-500' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
+                        isOnlineCardActive ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
 
             </div>
           </div>
@@ -5010,7 +5063,7 @@ export default function SaaSConfig({
                   <option value="Virement">Virement Bancaire (Recommandé)</option>
                   <option value="Mandat">Mandat Minute (La Poste)</option>
                   <option value="Poste">Versement d'Espèces</option>
-                  <option value="Flouci">Portefeuille Flouci</option>
+                  <option value="Flouci">Paiement en ligne (Carte Bancaire)</option>
                   <option value="Wafacash">Réseau Wafacash</option>
                 </select>
               </div>
@@ -5448,38 +5501,60 @@ export default function SaaSConfig({
                   </div>
 
                   {/* TAB SELECTOR FOR CARD vs WIRE */}
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                  <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
                     <button
                       type="button"
                       disabled={!isOnlineCardActive}
-                      onClick={() => setCheckoutPaymentMethod('card')}
-                      className={`py-1.5 rounded-lg text-[10px] font-black uppercase transition text-center flex items-center justify-center gap-1.5 relative ${
+                      onClick={() => {
+                        if (isOnlineCardActive) {
+                          setCheckoutPaymentMethod('card');
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl text-left transition-all duration-150 flex items-center justify-between gap-2 relative ${
                         !isOnlineCardActive
-                          ? 'opacity-35 cursor-not-allowed bg-slate-200/50 text-slate-400 border border-transparent'
+                          ? 'opacity-50 cursor-not-allowed bg-slate-200/60 text-slate-400 border border-slate-300/40 select-none'
                           : checkoutPaymentMethod === 'card'
-                          ? 'bg-white text-slate-900 shadow-3xs font-black border border-slate-200 cursor-pointer'
-                          : 'text-slate-500 hover:text-slate-800 font-bold cursor-pointer'
+                          ? 'bg-white text-slate-900 shadow-xs font-black border border-slate-200 cursor-pointer'
+                          : 'text-slate-500 hover:text-slate-800 font-bold cursor-pointer hover:bg-slate-50'
                       }`}
                     >
-                      <CreditCard className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                      <span>Par Carte (Direct)</span>
+                      <div className="flex items-center gap-2">
+                        <CreditCard className={`w-4 h-4 shrink-0 ${isOnlineCardActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <div className="flex flex-col leading-tight">
+                          <span className="font-black text-[10.5px] uppercase">PAIEMENT PAR CARTE (EN LIGNE)</span>
+                          {!isOnlineCardActive ? (
+                            <span className="text-[8px] text-amber-700 font-bold tracking-tight">
+                              Bientôt disponible / En cours de maintenance
+                            </span>
+                          ) : (
+                            <span className="text-[8px] text-emerald-600 font-bold tracking-tight">
+                              Actif / Instantané
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       {!isOnlineCardActive && (
-                        <span className="absolute -top-1.5 -right-1 bg-rose-650 text-white text-[5.5px] px-1 rounded font-sans font-bold leading-none py-0.5 uppercase tracking-wide">
-                          Grisé
+                        <span className="bg-amber-100 text-amber-800 border border-amber-300/60 text-[7.5px] font-black uppercase px-1.5 py-0.5 rounded-full shrink-0">
+                          Maintenance
                         </span>
                       )}
                     </button>
                     <button
                       type="button"
                       onClick={() => setCheckoutPaymentMethod('wire')}
-                      className={`py-1.5 rounded-lg text-[10px] font-black uppercase transition cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                      className={`p-2.5 rounded-xl text-left transition-all duration-150 cursor-pointer flex items-center justify-between gap-2 ${
                         checkoutPaymentMethod === 'wire'
-                          ? 'bg-white text-slate-900 shadow-3xs font-black border border-slate-200'
-                          : 'text-slate-500 hover:text-slate-800 font-bold'
+                          ? 'bg-white text-slate-900 shadow-xs font-black border border-slate-200'
+                          : 'text-slate-500 hover:text-slate-800 font-bold hover:bg-slate-50'
                       }`}
                     >
-                      <Building className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Par Virement (Clé)</span>
+                      <div className="flex items-center gap-2">
+                        <Building className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <div className="flex flex-col leading-tight">
+                          <span className="font-black text-[10.5px] uppercase">Virement Bancaire (Clé)</span>
+                          <span className="text-[8px] text-slate-400 font-bold tracking-tight">Validation administrative</span>
+                        </div>
+                      </div>
                     </button>
                   </div>
 
@@ -5487,7 +5562,7 @@ export default function SaaSConfig({
                     <div className="space-y-4 text-left">
                       {/* Payment Gateway selector */}
                       <div className="space-y-2">
-                        <label className="text-[9.5px] font-black uppercase tracking-wider text-slate-450 block">Agrégateur de Règlement Tunisien</label>
+                        <label className="text-[9.5px] font-black uppercase tracking-wider text-slate-450 block">Passerelle de Règlement</label>
                         <div className="grid grid-cols-4 gap-2">
                           {[
                             { id: 'Flouci', name: 'Carte Bancaire', badge: 'Visa/MC/CIB' },
@@ -5519,8 +5594,8 @@ export default function SaaSConfig({
                               <CreditCard className="w-4 h-4" />
                             </div>
                             <div>
-                              <h5 className="text-[11px] font-black uppercase text-cyan-900 leading-none">Paiement par Carte Bancaire</h5>
-                              <span className="text-[9px] text-cyan-600 font-semibold">Tunisie (Portail de Transaction Nationale Sécurisée)</span>
+                              <h5 className="text-[11px] font-black uppercase text-cyan-900 leading-none">Paiement en ligne (Carte Bancaire)</h5>
+                              <span className="text-[9px] text-cyan-600 font-semibold">Tunisie (Portail de Transaction Sécurisée)</span>
                             </div>
                           </div>
                           
@@ -6579,7 +6654,7 @@ export default function SaaSConfig({
                   >
                     <option value="Virement">Virement Bancaire</option>
                     <option value="Versement">Versement Espèces</option>
-                    <option value="FLOUCI">Portefeuille FLOUCI</option>
+                    <option value="FLOUCI">Paiement en ligne (Carte Bancaire)</option>
                   </select>
                 </div>
 
@@ -6804,7 +6879,7 @@ export default function SaaSConfig({
         order={selectedOrderForDoc} 
       />
 
-      {/* 🇹🇳 FLOUCI SANDBOX PAYMENT ENVIRONMENT OVERLAY */}
+      {/* 🇹🇳 SANDBOX PAYMENT ENVIRONMENT OVERLAY */}
       {(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const showSandboxScreen = urlParams.get('flouci_sandbox') === 'true';
@@ -6820,11 +6895,11 @@ export default function SaaSConfig({
               {/* Header */}
               <div className="bg-cyan-600 p-6 text-white text-center space-y-2">
                 <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto border border-white/30 shadow-inner">
-                  <span className="text-xl font-extrabold text-white tracking-widest uppercase">Flouci</span>
+                  <CreditCard className="w-8 h-8 text-white" />
                 </div>
                 <h2 className="text-lg font-black tracking-wide uppercase">Environnement d'Essai</h2>
                 <div className="inline-block bg-cyan-700/80 text-[10px] text-cyan-200 px-2.5 py-0.5 rounded-full font-black uppercase tracking-widest font-mono">
-                  Portail de Paiement Sandbox
+                  Paiement en ligne (Carte Bancaire) - Sandbox
                 </div>
               </div>
 
@@ -6852,7 +6927,7 @@ export default function SaaSConfig({
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl flex items-start space-x-2 text-[10px] leading-normal font-semibold">
                   <span className="shrink-0 text-amber-600 text-sm mt-0.5">⚠️</span>
                   <p>
-                    Vous utilisez la simulation Flouci car aucune clé API Flouci n'est configurée dans vos variables d'environnement (.env). En production, vous serez redirigé vers l'agrégateur Flouci officiel.
+                    Vous utilisez la simulation de paiement en ligne car aucune passerelle directe n'est connectée en direct. En production, vous serez redirigé vers la plateforme bancaire sécurisée officielle.
                   </p>
                 </div>
               </div>

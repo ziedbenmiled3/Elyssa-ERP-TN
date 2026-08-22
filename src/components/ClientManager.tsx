@@ -35,6 +35,8 @@ import {
   FileText
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { Employee } from '../types';
+import { isSalesOrCommercial } from '../services/hrSyncService';
 
 interface ClientManagerProps {
   clients: Client[];
@@ -42,6 +44,7 @@ interface ClientManagerProps {
   readOnly?: boolean;
   activeTenantId?: string;
   isDemoCompany?: boolean;
+  employees?: Employee[];
 }
 
 export const DEFAULT_DEMO_CLIENTS: Client[] = [
@@ -107,7 +110,8 @@ export default function ClientManager({
   onUpdateClients, 
   readOnly = false,
   activeTenantId,
-  isDemoCompany = false
+  isDemoCompany = false,
+  employees = []
 }: ClientManagerProps) {
   // Strict check for Demo tenant vs Production tenant
   const isDemoTenant = React.useMemo(() => {
@@ -118,6 +122,14 @@ export default function ClientManager({
     }
     return tid === 'inter-affaires-demo' || tid === 'demo' || tid === 'company_demo' || tid.includes('démo') || tid.includes('demo') || tid.includes('sandbox');
   }, [activeTenantId, isDemoCompany]);
+
+  // Dynamic Commercials List from HR
+  const commercialsList = React.useMemo(() => {
+    if (!Array.isArray(employees) || employees.length === 0) return [];
+    const list = employees.filter(emp => emp && isSalesOrCommercial(emp));
+    if (list.length > 0) return list;
+    return employees;
+  }, [employees]);
 
   // Direct state initialization: STRICT isolation (empty [] for PROD, demo only for demo tenants)
   const [clients, setClients] = useState<Client[]>(() => {
@@ -199,6 +211,7 @@ export default function ClientManager({
   const [newClientSector, setNewClientSector] = useState('');
   const [newClientRevenue, setNewClientRevenue] = useState<number>(10000);
   const [newClientNotes, setNewClientNotes] = useState('');
+  const [newClientCommercialId, setNewClientCommercialId] = useState('');
 
   // Edit Fiche Client State
   const [isEditingClient, setIsEditingClient] = useState(false);
@@ -210,6 +223,7 @@ export default function ClientManager({
   const [editClientSector, setEditClientSector] = useState('');
   const [editClientRevenue, setEditClientRevenue] = useState<number>(10000);
   const [editClientNotes, setEditClientNotes] = useState('');
+  const [editClientCommercialId, setEditClientCommercialId] = useState('');
 
   // Commitment adding form state
   const [isAddingCommitment, setIsAddingCommitment] = useState(false);
@@ -224,6 +238,8 @@ export default function ClientManager({
     e.preventDefault();
     if (!newClientName) return;
 
+    const assignedEmp = employees.find(emp => emp.id === newClientCommercialId);
+
     const newClient: Client = {
       id: `cli_${Date.now()}`,
       name: newClientName,
@@ -236,6 +252,8 @@ export default function ClientManager({
       engagements: [],
       status: 'Active',
       notes: newClientNotes,
+      assignedCommercialId: newClientCommercialId || undefined,
+      assignedCommercialName: assignedEmp ? assignedEmp.name : undefined,
       createdDate: new Date().toISOString().split('T')[0]
     };
 
@@ -252,6 +270,7 @@ export default function ClientManager({
     setNewClientSector('');
     setNewClientRevenue(10000);
     setNewClientNotes('');
+    setNewClientCommercialId('');
   };
 
   const startEditingClient = () => {
@@ -264,6 +283,7 @@ export default function ClientManager({
     setEditClientSector(selectedClient.sector || '');
     setEditClientRevenue(selectedClient.revenuePotential || 10000);
     setEditClientNotes(selectedClient.notes || '');
+    setEditClientCommercialId(selectedClient.assignedCommercialId || '');
     setIsEditingClient(true);
     setIsAddingClient(false);
   };
@@ -271,6 +291,8 @@ export default function ClientManager({
   const handleEditClient = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClientId || !editClientName) return;
+
+    const assignedEmp = employees.find(emp => emp.id === editClientCommercialId);
 
     const updated = clients.map(c => {
       if (c.id === selectedClientId) {
@@ -283,7 +305,9 @@ export default function ClientManager({
           category: editClientCategory,
           sector: editClientSector,
           revenuePotential: Number(editClientRevenue),
-          notes: editClientNotes
+          notes: editClientNotes,
+          assignedCommercialId: editClientCommercialId || undefined,
+          assignedCommercialName: assignedEmp ? assignedEmp.name : undefined
         };
       }
       return c;
@@ -715,6 +739,21 @@ export default function ClientManager({
                     className="w-full text-xs p-2 border border-slate-200 rounded focus:outline-none"
                   />
                 </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="block font-bold text-slate-600">Attaché Commercial / Chargé de Compte (RH)</label>
+                  <select
+                    value={newClientCommercialId}
+                    onChange={(e) => setNewClientCommercialId(e.target.value)}
+                    className="w-full p-2 border border-slate-200 rounded focus:outline-none bg-white"
+                  >
+                    <option value="">-- Aucun commercial assigné (Portefeuille général) --</option>
+                    {commercialsList.map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.jobTitle || 'Commercial / Ventes'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -822,6 +861,21 @@ export default function ClientManager({
                     onChange={(e) => setEditClientRevenue(Number(e.target.value))}
                     className="w-full text-xs p-2 border border-slate-200 rounded focus:outline-none"
                   />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="block font-bold text-slate-600">Attaché Commercial / Chargé de Compte (RH)</label>
+                  <select
+                    value={editClientCommercialId}
+                    onChange={(e) => setEditClientCommercialId(e.target.value)}
+                    className="w-full p-2 border border-slate-200 rounded focus:outline-none bg-white"
+                  >
+                    <option value="">-- Aucun commercial assigné (Portefeuille général) --</option>
+                    {commercialsList.map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.jobTitle || 'Commercial / Ventes'})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -951,6 +1005,17 @@ export default function ClientManager({
                     <span><strong>Potentiel commercial :</strong></span>
                     <span className="font-bold text-slate-800">
                       {formatTND(selectedClient.revenuePotential)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-600 pt-1 border-t border-slate-100">
+                    <span><strong>Attaché Commercial :</strong></span>
+                    <span className="font-bold text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded text-[11px] flex items-center gap-1">
+                      <Briefcase className="w-3 h-3 text-indigo-500" />
+                      {selectedClient.assignedCommercialName || (
+                        selectedClient.assignedCommercialId 
+                          ? (employees.find(e => e.id === selectedClient.assignedCommercialId)?.name || 'Commercial Dédié')
+                          : 'Portefeuille Général'
+                      )}
                     </span>
                   </div>
                 </div>

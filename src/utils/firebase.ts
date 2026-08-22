@@ -42,6 +42,7 @@ export interface SaaSBankConfig {
   isVersementActive: boolean;
   isWafacashActive: boolean;
   isOnlineCardActive: boolean;
+  online_payment_enabled?: boolean;
   updatedAt?: string;
 }
 
@@ -69,14 +70,32 @@ export function cleanFirestoreData<T>(data: T): T {
   return cleaned as T;
 }
 
-// Helper to save SaaS payment config to Firestore
+// Helper to save SaaS payment config to Firestore (both in admin_settings and company_erp_data/saas_settings)
 export const saveSaaSBankConfig = async (config: SaaSBankConfig) => {
   try {
-    const docRef = doc(db, 'admin_settings', 'payment_config');
-    await setDoc(docRef, cleanFirestoreData({
+    const isOnlineActive = config.online_payment_enabled !== undefined 
+      ? config.online_payment_enabled 
+      : config.isOnlineCardActive;
+
+    const payload = cleanFirestoreData({
       ...config,
+      isOnlineCardActive: isOnlineActive,
+      online_payment_enabled: isOnlineActive,
       updatedAt: new Date().toISOString()
-    }), { merge: true });
+    });
+
+    // 1. Save in admin_settings/payment_config
+    const docRef = doc(db, 'admin_settings', 'payment_config');
+    await setDoc(docRef, payload, { merge: true });
+
+    // 2. Also persist in company_erp_data/saas_settings as requested
+    try {
+      const saasSettingsRef = doc(db, 'company_erp_data', 'saas_settings');
+      await setDoc(saasSettingsRef, payload, { merge: true });
+    } catch (e) {
+      console.warn("Notice: Sync to company_erp_data/saas_settings skipped:", e);
+    }
+
     console.log("SaaS Payment Config saved to Firestore successfully");
   } catch (error) {
     console.warn("Notice: SaaS payment config save skipped or offline:", error);
@@ -89,8 +108,28 @@ export const loadSaaSBankConfig = async (): Promise<Partial<SaaSBankConfig> | nu
     const docRef = doc(db, 'admin_settings', 'payment_config');
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return docSnap.data() as SaaSBankConfig;
+      const data = docSnap.data() as SaaSBankConfig;
+      if (data.online_payment_enabled === undefined && data.isOnlineCardActive !== undefined) {
+        data.online_payment_enabled = data.isOnlineCardActive;
+      }
+      return data;
     }
+
+    // Fallback: check company_erp_data/saas_settings
+    try {
+      const saasSettingsRef = doc(db, 'company_erp_data', 'saas_settings');
+      const saasSnap = await getDoc(saasSettingsRef);
+      if (saasSnap.exists()) {
+        const saasData = saasSnap.data() as SaaSBankConfig;
+        if (saasData.online_payment_enabled === undefined && saasData.isOnlineCardActive !== undefined) {
+          saasData.online_payment_enabled = saasData.isOnlineCardActive;
+        }
+        return saasData;
+      }
+    } catch (e) {
+      console.warn("Notice: company_erp_data/saas_settings fallback check failed:", e);
+    }
+
     return null;
   } catch (error) {
     console.warn("Notice: SaaS payment config offline or not cached, falling back to local state:", error);

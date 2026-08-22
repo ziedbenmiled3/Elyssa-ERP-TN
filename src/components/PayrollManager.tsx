@@ -1,8 +1,21 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Employee, Payslip, BankAccount, BankTransaction, AbsenceRecord, WorkContract, AdminSettings, MissionOrder } from '../types';
+import { Employee, Payslip, BankAccount, BankTransaction, AbsenceRecord, WorkContract, AdminSettings, MissionOrder, RHPoleKey } from '../types';
 import { getValidMockBase64 } from '../utils/mockDynamicGed';
 import { ElyssaLogo } from './ElyssaLogo';
 import { computeTunisianPayroll, computeAnnualIRPP, TUNISIAN_TAX_CONSTANTS } from '../services/taxCalculations';
+import { 
+  UNIFIED_RH_POLES, 
+  UNIFIED_RH_POLES_LIST, 
+  getPoleInfo, 
+  getEmployeePole, 
+  matchPoleKey, 
+  dispatchHREmployeeEvent,
+  DEMO_HR_EMPLOYEES,
+  DEMO_HR_WORK_CONTRACTS,
+  DEMO_HR_ABSENCES,
+  DEMO_HR_PAYSLIPS,
+  DEMO_HR_COMPANY_LOCATIONS
+} from '../services/hrSyncService';
 import { 
   Users, 
   Calculator, 
@@ -121,162 +134,7 @@ export const INTER_AFFAIRES_EMPLOYEES: Employee[] = [
   }
 ];
 
-export const UNIFIED_7_PAYROLL_EMPLOYEES: Employee[] = [
-  {
-    id: 'demo-emp_0',
-    matricule: 'EMP-0000',
-    name: 'Meriam Doudou',
-    email: 'm.doudou@elyssa-erp.tn',
-    jobTitle: 'Gérante / Direction Générale',
-    department: 'Direction Générale',
-    ssn: '10019283-01',
-    cin: '04123456',
-    rib: '03001010015920038000',
-    baseSalary: 4500.000,
-    transportAllowance: 0,
-    presenceAllowance: 0,
-    otherAllowances: 0,
-    familySituation: 'Married_2',
-    isChefDeFamille: true,
-    status: 'Active',
-    hiringDate: '2022-01-01',
-    hireDate: '2022-01-01',
-    company: 'MD',
-    companyId: 'MD'
-  },
-  {
-    id: 'demo-emp_1',
-    matricule: 'EMP-0001',
-    name: 'Khaled Ben Amor',
-    email: 'k.benamor@elyssa-erp.tn',
-    jobTitle: 'Directeur Financier & Recouvrement',
-    department: 'Finance',
-    ssn: '14839211-92',
-    cin: '08912345',
-    rib: '03001010015920038472',
-    baseSalary: 2600.000,
-    transportAllowance: 180.000,
-    presenceAllowance: 80.000,
-    otherAllowances: 300.000,
-    familySituation: 'Married_2',
-    isChefDeFamille: true,
-    status: 'Active',
-    hiringDate: '2023-01-15',
-    hireDate: '2023-01-15',
-    company: 'MD',
-    companyId: 'MD'
-  },
-  {
-    id: 'demo-emp_2',
-    matricule: 'EMP-0002',
-    name: 'Ines Dridi',
-    email: 'i.dridi@elyssa-erp.tn',
-    jobTitle: 'Responsable Rapprochement',
-    department: 'Finance',
-    ssn: '20943810-18',
-    cin: '07123456',
-    rib: '08102030026710048259',
-    baseSalary: 1750.000,
-    transportAllowance: 120.000,
-    presenceAllowance: 80.000,
-    otherAllowances: 150.000,
-    familySituation: 'Single',
-    isChefDeFamille: false,
-    status: 'Active',
-    hiringDate: '2024-03-10',
-    hireDate: '2024-03-10',
-    company: 'MD',
-    companyId: 'MD'
-  },
-  {
-    id: 'demo-emp_3',
-    matricule: 'EMP-0003',
-    name: 'Mohamed Ali Gharbi',
-    email: 'm.gharbi@elyssa-erp.tn',
-    jobTitle: 'Chargé Clientèle / Ventes',
-    department: 'Ventes',
-    ssn: '12554739-44',
-    cin: '06543210',
-    rib: '12004050037840059341',
-    baseSalary: 1400.000,
-    transportAllowance: 110.000,
-    presenceAllowance: 80.000,
-    otherAllowances: 100.000,
-    familySituation: 'Married_1',
-    isChefDeFamille: true,
-    status: 'Active',
-    hiringDate: '2025-06-18',
-    hireDate: '2025-06-18',
-    company: 'MD',
-    companyId: 'MD'
-  },
-  {
-    id: 'demo-emp_4',
-    matricule: 'EMP-0004',
-    name: 'Amel Ben Soltane',
-    email: 'a.bensoltane@elyssa-erp.tn',
-    jobTitle: 'Responsable Ressources Humaines',
-    department: 'RH',
-    ssn: '19483029-45',
-    cin: '06123456',
-    rib: '05201040059283749501',
-    baseSalary: 2100.000,
-    transportAllowance: 150.000,
-    presenceAllowance: 80.000,
-    otherAllowances: 200.000,
-    familySituation: 'Married_3',
-    isChefDeFamille: true,
-    status: 'Active',
-    hiringDate: '2024-11-01',
-    hireDate: '2024-11-01',
-    company: 'MD',
-    companyId: 'MD'
-  },
-  {
-    id: 'demo-emp_5',
-    matricule: 'EMP-0005',
-    name: 'Sami Mansour',
-    email: 's.mansour@elyssa-erp.tn',
-    jobTitle: 'Développeur ERP Principal',
-    department: 'Direction & IT',
-    ssn: '11049382-77',
-    cin: '05123456',
-    rib: '14102030048592837410',
-    baseSalary: 3200.000,
-    transportAllowance: 200.000,
-    presenceAllowance: 80.000,
-    otherAllowances: 500.000,
-    familySituation: 'Single',
-    isChefDeFamille: false,
-    status: 'Active',
-    hiringDate: '2025-01-10',
-    hireDate: '2025-01-10',
-    company: 'MD',
-    companyId: 'MD'
-  },
-  {
-    id: 'demo-emp_6',
-    matricule: 'EMP-0006',
-    name: 'Hamza Ben Salem',
-    email: 'h.bensalem@elyssa-erp.tn',
-    jobTitle: 'Chauffeur Livreur / Logistique',
-    department: 'Logistique',
-    ssn: '16928301-22',
-    cin: '08812345',
-    rib: '08102030026710048102',
-    baseSalary: 1450.000,
-    transportAllowance: 0,
-    presenceAllowance: 0,
-    otherAllowances: 0,
-    familySituation: 'Married_1',
-    isChefDeFamille: true,
-    status: 'Active',
-    hiringDate: '2024-02-15',
-    hireDate: '2024-02-15',
-    company: 'MD',
-    companyId: 'MD'
-  }
-];
+export const UNIFIED_7_PAYROLL_EMPLOYEES: Employee[] = DEMO_HR_EMPLOYEES;
 
 // Tunisian Progressive Personal Income Tax (IRPP) Calculator
 // Brackets from latest LF:
@@ -481,8 +339,48 @@ export default function PayrollManager({
     return ps.id?.startsWith('demo-') || ps.is_demo === true || ps.isDemo === true || isDemoEmp({ id: ps.employeeId });
   };
 
-  const filteredEmployees = employees;
-  const filteredContracts = contracts;
+  const [selectedPoleFilter, setSelectedPoleFilter] = useState<string>('ALL');
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState<string>('');
+
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(emp => {
+      if (selectedPoleFilter !== 'ALL') {
+        const empPole = getEmployeePole(emp);
+        if (empPole !== selectedPoleFilter) return false;
+      }
+      if (employeeSearchQuery.trim()) {
+        const q = employeeSearchQuery.toLowerCase().trim();
+        const match = (emp.name || '').toLowerCase().includes(q) ||
+                      (emp.matricule || '').toLowerCase().includes(q) ||
+                      (emp.jobTitle || '').toLowerCase().includes(q) ||
+                      (emp.department || '').toLowerCase().includes(q) ||
+                      (emp.email || '').toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [employees, selectedPoleFilter, employeeSearchQuery]);
+
+  const filteredContracts = useMemo(() => {
+    return contracts.filter(ct => {
+      if (selectedPoleFilter !== 'ALL') {
+        const emp = employees.find(e => e.id === ct.employeeId);
+        if (emp) {
+          const empPole = getEmployeePole(emp);
+          if (empPole !== selectedPoleFilter) return false;
+        }
+      }
+      if (employeeSearchQuery.trim()) {
+        const q = employeeSearchQuery.toLowerCase().trim();
+        const match = (ct.employeeName || '').toLowerCase().includes(q) ||
+                      (ct.contractType || '').toLowerCase().includes(q) ||
+                      (ct.dutiesDescription || '').toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [contracts, employees, selectedPoleFilter, employeeSearchQuery]);
+
   const filteredAbsences = absences;
   const filteredPayslips = payslips;
 
@@ -544,16 +442,8 @@ export default function PayrollManager({
   const [remunPoleFilter, setRemunPoleFilter] = useState<string>('all');
 
   const getEmpPole = (emp: Employee): string => {
-    if (emp.department) return emp.department;
-    const title = (emp.jobTitle || '').toLowerCase();
-    const name = (emp.name || '').toLowerCase();
-    if (name.includes('meriam') || title.includes('gérant') || title.includes('générale')) return 'Direction Générale';
-    if (name.includes('khaled') || name.includes('ines') || title.includes('financ') || title.includes('rapproch') || title.includes('comptab')) return 'Finance';
-    if (name.includes('amel') || title.includes('rh') || title.includes('ressources')) return 'RH';
-    if (name.includes('mohamed') || name.includes('gharbi') || title.includes('client') || title.includes('vent') || title.includes('commerc')) return 'Ventes';
-    if (name.includes('sami') || name.includes('mansour') || title.includes('dév') || title.includes('it') || title.includes('systèm')) return 'Direction & IT';
-    if (name.includes('hamza') || name.includes('salem') || name.includes('trad') || title.includes('livr') || title.includes('chauf') || title.includes('logist')) return 'Logistique';
-    return 'Opérations';
+    const poleKey = getEmployeePole(emp);
+    return getPoleInfo(poleKey).label;
   };
 
   // Work contracts are loaded dynamically from props and synchronized to parent company
@@ -708,6 +598,8 @@ export default function PayrollManager({
   const [empName, setEmpName] = useState('');
   const [empEmail, setEmpEmail] = useState('');
   const [empJob, setEmpJob] = useState('');
+  const [empPole, setEmpPole] = useState<RHPoleKey>('DIRECTION_IT');
+  const [empDepartment, setEmpDepartment] = useState<string>('Direction Générale');
   const [empSsn, setEmpSsn] = useState('');
   const [empCin, setEmpCin] = useState('');
   const [empRib, setEmpRib] = useState('');
@@ -1045,6 +937,9 @@ export default function PayrollManager({
       setEmpName(emp.name);
       setEmpEmail(emp.email);
       setEmpJob(emp.jobTitle);
+      const poleKey: RHPoleKey = (emp.pole as RHPoleKey) || getEmployeePole(emp);
+      setEmpPole(poleKey);
+      setEmpDepartment(emp.department || UNIFIED_RH_POLES[poleKey]?.departments[0] || 'Direction Générale');
       setEmpSsn(emp.ssn);
       setEmpCin(emp.cin || '');
       setEmpRib(emp.rib || '');
@@ -1056,13 +951,15 @@ export default function PayrollManager({
       setEmpChef(emp.isChefDeFamille);
       setEmpStatus(emp.status);
       setEmpHiringDate(emp.hiringDate);
-      setEmpBranchId(emp.branchId || 'loc-maman');
+      setEmpBranchId(emp.branchId || emp.locationId || 'loc-maman');
     } else {
       setEditingEmployee(null);
       setEmpMatricule('');
       setEmpName('');
       setEmpEmail('');
       setEmpJob('');
+      setEmpPole('DIRECTION_IT');
+      setEmpDepartment('Direction Générale');
       setEmpSsn('');
       setEmpCin('');
       setEmpRib('');
@@ -1104,12 +1001,14 @@ export default function PayrollManager({
     }
 
     if (editingEmployee) {
-      setEmployees(employees.map(emp => emp.id === editingEmployee.id ? {
-        ...emp,
-        matricule: empMatricule.trim() || emp.matricule || generateAutoMatricule(employees),
+      const updatedEmp: Employee = {
+        ...editingEmployee,
+        matricule: empMatricule.trim() || editingEmployee.matricule || generateAutoMatricule(employees),
         name: empName,
         email: empEmail,
         jobTitle: empJob,
+        pole: empPole,
+        department: empDepartment || UNIFIED_RH_POLES[empPole]?.departments[0] || 'Direction Générale',
         ssn: empSsn,
         cin: empCin,
         rib: empRib,
@@ -1121,8 +1020,11 @@ export default function PayrollManager({
         isChefDeFamille: empChef,
         status: empStatus,
         hiringDate: empHiringDate,
-        branchId: empBranchId
-      } : emp));
+        branchId: empBranchId,
+        locationId: empBranchId
+      };
+      setEmployees(employees.map(emp => emp.id === editingEmployee.id ? updatedEmp : emp));
+      dispatchHREmployeeEvent('UPDATE', updatedEmp);
     } else {
       const finalMatricule = empMatricule.trim() || generateAutoMatricule(employees);
       const newEmp: Employee = {
@@ -1131,6 +1033,8 @@ export default function PayrollManager({
         name: empName,
         email: empEmail,
         jobTitle: empJob,
+        pole: empPole,
+        department: empDepartment || UNIFIED_RH_POLES[empPole]?.departments[0] || 'Direction Générale',
         ssn: empSsn,
         cin: empCin,
         rib: empRib,
@@ -1142,17 +1046,23 @@ export default function PayrollManager({
         isChefDeFamille: empChef,
         status: empStatus,
         hiringDate: empHiringDate,
-        branchId: empBranchId
+        branchId: empBranchId,
+        locationId: empBranchId
       };
       setEmployees([...employees, newEmp]);
+      dispatchHREmployeeEvent('CREATE', newEmp);
     }
     setIsEmployeeModalOpen(false);
   };
 
   const handleDeleteEmployee = (id: string, name: string) => {
     if (window.confirm(`Voulez-vous vraiment supprimer la fiche de ${name} ?`)) {
+      const empToDelete = employees.find(e => e.id === id);
       setEmployees(employees.filter(e => e.id !== id));
       setPayslips(payslips.filter(p => p.employeeId !== id));
+      if (empToDelete) {
+        dispatchHREmployeeEvent('DELETE', empToDelete);
+      }
 
       fetch('/api/db/admin/delete-collaborator', {
         method: 'POST',
@@ -1310,290 +1220,11 @@ export default function PayrollManager({
   };
 
   const handleRestoreDemoEmployees = () => {
-    const demoList: Employee[] = [
-      {
-        id: 'emp_0',
-        matricule: 'EMP-0000',
-        name: 'Meriam Doudou',
-        email: 'm.doudou@carthage.com.tn',
-        jobTitle: 'Gérante / Direction Générale',
-        department: 'Direction Générale',
-        ssn: '10019283-01',
-        cin: '04123456',
-        rib: '03001010015920038000',
-        baseSalary: 4500.000,
-        transportAllowance: 250.000,
-        presenceAllowance: 80.000,
-        otherAllowances: 500.000,
-        familySituation: 'Married_2',
-        isChefDeFamille: true,
-        status: 'Active',
-        hiringDate: '2022-01-01',
-        branchId: 'loc-maman'
-      },
-      {
-        id: 'emp_1',
-        matricule: 'EMP-0001',
-        name: 'Khaled Ben Amor',
-        email: 'k.benamor@carthage.com.tn',
-        jobTitle: 'Directeur Financier & Recouvrement',
-        department: 'Finance',
-        ssn: '14839211-92',
-        cin: '08912345',
-        rib: '03001010015920038472',
-        baseSalary: 2600.000,
-        transportAllowance: 180.000,
-        presenceAllowance: 80.000,
-        otherAllowances: 300.000,
-        familySituation: 'Married_2',
-        isChefDeFamille: true,
-        status: 'Active',
-        hiringDate: '2023-01-15',
-        branchId: 'loc-maman'
-      },
-      {
-        id: 'emp_2',
-        matricule: 'EMP-0002',
-        name: 'Ines Dridi',
-        email: 'i.dridi@carthage.com.tn',
-        jobTitle: 'Responsable Rapprochement',
-        department: 'Finance',
-        ssn: '20943810-18',
-        cin: '07123456',
-        rib: '08102030026710048259',
-        baseSalary: 1750.000,
-        transportAllowance: 120.000,
-        presenceAllowance: 80.000,
-        otherAllowances: 150.000,
-        familySituation: 'Single',
-        isChefDeFamille: false,
-        status: 'Active',
-        hiringDate: '2024-03-10',
-        branchId: 'loc-maman'
-      },
-      {
-        id: 'emp_3',
-        matricule: 'EMP-0003',
-        name: 'Mohamed Ali Gharbi',
-        email: 'm.gharbi@carthage.com.tn',
-        jobTitle: 'Chargé Clientèle / Ventes',
-        department: 'Ventes',
-        ssn: '12554739-44',
-        cin: '06543210',
-        rib: '12004050037840059341',
-        baseSalary: 1400.000,
-        transportAllowance: 110.000,
-        presenceAllowance: 80.000,
-        otherAllowances: 100.000,
-        familySituation: 'Married_1',
-        isChefDeFamille: true,
-        status: 'Active',
-        hiringDate: '2025-06-18',
-        branchId: 'loc-maman'
-      },
-      {
-        id: 'emp_4',
-        matricule: 'EMP-0004',
-        name: 'Amel Ben Soltane',
-        email: 'a.bensoltane@carthage.com.tn',
-        jobTitle: 'Responsable Ressources Humaines',
-        department: 'RH',
-        ssn: '19483029-45',
-        cin: '06123456',
-        rib: '05201040059283749501',
-        baseSalary: 2100.000,
-        transportAllowance: 150.000,
-        presenceAllowance: 80.000,
-        otherAllowances: 200.000,
-        familySituation: 'Married_3',
-        isChefDeFamille: true,
-        status: 'Active',
-        hiringDate: '2024-11-01',
-        branchId: 'loc-maman'
-      },
-      {
-        id: 'emp_5',
-        matricule: 'EMP-0005',
-        name: 'Sami Mansour',
-        email: 's.mansour@carthage.com.tn',
-        jobTitle: 'Développeur ERP Principal',
-        department: 'Direction & IT',
-        ssn: '11049382-77',
-        cin: '05123456',
-        rib: '14102030048592837410',
-        baseSalary: 3200.000,
-        transportAllowance: 200.000,
-        presenceAllowance: 80.000,
-        otherAllowances: 500.000,
-        familySituation: 'Single',
-        isChefDeFamille: false,
-        status: 'Active',
-        hiringDate: '2025-01-10',
-        branchId: 'loc-maman'
-      },
-      {
-        id: 'emp_6',
-        matricule: 'EMP-0006',
-        name: 'Hamza Ben Salem',
-        email: 'h.bensalem@carthage.com.tn',
-        jobTitle: 'Chauffeur Livreur / Logistique',
-        department: 'Logistique',
-        ssn: '16928301-22',
-        cin: '08812345',
-        rib: '08102030026710048102',
-        baseSalary: 1450.000,
-        transportAllowance: 120.000,
-        presenceAllowance: 80.000,
-        otherAllowances: 100.000,
-        familySituation: 'Married_1',
-        isChefDeFamille: true,
-        status: 'Active',
-        hiringDate: '2024-02-15',
-        branchId: 'loc-maman'
-      }
-    ];
-    setEmployees(demoList);
-
-    const defaultContracts: WorkContract[] = [
-      {
-        id: 'ct_0',
-        employeeId: 'emp_0',
-        employeeName: 'Meriam Doudou',
-        contractType: 'CDI',
-        startDate: '2022-01-01',
-        trialPeriodMonths: 6,
-        baseSalary: 4500.000,
-        status: 'Signed',
-        dutiesDescription: 'Direction Générale, stratégie de développement, gouvernance opérationnelle et partenariats majeurs Elyssa ERP S.A.',
-        generatedAt: '2022-01-01',
-        signedAt: '2022-01-01'
-      },
-      {
-        id: 'ct_1',
-        employeeId: 'emp_1',
-        employeeName: 'Khaled Ben Amor',
-        contractType: 'CDI',
-        startDate: '2023-01-15',
-        trialPeriodMonths: 3,
-        baseSalary: 2600.000,
-        status: 'Signed',
-        dutiesDescription: 'Superviser l\'ensemble des processus financiers, élaboration du budget annuel, pilotage de la trésorerie et reporting réglementaire auprès de la Banque Centrale de Tunisie.',
-        generatedAt: '2023-01-15',
-        signedAt: '2023-01-15'
-      },
-      {
-        id: 'ct_2',
-        employeeId: 'emp_2',
-        employeeName: 'Ines Dridi',
-        contractType: 'CDD',
-        startDate: '2024-03-10',
-        endDate: '2026-03-09',
-        trialPeriodMonths: 2,
-        baseSalary: 1750.000,
-        status: 'Signed',
-        dutiesDescription: 'Contrôler les opérations de rapprochement bancaire, auditer les pièces comptables de paie et s\'assurer du respect des règles fiscales de retenue à la source.',
-        generatedAt: '2024-03-08',
-        signedAt: '2024-03-10'
-      },
-      {
-        id: 'ct_3',
-        employeeId: 'emp_3',
-        employeeName: 'Mohamed Ali Gharbi',
-        contractType: 'CDI',
-        startDate: '2025-06-18',
-        trialPeriodMonths: 3,
-        baseSalary: 1400.000,
-        status: 'Signed',
-        dutiesDescription: 'Chargé Clientèle et développement des ventes, prospection terrain et négociation commerciale.',
-        generatedAt: '2025-06-15',
-        signedAt: '2025-06-18'
-      },
-      {
-        id: 'ct_4',
-        employeeId: 'emp_4',
-        employeeName: 'Amel Ben Soltane',
-        contractType: 'CDI',
-        startDate: '2024-11-01',
-        trialPeriodMonths: 3,
-        baseSalary: 2100.000,
-        status: 'Signed',
-        dutiesDescription: 'Gestion des ressources humaines, administration du personnel, déclarations sociales CNSS et clôture de paie.',
-        generatedAt: '2024-10-28',
-        signedAt: '2024-11-01'
-      },
-      {
-        id: 'ct_5',
-        employeeId: 'emp_5',
-        employeeName: 'Sami Mansour',
-        contractType: 'CDI',
-        startDate: '2025-01-10',
-        trialPeriodMonths: 3,
-        baseSalary: 3200.000,
-        status: 'Signed',
-        dutiesDescription: 'Architecture technique, maintenance continue du système d\'information et développement des modules ERP.',
-        generatedAt: '2025-01-08',
-        signedAt: '2025-01-10'
-      },
-      {
-        id: 'ct_6',
-        employeeId: 'emp_6',
-        employeeName: 'Hamza Ben Salem',
-        contractType: 'CDI',
-        startDate: '2024-02-15',
-        trialPeriodMonths: 3,
-        baseSalary: 1450.000,
-        status: 'Signed',
-        dutiesDescription: 'Logistique d\'expédition, gestion de la flotte de livraison, picking et distribution clients.',
-        generatedAt: '2024-02-12',
-        signedAt: '2024-02-15'
-      }
-    ];
-    setContracts(defaultContracts);
-
-    const defaultAbsences: AbsenceRecord[] = [
-      {
-        id: 'abs_1',
-        employeeId: 'emp_2',
-        employeeName: 'Ines Dridi',
-        type: 'SickLeave',
-        startDate: '2026-06-02',
-        endDate: '2026-06-05',
-        daysCount: 4,
-        isDeductibleFromSalary: true,
-        deductionAmount: 240.000,
-        status: 'Approved',
-        description: 'Grippe saisonnière sévère - Certificat médical transmis'
-      },
-      {
-        id: 'abs_2',
-        employeeId: 'emp_3',
-        employeeName: 'Mohamed Ali Gharbi',
-        type: 'WorkAccident',
-        startDate: '2026-06-10',
-        endDate: '2026-06-12',
-        daysCount: 3,
-        isDeductibleFromSalary: false,
-        deductionAmount: 0.000,
-        status: 'Approved',
-        description: "Accident de trajet (visite clientèle) - Notification d'arrêt délivrée par la CNAM"
-      },
-      {
-        id: 'abs_3',
-        employeeId: 'emp_1',
-        employeeName: 'Khaled Ben Amor',
-        type: 'PaidLeave',
-        startDate: '2026-06-15',
-        endDate: '2026-06-19',
-        daysCount: 5,
-        isDeductibleFromSalary: false,
-        deductionAmount: 0,
-        status: 'Approved',
-        description: "Congés d'été annuels validés par la Direction"
-      }
-    ];
-    setAbsences(defaultAbsences);
-    setPayslips([]);
-    alert("Données de démonstration unifiées (7 collaborateurs, 7 contrats, 3 absences actives) restaurées avec succès !");
+    setEmployees(DEMO_HR_EMPLOYEES);
+    setContracts(DEMO_HR_WORK_CONTRACTS);
+    setAbsences(DEMO_HR_ABSENCES);
+    setPayslips(DEMO_HR_PAYSLIPS);
+    alert("Données de démonstration unifiées (7 collaborateurs, 7 contrats, 3 absences actives, 3 fiches de paie initiales) restaurées avec succès !");
   };
 
   const handleAddAbsence = (e: React.FormEvent) => {
@@ -2409,13 +2040,10 @@ export default function PayrollManager({
                         onChange={(e) => setRemunPoleFilter(e.target.value)}
                         className="pl-7 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-semibold focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
                       >
-                        <option value="all">Tous les Pôles</option>
-                        <option value="Direction Générale">Direction Générale</option>
-                        <option value="Finance">Finance</option>
-                        <option value="RH">RH</option>
-                        <option value="Ventes">Ventes</option>
-                        <option value="Direction & IT">Direction & IT</option>
-                        <option value="Logistique">Logistique</option>
+                        <option value="all">Tous les Pôles (6 Pôles)</option>
+                        {UNIFIED_RH_POLES_LIST.map(p => (
+                          <option key={p.key} value={p.key}>{p.label}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -2447,8 +2075,8 @@ export default function PayrollManager({
                               if (!matchesName && !matchesTitle && !matchesMat) return false;
                             }
                             if (remunPoleFilter !== 'all') {
-                              const empPole = getEmpPole(emp);
-                              if (empPole !== remunPoleFilter) return false;
+                              const empPoleKey = getEmployeePole(emp);
+                              if (empPoleKey !== remunPoleFilter && getEmpPole(emp) !== remunPoleFilter) return false;
                             }
                             return true;
                           })
@@ -2918,6 +2546,59 @@ export default function PayrollManager({
               </div>
             </div>
 
+            {/* 6 Pôles Filter Bar & Search */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-150 shadow-3xs">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPoleFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    selectedPoleFilter === 'ALL'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/70'
+                  }`}
+                >
+                  <span>Tous les Pôles</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${selectedPoleFilter === 'ALL' ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-700'}`}>
+                    {employees.length}
+                  </span>
+                </button>
+                {UNIFIED_RH_POLES_LIST.map(p => {
+                  const isSel = selectedPoleFilter === p.key;
+                  const count = employees.filter(e => getEmployeePole(e) === p.key).length;
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => setSelectedPoleFilter(p.key)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
+                        isSel
+                          ? `${p.bgBadge} ${p.textBadge} ring-2 ring-indigo-500 font-black shadow-xs`
+                          : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <span className="truncate max-w-[140px]">{p.label}</span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${isSel ? 'bg-white/80 text-slate-900 font-bold' : 'bg-slate-100 text-slate-600'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Search input */}
+              <div className="relative shrink-0">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filtrer par nom, poste, matricule..."
+                  value={employeeSearchQuery}
+                  onChange={e => setEmployeeSearchQuery(e.target.value)}
+                  className="pl-8.5 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 w-full sm:w-64"
+                />
+              </div>
+            </div>
+
             <div className="bg-white border border-slate-150 rounded-2xl overflow-hidden shadow-3xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
@@ -2925,10 +2606,11 @@ export default function PayrollManager({
                     <tr className="bg-slate-50 text-slate-500 font-extrabold uppercase border-b border-slate-100">
                       <th className="p-4 w-24 whitespace-normal leading-tight">Matricule</th>
                       <th className="p-4 whitespace-normal leading-tight">Salarié</th>
+                      <th className="p-4 whitespace-normal leading-tight">Pôle & Service</th>
                       <th className="p-4 whitespace-normal leading-tight">SSN CNSS</th>
                       <th className="p-4 whitespace-normal leading-tight">Poste Occupé</th>
                       <th className="p-4 whitespace-normal leading-tight">Base Salariale</th>
-                      <th className="p-4 whitespace-normal leading-tight max-w-[180px]">Indemnités Fixes (Trans.+Pres.+Alt)</th>
+                      <th className="p-4 whitespace-normal leading-tight max-w-[180px]">Indemnités Fixes</th>
                       <th className="p-4 whitespace-normal leading-tight">Brut Mensuel</th>
                       <th className="p-4 text-center whitespace-normal leading-tight">Situation</th>
                       <th className="p-4 text-right whitespace-nowrap">Actions</th>
@@ -2937,7 +2619,7 @@ export default function PayrollManager({
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {filteredEmployees.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="p-12 text-center text-slate-500 bg-slate-50/50">
+                        <td colSpan={10} className="p-12 text-center text-slate-500 bg-slate-50/50">
                           <div className="flex flex-col items-center justify-center space-y-2">
                             <Users className="w-10 h-10 text-slate-300 animate-pulse-slow" />
                             <h4 className="text-sm font-black text-slate-800">Aucun collaborateur enregistré</h4>
@@ -2950,6 +2632,8 @@ export default function PayrollManager({
                     ) : (
                       filteredEmployees.map(emp => {
                         const brut = emp.baseSalary + emp.transportAllowance + emp.presenceAllowance + emp.otherAllowances;
+                        const poleKey = getEmployeePole(emp);
+                        const poleInfo = getPoleInfo(poleKey);
                         return (
                           <tr key={emp.id} className="hover:bg-slate-50/50 transition">
                             <td className="p-4 whitespace-nowrap">
@@ -2972,6 +2656,16 @@ export default function PayrollManager({
                                   )}
                                 </div>
                                 <span className="text-[10px] text-slate-400 block font-mono whitespace-nowrap">{emp.email || "non-rensigné"}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 whitespace-nowrap">
+                            <div className="space-y-1">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${poleInfo.bgBadge} ${poleInfo.textBadge} ${poleInfo.borderBadge}`}>
+                                {poleInfo.label}
+                              </span>
+                              <div className="text-[10.5px] font-medium text-slate-500 truncate max-w-[150px]">
+                                {emp.department || poleInfo.departments[0]}
                               </div>
                             </div>
                           </td>
@@ -6154,6 +5848,42 @@ export default function PayrollManager({
                       placeholder="k.benamor@carthage.com.tn"
                       className="w-full text-xs p-2.5 border rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none"
                     />
+                  </div>
+                </div>
+
+                {/* Pole & Department Selection */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 bg-indigo-50/40 border border-indigo-100 rounded-xl">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Pôle Organisationnel RH *</label>
+                    <select
+                      value={empPole}
+                      onChange={e => {
+                        const newPole = e.target.value as RHPoleKey;
+                        setEmpPole(newPole);
+                        setEmpDepartment(UNIFIED_RH_POLES[newPole]?.departments[0] || '');
+                      }}
+                      className="w-full text-xs p-2.5 border border-indigo-200 rounded-lg bg-white font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      {UNIFIED_RH_POLES_LIST.map(pole => (
+                        <option key={pole.key} value={pole.key}>
+                          {pole.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Service / Département Spécifique *</label>
+                    <select
+                      value={empDepartment}
+                      onChange={e => setEmpDepartment(e.target.value)}
+                      className="w-full text-xs p-2.5 border border-indigo-200 rounded-lg bg-white font-medium text-slate-800 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      {UNIFIED_RH_POLES[empPole]?.departments.map((dept: string) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

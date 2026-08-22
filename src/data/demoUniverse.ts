@@ -28,9 +28,21 @@ import {
   PerformanceContract,
   LCRequest,
   DeliveryTour,
-  PickingOrder
+  PickingOrder,
+  Employee,
+  WorkContract,
+  AbsenceRecord,
+  Payslip,
+  CompanyLocation
 } from '../types';
 import { DEFAULT_DEMO_PERFORMANCE_CONTRACTS } from '../services/performanceContractService';
+import {
+  DEMO_HR_EMPLOYEES,
+  DEMO_HR_WORK_CONTRACTS,
+  DEMO_HR_ABSENCES,
+  DEMO_HR_PAYSLIPS,
+  DEMO_HR_COMPANY_LOCATIONS
+} from '../services/hrSyncService';
 
 export const DEMO_TENANT_ID = 'company_demo';
 
@@ -46,6 +58,12 @@ export interface DemoUniverseType {
   importFolders: ImportFolder[];
   bankAccounts: BankAccount[];
   collaborators: CollaboratorAccount[];
+  employees?: Employee[];
+  contracts?: WorkContract[];
+  workContracts?: WorkContract[];
+  absences?: AbsenceRecord[];
+  payslips?: Payslip[];
+  companyLocations?: CompanyLocation[];
   suppliers?: Supplier[];
   stockMovements?: StockMovement[];
   nomenclatures?: Nomenclature[];
@@ -1151,5 +1169,13 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
         }
       ]
     }
-  ]
+  ],
+
+  // 12. RESSOURCES HUMAINES & MULTI-SITES SYNCHRONISÉS
+  employees: DEMO_HR_EMPLOYEES,
+  contracts: DEMO_HR_WORK_CONTRACTS,
+  workContracts: DEMO_HR_WORK_CONTRACTS,
+  absences: DEMO_HR_ABSENCES,
+  payslips: DEMO_HR_PAYSLIPS,
+  companyLocations: DEMO_HR_COMPANY_LOCATIONS
 };

@@ -23,6 +23,8 @@ import {
   Check
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { Employee } from '../types';
+import { isSalesOrCommercial } from '../services/hrSyncService';
 
 interface ReportsManagerProps {
   visitReports: VisitReport[];
@@ -30,6 +32,8 @@ interface ReportsManagerProps {
   complaints: Complaint[];
   invoices: Invoice[];
   onUpdateVisitReports: (updatedReports: VisitReport[]) => void;
+  employees?: Employee[];
+  currentUser?: any;
 }
 
 export default function ReportsManager({ 
@@ -37,8 +41,20 @@ export default function ReportsManager({
   clients, 
   complaints, 
   invoices, 
-  onUpdateVisitReports 
+  onUpdateVisitReports,
+  employees = [],
+  currentUser
 }: ReportsManagerProps) {
+  // Commercials & Sales dynamic team from HR
+  const commercialsList = React.useMemo(() => {
+    if (!Array.isArray(employees) || employees.length === 0) return [];
+    const list = employees.filter(emp => emp && isSalesOrCommercial(emp));
+    if (list.length > 0) return list;
+    return employees;
+  }, [employees]);
+
+  const defaultAuthorName = currentUser?.name || (commercialsList[0]?.name) || 'Zied Ben Miled';
+
   const [activeSubTab, setActiveSubTab] = useState<'visits' | 'calendar' | 'weekly'>('visits');
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(visitReports[0]?.id || null);
 
@@ -49,7 +65,7 @@ export default function ReportsManager({
   const [schedulePurpose, setSchedulePurpose] = useState('');
   const [scheduleSummary, setScheduleSummary] = useState('');
   const [scheduleActions, setScheduleActions] = useState('');
-  const [scheduleAuthor, setScheduleAuthor] = useState('Zied Ben Miled');
+  const [scheduleAuthor, setScheduleAuthor] = useState(defaultAuthorName);
 
   // Visit Creation form states
   const [isAddingVisit, setIsAddingVisit] = useState(false);
@@ -57,7 +73,7 @@ export default function ReportsManager({
   const [visitPurpose, setVisitPurpose] = useState('');
   const [visitSummary, setVisitSummary] = useState('');
   const [visitActions, setVisitActions] = useState('');
-  const [visitAuthor, setVisitAuthor] = useState('Zied Ben Miled');
+  const [visitAuthor, setVisitAuthor] = useState(defaultAuthorName);
   const [isAnalyzingVisit, setIsAnalyzingVisit] = useState<string | null>(null);
 
   // Weekly report state
@@ -347,6 +363,25 @@ export default function ReportsManager({
                         className="p-2 border rounded w-full"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block font-bold text-slate-600">Collaborateur / Visiteur Commercial (RH)</label>
+                    <select
+                      value={visitAuthor}
+                      onChange={(e) => setVisitAuthor(e.target.value)}
+                      className="w-full p-2 border border-slate-200 rounded bg-white text-xs"
+                    >
+                      {commercialsList.length > 0 ? (
+                        commercialsList.map(emp => (
+                          <option key={emp.id} value={emp.name}>
+                            {emp.name} ({emp.jobTitle || 'Commercial / Ventes'})
+                          </option>
+                        ))
+                      ) : (
+                        <option value={visitAuthor}>{visitAuthor}</option>
+                      )}
+                    </select>
                   </div>
 
                   <div className="space-y-1">
@@ -658,14 +693,23 @@ export default function ReportsManager({
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent Responsable</label>
-                      <input 
-                        type="text" 
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent Responsable (RH)</label>
+                      <select 
                         required
                         value={scheduleAuthor}
                         onChange={(e) => setScheduleAuthor(e.target.value)}
-                        className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 hover:bg-slate-100 transition"
-                      />
+                        className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 hover:bg-slate-100 transition focus:bg-white"
+                      >
+                        {commercialsList.length > 0 ? (
+                          commercialsList.map(emp => (
+                            <option key={emp.id} value={emp.name}>
+                              {emp.name} ({emp.jobTitle || 'Commercial / Ventes'})
+                            </option>
+                          ))
+                        ) : (
+                          <option value={scheduleAuthor}>{scheduleAuthor}</option>
+                        )}
+                      </select>
                     </div>
                   </div>
 

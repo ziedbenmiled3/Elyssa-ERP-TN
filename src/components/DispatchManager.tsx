@@ -9,6 +9,7 @@ import {
 import { db } from '../utils/firebase';
 import { DeliveryTour, DeliveryTourOrder, FleetInventoryItem, PickingOrder, DeliveryPickupStop, EveningTourClosure } from '../types/mobileTerrain';
 import { Invoice, Employee } from '../types';
+import { isDriverOrDelivery } from '../services/hrSyncService';
 import { 
   Truck, 
   Package, 
@@ -410,24 +411,31 @@ export const DispatchManager: React.FC<DispatchManagerProps> = ({ tenantId, empl
     const existingIds = new Set(list.map(d => d.id));
 
     if (Array.isArray(employees) && employees.length > 0) {
+      // First pass: specific drivers/delivery personnel
       employees.forEach(emp => {
         if (!emp || !emp.id) return;
-        const job = (emp.jobTitle || '').toLowerCase();
-        const role = (emp.role || '').toLowerCase();
-        const dept = (emp.department || '').toLowerCase();
-
-        const isDriver = job.includes('chauffeur') || job.includes('livreur') || job.includes('conducteur') ||
-                         job.includes('agent') || job.includes('logistique') || dept.includes('logistique') ||
-                         dept.includes('transport') || role === 'chauffeur' || role === 'livreur' || role === 'agent';
-
-        if (isDriver && !existingIds.has(emp.id)) {
+        if (isDriverOrDelivery(emp) && !existingIds.has(emp.id)) {
           list.push({
             id: emp.id,
-            name: `${emp.name} (${emp.jobTitle || 'Chauffeur Terrain'})`
+            name: `${emp.name} (${emp.jobTitle || 'Chauffeur / Livreur'})`
           });
           existingIds.add(emp.id);
         }
       });
+
+      // If no designated driver found, include all active employees as fallback
+      if (list.length === 0) {
+        employees.forEach(emp => {
+          if (!emp || !emp.id) return;
+          if (!existingIds.has(emp.id)) {
+            list.push({
+              id: emp.id,
+              name: `${emp.name} (${emp.jobTitle || 'Collaborateur Terrain'})`
+            });
+            existingIds.add(emp.id);
+          }
+        });
+      }
     }
 
     return list.map(d => {

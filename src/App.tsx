@@ -6187,6 +6187,9 @@ function AppMain() {
 
   const tenantEmployees = useMemo(() => {
     if (isDemoTenant) {
+      if (DEMO_UNIVERSE.employees && DEMO_UNIVERSE.employees.length > 0) {
+        return DEMO_UNIVERSE.employees;
+      }
       return (DEMO_UNIVERSE.collaborators || []).map((c, idx) => ({
         id: c.id,
         tenantId: c.tenantId || 'company_demo',
@@ -6244,21 +6247,21 @@ function AppMain() {
 
   const tenantContracts = useMemo(() => {
     if (isDemoTenant) {
-      return [];
+      return DEMO_UNIVERSE.workContracts || [];
     }
     return (contracts || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
   }, [isDemoTenant, contracts]);
 
   const tenantAbsences = useMemo(() => {
     if (isDemoTenant) {
-      return [];
+      return DEMO_UNIVERSE.absences || [];
     }
     return (absences || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
   }, [isDemoTenant, absences]);
 
   const tenantPayslips = useMemo(() => {
     if (isDemoTenant) {
-      return [];
+      return DEMO_UNIVERSE.payslips || [];
     }
     return (payslips || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-'))));
   }, [isDemoTenant, payslips]);
@@ -7190,6 +7193,7 @@ function AppMain() {
                   readOnly={currentUser?.role === 'Viewer'}
                   activeTenantId={activeCompanyName}
                   isDemoCompany={isDemoCompany}
+                  employees={tenantEmployees}
                 />
               )}
 
@@ -7484,6 +7488,7 @@ function AppMain() {
                     tenantId={activeCompanyName} 
                     currentUser={currentUser} 
                     isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
+                    employees={tenantEmployees}
                   />
                 </ErrorBoundary>
               )}
@@ -7557,6 +7562,8 @@ function AppMain() {
                   complaints={tenantComplaints}
                   invoices={tenantInvoices}
                   onUpdateVisitReports={setVisitReports}
+                  employees={tenantEmployees}
+                  currentUser={currentUser}
                 />
               )}
 
@@ -7582,6 +7589,7 @@ function AppMain() {
                   isDemoCompany={isDemoCompany}
                   importFolders={tenantImportFolders}
                   lcRequests={tenantLcRequests}
+                  employees={tenantEmployees}
                 />
               )}
 
