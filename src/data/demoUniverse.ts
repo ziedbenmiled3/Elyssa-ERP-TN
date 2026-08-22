@@ -517,13 +517,13 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
     }
   ],
 
-  // 6. MANUFACTURING ORDERS (1 OF : demo-mo_1 pour Outillage Pro avec advancement: 45, totalUnits: 100, completedUnits: 45, scrapUnits: 2)
+  // 6. MANUFACTURING ORDERS (2 OFs cohérents : Tunis Assemblage B & Sfax Extrusion A)
   manufacturingOrders: [
     {
       id: "demo-mo_1",
       tenantId: DEMO_TENANT_ID,
       nomenclatureId: "demo-nom_1",
-      productName: "Outillage pro (Conditionnement & Pack Chantier 230mm)",
+      productName: "Outillage pro (Pack Chantier 230mm)",
       quantityToProduce: 100,
       quantityProduced: 45,
       quantityScrapped: 2,
@@ -534,8 +534,24 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       assignedTeam: "Équipe Matin (Chef : J. Ben Ali)",
       status: "En cours",
       importFolderId: "demo-imp_1",
-      notes: "OF Actif Outillage pro 230mm - 45% d'avancement, 45 unités terminées, 2 rebuts.",
+      notes: "OF Actif Outillage pro (Pack Chantier 230mm) - 45% d'avancement, 45 unités terminées, 2 rebuts. Liaison transit IMP-RADES-2026-081.",
       customsStatusOverride: "Released"
+    },
+    {
+      id: "demo-mo_2",
+      tenantId: DEMO_TENANT_ID,
+      nomenclatureId: "demo-nom_2",
+      productName: "Tube PVC Haute Pression PN16 D63 (Barre 4m)",
+      quantityToProduce: 250,
+      quantityProduced: 0,
+      quantityScrapped: 0,
+      advancement: 0,
+      startDate: "2026-08-25",
+      endDate: "2026-09-05",
+      assignedLine: "Ligne Extrusion A (Sfax)",
+      assignedTeam: "Équipe Après-midi (Chef : M. Trabelsi)",
+      status: "Planifié",
+      notes: "OF Planifié Tube PVC PN16 D63 (Barre 4m) - Début prévu le 25/08/2026. Dépendance matière : Résine PVC S-67."
     }
   ],
 
@@ -932,7 +948,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
     {
       id: "demo-nom_1",
       tenantId: DEMO_TENANT_ID,
-      productName: "Outillage pro (Conditionnement & Pack Chantier 230mm)",
+      productName: "Outillage pro (Pack Chantier 230mm)",
       category: "Outillage Pro",
       estimatedTimeMinutes: 25,
       laborCostPerUnit: 4.500,
@@ -953,6 +969,40 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
           quantityNeeded: 2,
           unit: "Pcs",
           unitCost: 10.000
+        }
+      ]
+    },
+    {
+      id: "demo-nom_2",
+      tenantId: DEMO_TENANT_ID,
+      productName: "Tube PVC Haute Pression PN16 D63 (Barre 4m)",
+      category: "Conduits & Plasturgie",
+      estimatedTimeMinutes: 18,
+      laborCostPerUnit: 3.200,
+      materials: [
+        {
+          id: "demo-rm_3",
+          tenantId: DEMO_TENANT_ID,
+          name: "Résine PVC S-67",
+          quantityNeeded: 4.8,
+          unit: "kg",
+          unitCost: 3.400
+        },
+        {
+          id: "demo-rm_4",
+          tenantId: DEMO_TENANT_ID,
+          name: "Stabilisant thermique Ca/Zn",
+          quantityNeeded: 0.15,
+          unit: "kg",
+          unitCost: 12.500
+        },
+        {
+          id: "demo-rm_5",
+          tenantId: DEMO_TENANT_ID,
+          name: "Colorant & Masterbatch Gris",
+          quantityNeeded: 0.08,
+          unit: "kg",
+          unitCost: 8.200
         }
       ]
     }

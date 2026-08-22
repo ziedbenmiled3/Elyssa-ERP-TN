@@ -789,21 +789,50 @@ export async function seedHyperConnectedDemoData(tenantId: string): Promise<Hype
     }
   ];
 
-  // Production & GPAO (1 OF actif & Nomenclature)
+  // Production & GPAO (2 OFs cohérents : Tunis Assemblage B & Sfax Extrusion A)
   const manufacturingOrdersData = [
     {
       id: "demo-mo_1",
       orderNumber: "OF-2026-0042",
       nomenclatureId: "demo-nom_1",
-      productName: "Outillage pro (Conditionnement & Pack Chantier 230mm)",
+      productName: "Outillage pro (Pack Chantier 230mm)",
       quantity: 100,
+      quantityToProduce: 100,
+      quantityProduced: 45,
+      quantityScrapped: 2,
+      advancement: 45,
       startDate: "2026-08-15",
       dueDate: "2026-08-30",
-      status: "InProgress",
-      supervisor: "Khaled Ben Amor",
+      assignedLine: "Ligne Assemblage B (Tunis)",
+      assignedTeam: "Équipe Matin (Chef : J. Ben Ali)",
+      status: "En cours",
+      importFolderId: "demo-imp_1",
+      supervisor: "J. Ben Ali",
       priority: "High",
-      progressPercentage: 65,
-      notes: "Ordre de fabrication actif atelier outillage pro.",
+      progressPercentage: 45,
+      notes: "OF Actif Outillage pro (Pack Chantier 230mm) - 45% d'avancement, 45 unités terminées, 2 rebuts. Liaison transit IMP-RADES-2026-081.",
+      customsStatusOverride: "Released",
+      is_demo: true
+    },
+    {
+      id: "demo-mo_2",
+      orderNumber: "OF-2026-0043",
+      nomenclatureId: "demo-nom_2",
+      productName: "Tube PVC Haute Pression PN16 D63 (Barre 4m)",
+      quantity: 250,
+      quantityToProduce: 250,
+      quantityProduced: 0,
+      quantityScrapped: 0,
+      advancement: 0,
+      startDate: "2026-08-25",
+      dueDate: "2026-09-05",
+      assignedLine: "Ligne Extrusion A (Sfax)",
+      assignedTeam: "Équipe Après-midi (Chef : M. Trabelsi)",
+      status: "Planifié",
+      supervisor: "M. Trabelsi",
+      priority: "Normal",
+      progressPercentage: 0,
+      notes: "OF Planifié Tube PVC PN16 D63 (Barre 4m) - Début prévu le 25/08/2026. Dépendance matière : Résine PVC S-67.",
       is_demo: true
     }
   ];
@@ -814,11 +843,40 @@ export async function seedHyperConnectedDemoData(tenantId: string): Promise<Hype
       code: "BOM-OUT-230",
       name: "Outillage pro (Pack Chantier 230mm)",
       version: "1.0",
-      productName: "Outillage pro (Meuleuse & Découpe 230mm)",
+      productName: "Outillage pro (Pack Chantier 230mm)",
+      category: "Outillage Pro",
       status: "Approved",
+      estimatedTimeMinutes: 25,
+      laborCostPerUnit: 4.500,
       components: [
         { id: "c1", componentName: "Meuleuse d'angle Pro 230mm", quantity: 1, unit: "Pcs", unitCost: 85.000 },
         { id: "c2", componentName: "Disque diamanté béton armé", quantity: 2, unit: "Pcs", unitCost: 10.000 }
+      ],
+      materials: [
+        { id: "demo-rm_1", tenantId: "company_demo", name: "Meuleuse d'angle Pro 230mm", quantityNeeded: 1, unit: "Pcs", unitCost: 85.000, importFolderId: "demo-imp_1" },
+        { id: "demo-rm_2", tenantId: "company_demo", name: "Disque diamanté béton armé", quantityNeeded: 2, unit: "Pcs", unitCost: 10.000 }
+      ],
+      is_demo: true
+    },
+    {
+      id: "demo-nom_2",
+      code: "BOM-PVC-63",
+      name: "Tube PVC Haute Pression PN16 D63 (Barre 4m)",
+      version: "1.0",
+      productName: "Tube PVC Haute Pression PN16 D63 (Barre 4m)",
+      category: "Conduits & Plasturgie",
+      status: "Approved",
+      estimatedTimeMinutes: 18,
+      laborCostPerUnit: 3.200,
+      components: [
+        { id: "c3", componentName: "Résine PVC S-67", quantity: 4.8, unit: "kg", unitCost: 3.400 },
+        { id: "c4", componentName: "Stabilisant thermique Ca/Zn", quantity: 0.15, unit: "kg", unitCost: 12.500 },
+        { id: "c5", componentName: "Colorant & Masterbatch Gris", quantity: 0.08, unit: "kg", unitCost: 8.200 }
+      ],
+      materials: [
+        { id: "demo-rm_3", tenantId: "company_demo", name: "Résine PVC S-67", quantityNeeded: 4.8, unit: "kg", unitCost: 3.400 },
+        { id: "demo-rm_4", tenantId: "company_demo", name: "Stabilisant thermique Ca/Zn", quantityNeeded: 0.15, unit: "kg", unitCost: 12.500 },
+        { id: "demo-rm_5", tenantId: "company_demo", name: "Colorant & Masterbatch Gris", quantityNeeded: 0.08, unit: "kg", unitCost: 8.200 }
       ],
       is_demo: true
     }

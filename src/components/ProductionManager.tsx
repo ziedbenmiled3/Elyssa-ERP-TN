@@ -26,7 +26,13 @@ import {
   ChevronRight,
   ClipboardList,
   Flame,
-  Info
+  Info,
+  Package,
+  ShoppingCart,
+  Check,
+  Clock,
+  ShieldCheck,
+  Truck
 } from 'lucide-react';
 
 import { RawMaterial, Nomenclature, ManufacturingOrder, ImportFolder, LCRequest, Employee } from '../types';
@@ -60,9 +66,97 @@ export default function ProductionManager({
   const MO_STORAGE_KEY = 'carthage_production_manufacturing_orders';
 
   // --- Prepopulated Data ---
-  const DEFAULT_NOMENCLATURES: Nomenclature[] = [];
+  const DEFAULT_NOMENCLATURES: Nomenclature[] = [
+    {
+      id: "demo-nom_1",
+      productName: "Outillage pro (Pack Chantier 230mm)",
+      category: "Outillage Pro",
+      estimatedTimeMinutes: 25,
+      laborCostPerUnit: 4.500,
+      materials: [
+        {
+          id: "demo-rm_1",
+          name: "Meuleuse d'angle Pro 230mm",
+          quantityNeeded: 1,
+          unit: "Pcs",
+          unitCost: 85.000,
+          importFolderId: "demo-imp_1"
+        },
+        {
+          id: "demo-rm_2",
+          name: "Disque diamanté béton armé",
+          quantityNeeded: 2,
+          unit: "Pcs",
+          unitCost: 10.000
+        }
+      ]
+    },
+    {
+      id: "demo-nom_2",
+      productName: "Tube PVC Haute Pression PN16 D63 (Barre 4m)",
+      category: "Conduits & Plasturgie",
+      estimatedTimeMinutes: 18,
+      laborCostPerUnit: 3.200,
+      materials: [
+        {
+          id: "demo-rm_3",
+          name: "Résine PVC S-67",
+          quantityNeeded: 4.8,
+          unit: "kg",
+          unitCost: 3.400
+        },
+        {
+          id: "demo-rm_4",
+          name: "Stabilisant thermique Ca/Zn",
+          quantityNeeded: 0.15,
+          unit: "kg",
+          unitCost: 12.500
+        },
+        {
+          id: "demo-rm_5",
+          name: "Colorant & Masterbatch Gris",
+          quantityNeeded: 0.08,
+          unit: "kg",
+          unitCost: 8.200
+        }
+      ]
+    }
+  ];
 
-  const DEFAULT_MANUFACTURING_ORDERS: ManufacturingOrder[] = [];
+  const DEFAULT_MANUFACTURING_ORDERS: ManufacturingOrder[] = [
+    {
+      id: "demo-mo_1",
+      nomenclatureId: "demo-nom_1",
+      productName: "Outillage pro (Pack Chantier 230mm)",
+      quantityToProduce: 100,
+      quantityProduced: 45,
+      quantityScrapped: 2,
+      advancement: 45,
+      startDate: "2026-08-15",
+      endDate: "2026-08-30",
+      assignedLine: "Ligne Assemblage B (Tunis)",
+      assignedTeam: "Équipe Matin (Chef : J. Ben Ali)",
+      status: "En cours",
+      importFolderId: "demo-imp_1",
+      notes: "OF Actif Outillage pro (Pack Chantier 230mm) - 45% d'avancement, 45 unités terminées, 2 rebuts. Liaison transit IMP-RADES-2026-081.",
+      customsStatusOverride: "Released"
+    },
+    {
+      id: "demo-mo_2",
+      nomenclatureId: "demo-nom_2",
+      productName: "Tube PVC Haute Pression PN16 D63 (Barre 4m)",
+      quantityToProduce: 250,
+      quantityProduced: 0,
+      quantityScrapped: 0,
+      advancement: 0,
+      startDate: "2026-08-25",
+      endDate: "2026-09-05",
+      assignedLine: "Ligne Extrusion A (Sfax)",
+      assignedTeam: "Équipe Après-midi (Chef : M. Trabelsi)",
+      status: "Planifié",
+      notes: "OF Planifié Tube PVC PN16 D63 (Barre 4m) - Début prévu le 25/08/2026. Dépendance matière : Résine PVC S-67."
+    }
+  ];
 
   // --- States & Proxies ---
   const nomenclatures = propNomenclatures;
