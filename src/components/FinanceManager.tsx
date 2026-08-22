@@ -40,7 +40,9 @@ import {
   HelpCircle,
   Send,
   FolderKey,
-  ArrowLeft
+  ArrowLeft,
+  Landmark,
+  CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -355,8 +357,12 @@ export default function FinanceManager({
   const [newAccName, setNewAccName] = useState('');
   const [newAccNum, setNewAccNum] = useState('');
   const [newAccType, setNewAccType] = useState<'Checking' | 'Savings' | 'CashBox'>('Checking');
+  const [newAccTypeCategory, setNewAccTypeCategory] = useState<'COURANT' | 'CAISSE' | 'EPARGNE' | 'TITRES'>('COURANT');
+  const [newAccSceAccount, setNewAccSceAccount] = useState('');
+  const [newAccInterestRate, setNewAccInterestRate] = useState('');
   const [newAccInitial, setNewAccInitial] = useState<number>(0);
   const [newAccCurrency, setNewAccCurrency] = useState<string>('TND');
+  const [accountCategoryFilter, setAccountCategoryFilter] = useState<'ALL' | 'COURANT' | 'CAISSE' | 'EPARGNE' | 'TITRES'>('ALL');
 
   // Transaction form states
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -677,6 +683,28 @@ export default function FinanceManager({
     doc.save(`Bilan_Tresorerie_Elyssa_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
+  // Account category classifier helper
+  const getAccountCategory = (acc: BankAccount): 'COURANT' | 'CAISSE' | 'EPARGNE' | 'TITRES' => {
+    if (acc.accountTypeCategory) {
+      if (acc.accountTypeCategory === 'COURANT') return 'COURANT';
+      if (acc.accountTypeCategory === 'CAISSE') return 'CAISSE';
+      if (acc.accountTypeCategory === 'EPARGNE') return 'EPARGNE';
+      if (acc.accountTypeCategory === 'TITRES') return 'TITRES';
+    }
+    const typeStr = (acc.type || '').toUpperCase();
+    const nameStr = (acc.bankName || '').toLowerCase();
+    if (typeStr === 'TITRES' || typeStr.includes('TITRE') || nameStr.includes('titre') || nameStr.includes('bourse') || acc.isBvmtDedicated) {
+      return 'TITRES';
+    }
+    if (typeStr === 'CAISSE' || typeStr === 'CASHBOX' || nameStr.includes('caisse') || nameStr.includes('espèces') || nameStr.includes('especes')) {
+      return 'CAISSE';
+    }
+    if (typeStr === 'EPARGNE' || typeStr === 'SAVINGS' || nameStr.includes('épargne') || nameStr.includes('epargne') || nameStr.includes('dat')) {
+      return 'EPARGNE';
+    }
+    return 'COURANT';
+  };
+
   // Compute actual account balances dynamically based on transactions
   const computedAccounts = useMemo(() => {
     return bankAccounts.map(acc => {
@@ -690,20 +718,48 @@ export default function FinanceManager({
     });
   }, [bankAccounts, bankTransactions]);
 
-  // Combined Total Cash
+  // Category Breakdown Totals
+  const courantTotal = useMemo(() => {
+    return computedAccounts.filter(a => getAccountCategory(a) === 'COURANT').reduce((s, a) => s + (a.currentBalance || 0), 0);
+  }, [computedAccounts]);
+
+  const caisseTotal = useMemo(() => {
+    return computedAccounts.filter(a => getAccountCategory(a) === 'CAISSE').reduce((s, a) => s + (a.currentBalance || 0), 0);
+  }, [computedAccounts]);
+
+  const epargneTotal = useMemo(() => {
+    return computedAccounts.filter(a => getAccountCategory(a) === 'EPARGNE').reduce((s, a) => s + (a.currentBalance || 0), 0);
+  }, [computedAccounts]);
+
+  const titresTotal = useMemo(() => {
+    return computedAccounts.filter(a => getAccountCategory(a) === 'TITRES').reduce((s, a) => s + (a.currentBalance || 0), 0);
+  }, [computedAccounts]);
+
+  // Combined Total Cash (Trésorerie Globale Cumulée)
   const totalCashOnHand = useMemo(() => {
     return computedAccounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
   }, [computedAccounts]);
+
+  // Filtered accounts for display
+  const displayedAccounts = useMemo(() => {
+    if (accountCategoryFilter === 'ALL') return computedAccounts;
+    return computedAccounts.filter(a => getAccountCategory(a) === accountCategoryFilter);
+  }, [computedAccounts, accountCategoryFilter]);
 
   // Handle adding account
   const handleAddAccount = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAccName || !newAccNum) return;
+    const defaultSce = newAccTypeCategory === 'COURANT' ? '5321' : newAccTypeCategory === 'CAISSE' ? '5411' : newAccTypeCategory === 'EPARGNE' ? '5313' : '5323';
     const newAcc: BankAccount = {
       id: 'acc_' + Date.now(),
       bankName: newAccName,
       accountNumber: newAccNum,
-      type: newAccType as any,
+      type: newAccTypeCategory as any,
+      accountTypeCategory: newAccTypeCategory,
+      sceAccount: newAccSceAccount || defaultSce,
+      interestRate: newAccTypeCategory === 'EPARGNE' ? (newAccInterestRate || '6.5%') : undefined,
+      isBvmtDedicated: newAccTypeCategory === 'TITRES' ? true : undefined,
       initialBalance: Number(newAccInitial),
       currentBalance: Number(newAccInitial),
       currency: newAccCurrency,
@@ -713,8 +769,11 @@ export default function FinanceManager({
     setIsAccountModalOpen(false);
     setNewAccName('');
     setNewAccNum('');
+    setNewAccSceAccount('');
+    setNewAccInterestRate('');
     setNewAccInitial(0);
     setNewAccCurrency('TND');
+    setNewAccTypeCategory('COURANT');
   };
 
   // Handle adding payment transaction
@@ -1586,13 +1645,16 @@ export default function FinanceManager({
           </div>
         )}
 
-        {/* TAB 2: MULTI BANK ACCOUNTS */}
+        {/* TAB 2: MULTI BANK ACCOUNTS & TREASURY REGISTRY */}
         {activeSubTab === 'accounts' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-800">Suivi & Rapprochement des Comptes Bancaires</h3>
-                <p className="text-xs text-slate-500">Mise à jour automatique des balances à partir des chèques certifiés et virements encaissés</p>
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Landmark className="w-4 h-4 text-indigo-600" />
+                  Registre Multi-Comptes Financiers (Banques, Caisses, Épargne & Titres)
+                </h3>
+                <p className="text-xs text-slate-500">Mise à jour automatique des balances à partir des chèques certifiés, virements, dépôts espèces et ordres de bourse</p>
               </div>
               {!readOnly && (
                 <button
@@ -1600,61 +1662,238 @@ export default function FinanceManager({
                   className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 px-4 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Nouveau Compte Bancaire</span>
+                  <span>Nouveau Compte / Caisse</span>
                 </button>
               )}
             </div>
 
-            {/* Grid of bank cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {computedAccounts.map(acc => (
-                <div key={acc.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition flex flex-col justify-between h-40 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-full mix-blend-multiply filter blur-xl opacity-40 group-hover:opacity-70 transition duration-500 -mr-4 -mt-4" />
-                  
-                  <div className="relative">
-                    <div className="flex justify-between items-start">
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${
-                        acc.type === 'Checking' ? 'bg-blue-50 text-blue-700 border border-blue-150' : 
-                        acc.type === 'Savings' ? 'bg-purple-50 text-purple-700 border border-purple-150' :
-                        'bg-amber-50 text-amber-700 border border-amber-150'
-                      }`}>
-                        {acc.type === 'Checking' ? 'Courant' : acc.type === 'Savings' ? 'Épargne' : 'Caisse Espèces'}
-                      </span>
-                      <span className="text-[10px] text-indigo-650 font-bold font-mono bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-                        {acc.currency === 'TND_CONV' ? 'TND Conv.' : (acc.currency || 'TND')}
+            {/* Global & Category KPI Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white shadow-sm flex flex-col justify-between border border-indigo-800">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300">Trésorerie Globale</span>
+                  <span className="text-[9px] bg-indigo-500/30 text-indigo-200 px-1.5 py-0.5 rounded font-bold">Cumulée</span>
+                </div>
+                <div className="mt-2">
+                  <div className="text-lg font-black font-mono tracking-tight text-white">
+                    {totalCashOnHand.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
+                    <span className="text-[10px] ml-1 text-indigo-300 font-bold">TND</span>
+                  </div>
+                  <span className="text-[10px] text-indigo-200 mt-1 block">
+                    {computedAccounts.length} comptes actifs consolidés
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-600">Courant Commercial</span>
+                  <span className="text-[9px] bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded">SCE 5321/2</span>
+                </div>
+                <div className="mt-2">
+                  <div className="text-base font-black font-mono text-slate-900">
+                    {courantTotal.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
+                    <span className="text-[10px] ml-1 text-slate-400 font-bold">TND</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">Exploitation & Ventes</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-600">Caisses Espèces</span>
+                  <span className="text-[9px] bg-amber-50 text-amber-700 font-bold px-1.5 py-0.5 rounded">SCE 5411</span>
+                </div>
+                <div className="mt-2">
+                  <div className="text-base font-black font-mono text-slate-900">
+                    {caisseTotal.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
+                    <span className="text-[10px] ml-1 text-slate-400 font-bold">TND</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">Espèces physiques siège</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Épargne & DAT</span>
+                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.5 rounded">Taux 6.5%</span>
+                </div>
+                <div className="mt-2">
+                  <div className="text-base font-black font-mono text-slate-900">
+                    {epargneTotal.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
+                    <span className="text-[10px] ml-1 text-slate-400 font-bold">TND</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">Placements rémunérés</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-purple-600">Compte Titres BVMT</span>
+                  <span className="text-[9px] bg-purple-50 text-purple-700 font-bold px-1.5 py-0.5 rounded">Bourse</span>
+                </div>
+                <div className="mt-2">
+                  <div className="text-base font-black font-mono text-slate-900">
+                    {titresTotal.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
+                    <span className="text-[10px] ml-1 text-slate-400 font-bold">TND</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">Tunisie Clearing J+2</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setAccountCategoryFilter('ALL')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                  accountCategoryFilter === 'ALL'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Tous les comptes ({computedAccounts.length})
+              </button>
+              <button
+                onClick={() => setAccountCategoryFilter('COURANT')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                  accountCategoryFilter === 'COURANT'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-blue-700 hover:bg-blue-50'
+                }`}
+              >
+                Comptes Courants & Exploitation
+              </button>
+              <button
+                onClick={() => setAccountCategoryFilter('CAISSE')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                  accountCategoryFilter === 'CAISSE'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-amber-700 hover:bg-amber-50'
+                }`}
+              >
+                Caisses Espèces
+              </button>
+              <button
+                onClick={() => setAccountCategoryFilter('EPARGNE')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                  accountCategoryFilter === 'EPARGNE'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-emerald-700 hover:bg-emerald-50'
+                }`}
+              >
+                Comptes Épargne & DAT
+              </button>
+              <button
+                onClick={() => setAccountCategoryFilter('TITRES')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                  accountCategoryFilter === 'TITRES'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-purple-700 hover:bg-purple-50'
+                }`}
+              >
+                Comptes Titres (BVMT)
+              </button>
+            </div>
+
+            {/* Grid of Bank Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {displayedAccounts.map(acc => {
+                const cat = getAccountCategory(acc);
+                const isCourant = cat === 'COURANT';
+                const isCaisse = cat === 'CAISSE';
+                const isEpargne = cat === 'EPARGNE';
+                const isTitres = cat === 'TITRES';
+
+                return (
+                  <div 
+                    key={acc.id} 
+                    className={`p-5 rounded-2xl border transition flex flex-col justify-between min-h-[180px] relative overflow-hidden bg-white shadow-xs hover:shadow-md ${
+                      isCourant ? 'border-blue-200 hover:border-blue-300' :
+                      isCaisse ? 'border-amber-200 hover:border-amber-300' :
+                      isEpargne ? 'border-emerald-200 hover:border-emerald-300' :
+                      'border-purple-200 hover:border-purple-300'
+                    }`}
+                  >
+                    <div className="relative">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className={`text-[9.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          isCourant ? 'bg-blue-50 text-blue-700 border border-blue-200' : 
+                          isEpargne ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          isTitres ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                          'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          {isCourant ? 'Courant Commercial' : isEpargne ? 'Épargne & DAT' : isTitres ? 'Compte Titres BVMT' : 'Caisse Espèces'}
+                        </span>
+                        
+                        {acc.sceAccount && (
+                          <span className="text-[9.5px] font-mono font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                            SCE {acc.sceAccount}
+                          </span>
+                        )}
+                      </div>
+
+                      <h4 className="text-sm font-black text-slate-800 mt-3 truncate">{acc.bankName}</h4>
+                      <p className="text-[11px] font-mono text-slate-500 mt-1 truncate">
+                        {isCaisse ? `Caisse : ${acc.accountNumber}` : `RIB : ${acc.accountNumber}`}
+                      </p>
+
+                      {/* Extra Badges */}
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {isEpargne && (
+                          <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                            📈 Rémunération : {acc.interestRate || '6.5%'}
+                          </span>
+                        )}
+                        {isTitres && (
+                          <span className="text-[9.5px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
+                            🎯 Dédié Bourse BVMT
+                          </span>
+                        )}
+                        {isCaisse && (
+                          <span className="text-[9.5px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                            💵 Espèces physiques Siège
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="relative pt-3.5 mt-3 border-t border-slate-100 flex justify-between items-end">
+                      <div>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Solde Disponible</span>
+                        <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Rapproché
+                        </span>
+                      </div>
+                      <span className="text-lg font-black text-slate-900 font-mono">
+                        {acc.currentBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
+                        <span className="text-[10px] ml-1 font-bold text-slate-400 uppercase">
+                          {acc.currency === 'TND_CONV' ? 'TND Conv.' : (acc.currency || 'TND')}
+                        </span>
                       </span>
                     </div>
-                    <h4 className="text-xs font-black text-slate-800 mt-2.5 truncate">{acc.bankName}</h4>
-                    <p className="text-[10px] font-mono text-slate-400 mt-1 truncate">{acc.accountNumber}</p>
                   </div>
-
-                  <div className="relative pt-3 border-t border-slate-100 flex justify-between items-end">
-                    <span className="text-[9px] text-slate-400 font-semibold">Solde calculé</span>
-                    <span className="text-base font-black text-slate-800 font-mono">
-                      {acc.currentBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3 })}
-                      <span className="text-[9.5px] ml-1 font-bold text-slate-400 uppercase">
-                        {acc.currency === 'TND_CONV' ? 'TND' : (acc.currency || 'TND')}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Modal for adding account */}
             {isAccountModalOpen && (
               <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl border border-slate-150 p-6 w-full max-w-md shadow-2xl">
-                  <h3 className="text-sm font-bold text-slate-800 pb-3 border-b mb-4">Créer un Nouveau Compte / Caisse</h3>
+                <div className="bg-white rounded-2xl border border-slate-150 p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-150">
+                  <h3 className="text-sm font-bold text-slate-800 pb-3 border-b mb-4 flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-indigo-600" />
+                    Créer un Nouveau Compte de Trésorerie
+                  </h3>
                   <form onSubmit={handleAddAccount} className="space-y-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Nom de la Banque ou Caisse *</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Nom du Compte / Banque *</label>
                       <input 
                         type="text" 
                         required
                         value={newAccName}
                         onChange={e => setNewAccName(e.target.value)}
-                        placeholder="Ex: Amen Bank Tunis, Caisse Auxiliaire"
+                        placeholder="Ex: UIB - Exploitation, Caisse Dépôt Sousse"
                         className="w-full text-xs p-2.5 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500" 
                       />
                     </div>
@@ -1665,23 +1904,50 @@ export default function FinanceManager({
                         required
                         value={newAccNum}
                         onChange={e => setNewAccNum(e.target.value)}
-                        placeholder="Ex: RIB sur 24 chiffres"
+                        placeholder="Ex: RIB 20 chiffres ou ID Caisse (ex: CAISSE-02)"
                         className="w-full text-xs p-2.5 border rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" 
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Type de Compte</label>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Typologie de Compte</label>
                         <select 
-                          value={newAccType}
-                          onChange={e => setNewAccType(e.target.value as any)}
-                          className="w-full text-xs p-2.5 border rounded-lg focus:outline-none"
+                          value={newAccTypeCategory}
+                          onChange={e => setNewAccTypeCategory(e.target.value as any)}
+                          className="w-full text-xs p-2.5 border rounded-lg focus:outline-none bg-white font-medium"
                         >
-                          <option value="Checking">Courant professionnel</option>
-                          <option value="Savings">Compte d'épargne d'entreprise</option>
-                          <option value="CashBox">Caisse caisse-espèces physique</option>
+                          <option value="COURANT">Courant Commercial</option>
+                          <option value="CAISSE">Caisse Espèces Physique</option>
+                          <option value="EPARGNE">Compte Épargne & DAT</option>
+                          <option value="TITRES">Compte Titres BVMT</option>
                         </select>
                       </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Compte SCE (Comptabilité)</label>
+                        <input 
+                          type="text" 
+                          value={newAccSceAccount}
+                          onChange={e => setNewAccSceAccount(e.target.value)}
+                          placeholder={newAccTypeCategory === 'COURANT' ? '5321' : newAccTypeCategory === 'CAISSE' ? '5411' : newAccTypeCategory === 'EPARGNE' ? '5313' : '5323'}
+                          className="w-full text-xs p-2.5 border rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" 
+                        />
+                      </div>
+                    </div>
+
+                    {newAccTypeCategory === 'EPARGNE' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Taux de Rémunération Annuel</label>
+                        <input 
+                          type="text" 
+                          value={newAccInterestRate}
+                          onChange={e => setNewAccInterestRate(e.target.value)}
+                          placeholder="Ex: 6.5%"
+                          className="w-full text-xs p-2.5 border rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" 
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">Devise de Tenue</label>
                         <select 
@@ -1693,22 +1959,20 @@ export default function FinanceManager({
                           <option value="TND_CONV">Dinar Convertible (TND Conv)</option>
                           <option value="EUR">Euro En Devise (EUR)</option>
                           <option value="USD">Dollar Devise (USD)</option>
-                          <option value="GBP">Livre Sterling (GBP)</option>
                         </select>
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">
-                        Solde Initial ({newAccCurrency === 'TND_CONV' ? 'TND convertible' : newAccCurrency})
-                      </label>
-                      <input 
-                        type="number" 
-                        step="0.001"
-                        value={newAccInitial}
-                        onChange={e => setNewAccInitial(Number(e.target.value))}
-                        className="w-full text-xs p-2.5 border rounded-lg font-mono text-right font-bold text-indigo-900 focus:outline-none" 
-                      />
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">
+                          Solde Initial ({newAccCurrency})
+                        </label>
+                        <input 
+                          type="number" 
+                          step="0.001"
+                          value={newAccInitial}
+                          onChange={e => setNewAccInitial(Number(e.target.value))}
+                          className="w-full text-xs p-2.5 border rounded-lg font-mono text-right font-bold text-indigo-900 focus:outline-none" 
+                        />
+                      </div>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t">

@@ -20,6 +20,7 @@ import {
   Search, 
   Filter, 
   AlertTriangle, 
+  AlertCircle,
   ArrowUpRight, 
   ArrowDownLeft, 
   Edit, 
@@ -36,7 +37,11 @@ import {
   Printer,
   Sliders,
   DollarSign,
-  CheckSquare
+  CheckSquare,
+  ShoppingCart,
+  Send,
+  ArrowRight,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -52,6 +57,9 @@ interface StockManagerProps {
   onUpdateCompanyLocations: (locs: any[]) => void;
   activeTenantId?: string;
   isDemoCompany?: boolean;
+  purchaseRequisitions?: any[];
+  onUpdatePurchaseRequisitions?: (reqs: any[]) => void;
+  onNavigateToPurchasing?: () => void;
 }
 
 export const DEFAULT_DEMO_PRODUCTS: Product[] = [
@@ -130,6 +138,44 @@ export const DEFAULT_DEMO_PRODUCTS: Product[] = [
     warehouseId: "WH-TUNIS-02",
     warehouse_location: "Magasin Principal Tunis",
     is_demo: true
+  },
+  {
+    id: "demo-prod_5",
+    sku: "PLA-BA13-30",
+    name: "Plaques de Plâtre BA13 Standard (120x300cm)",
+    category: "Gros Œuvre",
+    type: "PRODUIT_FINI",
+    unitPrice: 26.000,
+    costPrice: 18.500,
+    marginPercentage: 40.54,
+    stockLevel: 0,
+    minStockLevel: 50,
+    unit: "Plaque",
+    supplierId: "demo-sup_5",
+    supplierName: "Knauf Tunisie",
+    createdDate: "2026-03-01",
+    warehouseId: "WH-CHARGUIA-02",
+    warehouse_location: "Entrepôt Central - Charguia II",
+    is_demo: true
+  },
+  {
+    id: "demo-prod_6",
+    sku: "COL-CAR-25",
+    name: "Mortier Colle C2TE Haute Performance (Sac 25kg)",
+    category: "Finition & Décoration",
+    type: "PRODUIT_FINI",
+    unitPrice: 21.000,
+    costPrice: 14.200,
+    marginPercentage: 47.89,
+    stockLevel: 12,
+    minStockLevel: 40,
+    unit: "Sac",
+    supplierId: "demo-sup_6",
+    supplierName: "Sika Tunisie",
+    createdDate: "2026-03-10",
+    warehouseId: "WH-SFAX-01",
+    warehouse_location: "Dépôt Régional - Sfax",
+    is_demo: true
   }
 ];
 
@@ -144,7 +190,10 @@ export default function StockManager({
   companyLocations,
   onUpdateCompanyLocations,
   activeTenantId,
-  isDemoCompany = false
+  isDemoCompany = false,
+  purchaseRequisitions,
+  onUpdatePurchaseRequisitions,
+  onNavigateToPurchasing
 }: StockManagerProps) {
   // Strict check for Demo tenant vs Production tenant
   const isDemoTenant = useMemo(() => {
@@ -256,6 +305,65 @@ export default function StockManager({
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
+  // DA (Demande d'Achat) Modal States
+  const [isDaModalOpen, setIsDaModalOpen] = useState(false);
+  const [daProduct, setDaProduct] = useState<Product | null>(null);
+  const [daQuantity, setDaQuantity] = useState<number>(50);
+  const [daUnitCost, setDaUnitCost] = useState<number>(0);
+  const [daDepartment, setDaDepartment] = useState<string>('Approvisionnement & Logistique');
+  const [daNotes, setDaNotes] = useState<string>('');
+  const [daDeliveryWarehouse, setDaDeliveryWarehouse] = useState<string>('');
+
+  const openDaModal = (p: Product) => {
+    setDaProduct(p);
+    const minLvl = p.minStockLevel ?? 50;
+    const currentStock = p.stockLevel ?? 0;
+    const suggestedQty = Math.max(minLvl * 2 - currentStock, minLvl);
+    setDaQuantity(suggestedQty > 0 ? suggestedQty : minLvl);
+    setDaUnitCost(p.costPrice || p.unitPrice || 0);
+    setDaDeliveryWarehouse(p.warehouse_location || (companyLocations.find(l => l.id === p.warehouseId)?.name) || 'Entrepôt Central - Charguia II');
+    setDaNotes(`Réapprovisionnement d'urgence pour ${p.name} (${p.sku}) - Stock actuel: ${currentStock} ${p.unit || ''} (Seuil min: ${minLvl}).`);
+    setIsDaModalOpen(true);
+  };
+
+  const handleConfirmDA = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!daProduct) return;
+    const daId = `DA-2026-${String(Math.floor(100 + Math.random() * 900))}`;
+    const newDA = {
+      id: daId,
+      itemDescription: `${daProduct.name} (${daProduct.sku})`,
+      quantityRequested: Number(daQuantity),
+      unit: daProduct.unit || 'Unité',
+      estimatedCost: Number(daQuantity) * Number(daUnitCost),
+      requestedBy: 'Responsable Stocks (Elyssa ERP)',
+      department: daDepartment,
+      requestDate: new Date().toISOString().split('T')[0],
+      status: 'En attente',
+      decisionNotes: daNotes,
+      supplierName: daProduct.supplierName || 'Fournisseur Référencé',
+      productId: daProduct.id,
+      sku: daProduct.sku,
+      warehouse: daDeliveryWarehouse
+    };
+
+    try {
+      const existingRaw = localStorage.getItem('carthage_purchasing_requisitions');
+      const existingDAs = existingRaw ? JSON.parse(existingRaw) : [];
+      const updated = [newDA, ...existingDAs];
+      localStorage.setItem('carthage_purchasing_requisitions', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      if (onUpdatePurchaseRequisitions) {
+        onUpdatePurchaseRequisitions(updated);
+      }
+    } catch (err) {
+      console.error('Error saving DA:', err);
+    }
+
+    setIsDaModalOpen(false);
+    triggerToast(`Demande d'Achat ${daId} transmise avec succès vers ${daProduct.supplierName || 'Fournisseur'} !`);
+  };
+
   // Form Fields - Product
   const [prodName, setProdName] = useState('');
   const [prodSku, setProdSku] = useState('');
@@ -290,8 +398,8 @@ export default function StockManager({
   };
 
   // Categories lists
-  const productCategories = ['All', 'Matières Premières', 'Produits Finis', 'Emballages', 'Pièces de Rechange'];
-  const supplierCategories = ['Matériaux', 'Chimie', 'Emballage', 'Textile', 'Logistique', 'Services'];
+  const productCategories = ['All', 'Matières Premières', 'Produits Finis', 'Emballages', 'Pièces de Rechange', 'Gros Œuvre', 'Finition & Décoration', 'Outillage Pro'];
+  const supplierCategories = ['Matériaux', 'Chimie', 'Emballage', 'Textile', 'Logistique', 'Services', 'Matériaux de Construction', 'Sidérurgie & Métallurgie', 'Peintures & Revêtements', 'Outillage Professionnel', 'Plaques & Systèmes Plâtre', 'Colles & Chimie du Bâtiment'];
 
   // Handle Product Save (Add / Edit)
   const openProductForm = (p: Product | null) => {
@@ -852,20 +960,45 @@ export default function StockManager({
     reader.readAsText(file, "UTF-8");
   };
 
-  // Filters logic
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
-    
-    let matchesStatus = true;
-    if (stockStatusFilter === 'Low') {
-      matchesStatus = p.stockLevel <= p.minStockLevel;
-    } else if (stockStatusFilter === 'Normal') {
-      matchesStatus = p.stockLevel > p.minStockLevel;
-    }
+  // Alert & Rupture Metrics
+  const ruptureProducts = useMemo(() => {
+    return products.filter(p => (p.stockLevel ?? 0) <= 0);
+  }, [products]);
 
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  const warningProducts = useMemo(() => {
+    return products.filter(p => (p.stockLevel ?? 0) > 0 && (p.stockLevel ?? 0) <= (p.minStockLevel ?? 0));
+  }, [products]);
+
+  const totalAlertsCount = ruptureProducts.length + warningProducts.length;
+
+  // Filters logic
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = q === '' || 
+                            p.name.toLowerCase().includes(q) || 
+                            p.sku.toLowerCase().includes(q) ||
+                            (p.supplierName && p.supplierName.toLowerCase().includes(q)) ||
+                            (p.category && p.category.toLowerCase().includes(q));
+      const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
+      
+      let matchesStatus = true;
+      if (stockStatusFilter === 'Low') {
+        matchesStatus = (p.stockLevel ?? 0) <= (p.minStockLevel ?? 0);
+      } else if (stockStatusFilter === 'Normal') {
+        matchesStatus = (p.stockLevel ?? 0) > (p.minStockLevel ?? 0);
+      }
+
+      let matchesChart = true;
+      if (chartFilter === 'critical') {
+        matchesChart = (p.stockLevel ?? 0) <= 0;
+      } else if (chartFilter === 'warning') {
+        matchesChart = (p.stockLevel ?? 0) > 0 && (p.stockLevel ?? 0) <= (p.minStockLevel ?? 0);
+      }
+
+      return matchesSearch && matchesCategory && matchesStatus && matchesChart;
+    });
+  }, [products, searchQuery, categoryFilter, stockStatusFilter, chartFilter]);
 
   const filteredSuppliers = suppliers.filter(s => {
     return s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -879,15 +1012,16 @@ export default function StockManager({
   });
 
   // Calculate high level metrics
-  const totalStockValue = products.reduce((acc, p) => acc + (p.stockLevel * p.costPrice), 0);
-  const lowStockProductsCount = products.filter(p => p.stockLevel <= p.minStockLevel).length;
+  const totalStockValue = products.reduce((acc, p) => acc + ((p.stockLevel ?? 0) * (p.costPrice ?? 0)), 0);
+  const lowStockProductsCount = products.filter(p => (p.stockLevel ?? 0) <= (p.minStockLevel ?? 0)).length;
   const activeSuppliersCount = suppliers.filter(s => s.status === 'Active').length;
 
   // Custom high-contrast tooltip for safety stock chart
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
-      const isUnderThreshold = data.stockLevel <= data.minStockLevel;
+      const isZero = (data?.stockLevel ?? 0) <= 0;
+      const isUnderThreshold = (data?.stockLevel ?? 0) <= (data?.minStockLevel ?? 0);
       
       return (
         <div className="bg-slate-900 border border-slate-800 text-white p-3 rounded-lg shadow-xl text-xs space-y-1 font-sans">
@@ -896,7 +1030,7 @@ export default function StockManager({
           <div className="h-px bg-slate-800 my-1" />
           <div className="flex items-center justify-between gap-4">
             <span className="text-slate-400">Stock Réel :</span>
-            <span className={`font-mono font-bold ${isUnderThreshold ? 'text-rose-450' : 'text-emerald-400'}`}>
+            <span className={`font-mono font-bold ${isZero ? 'text-rose-500 font-black' : isUnderThreshold ? 'text-amber-400' : 'text-emerald-400'}`}>
               {(data?.stockLevel ?? 0).toLocaleString('fr-FR')} {data?.unit || ''}
             </span>
           </div>
@@ -906,9 +1040,13 @@ export default function StockManager({
               {(data?.minStockLevel ?? 0).toLocaleString('fr-FR')} {data?.unit || ''}
             </span>
           </div>
-          {isUnderThreshold ? (
-            <div className="mt-1 text-center bg-rose-950/40 text-rose-300 text-[10px] p-1 rounded font-bold uppercase tracking-wider">
-              Stock critique !
+          {isZero ? (
+            <div className="mt-1 text-center bg-rose-950/60 border border-rose-800 text-rose-300 text-[10px] p-1 rounded font-black uppercase tracking-wider animate-pulse">
+              RUPTURE TOTALE !
+            </div>
+          ) : isUnderThreshold ? (
+            <div className="mt-1 text-center bg-amber-950/60 border border-amber-800 text-amber-300 text-[10px] p-1 rounded font-bold uppercase tracking-wider">
+              PROCHE DE LA RUPTURE (Stock Bas)
             </div>
           ) : (
             <div className="mt-1 text-center bg-emerald-950/40 text-emerald-300 text-[10px] p-1 rounded font-bold">
@@ -938,24 +1076,26 @@ export default function StockManager({
       );
     }
 
-    // Chart filter state: "critical", "warning", or "all"
+    // Chart filter state: "critical" (rupture = 0), "warning" (stock bas <= min), or "all"
     if (chartFilter === 'critical') {
-      list = list.filter(p => p.stockLevel <= p.minStockLevel);
+      list = list.filter(p => (p.stockLevel ?? 0) <= 0);
     } else if (chartFilter === 'warning') {
-      list = list.filter(p => p.stockLevel <= p.minStockLevel * 1.5);
+      list = list.filter(p => (p.stockLevel ?? 0) > 0 && (p.stockLevel ?? 0) <= (p.minStockLevel ?? 0));
     }
 
     // Map properties for Recharts and sort by critical ratio (urgency) ascending page-wise
     return list
       .map(p => {
-        const ratio = p.minStockLevel > 0 ? (p.stockLevel / p.minStockLevel) : 999;
+        const stockLvl = p.stockLevel ?? 0;
+        const minLvl = p.minStockLevel ?? 0;
+        const ratio = minLvl > 0 ? (stockLvl / minLvl) : 999;
         return {
           id: p.id,
           name: p.name,
-          displayName: p.name.length > 20 ? p.name.substring(0, 18) + '...' : p.name,
+          displayName: p.name.length > 22 ? p.name.substring(0, 20) + '…' : p.name,
           sku: p.sku,
-          stockLevel: p.stockLevel,
-          minStockLevel: p.minStockLevel,
+          stockLevel: stockLvl,
+          minStockLevel: minLvl,
           unit: p.unit,
           category: p.category,
           ratio
@@ -1259,7 +1399,7 @@ export default function StockManager({
                 <h3 className="text-xs font-black text-slate-800 flex items-center space-x-1.5 font-display tracking-tight">
                   <span>Analyse des Niveaux de Stock Critiques & Alertes</span>
                   <span className="p-0.5 px-2 bg-rose-100 text-rose-700 text-[9px] font-extrabold rounded-full uppercase tracking-wider">
-                    {products.filter(p => p.stockLevel <= p.minStockLevel).length} alertes
+                    {totalAlertsCount} {totalAlertsCount > 1 ? 'alertes' : 'alerte'}
                   </span>
                 </h3>
                 <p className="text-[11px] text-slate-500">Comparez le stock réel disponible face au seuil d'alerte configuré pour pallier aux ruptures.</p>
@@ -1270,50 +1410,38 @@ export default function StockManager({
               <div className="flex bg-slate-100 p-1 rounded-xl">
                 <button
                   type="button"
-                  onClick={() => setChartFilter('critical')}
-                  className={`p-1.5 px-2.5 text-[10px] font-extrabold rounded-lg transition-all ${
+                  onClick={() => setChartFilter(chartFilter === 'critical' ? 'all' : 'critical')}
+                  className={`p-1.5 px-2.5 text-[10px] font-extrabold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                     chartFilter === 'critical' 
-                      ? 'bg-white text-rose-650 shadow-xs' 
-                      : 'text-slate-500 hover:text-slate-850'
+                      ? 'bg-rose-600 text-white shadow-xs' 
+                      : 'text-slate-600 hover:text-rose-700 hover:bg-slate-200/60'
                   }`}
                 >
-                  Rupture ({products.filter(p => {
-                    const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
-                    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-                    return matchesCategory && matchesSearch && p.stockLevel <= p.minStockLevel;
-                  }).length})
+                  <span className={`w-1.5 h-1.5 rounded-full ${chartFilter === 'critical' ? 'bg-white' : 'bg-rose-500'}`} />
+                  <span>Rupture ({ruptureProducts.length})</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setChartFilter('warning')}
-                  className={`p-1.5 px-2.5 text-[10px] font-extrabold rounded-lg transition-all ${
+                  onClick={() => setChartFilter(chartFilter === 'warning' ? 'all' : 'warning')}
+                  className={`p-1.5 px-2.5 text-[10px] font-extrabold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                     chartFilter === 'warning' 
-                      ? 'bg-white text-amber-600 shadow-xs' 
-                      : 'text-slate-500 hover:text-slate-850'
+                      ? 'bg-amber-500 text-white shadow-xs' 
+                      : 'text-slate-600 hover:text-amber-700 hover:bg-slate-200/60'
                   }`}
                 >
-                  Proche ({products.filter(p => {
-                    const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
-                    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-                    return matchesCategory && matchesSearch && p.stockLevel <= p.minStockLevel * 1.5;
-                  }).length})
+                  <span className={`w-1.5 h-1.5 rounded-full ${chartFilter === 'warning' ? 'bg-white' : 'bg-amber-500'}`} />
+                  <span>Proche ({warningProducts.length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setChartFilter('all')}
-                  className={`p-1.5 px-2.5 text-[10px] font-extrabold rounded-lg transition-all ${
+                  className={`p-1.5 px-2.5 text-[10px] font-extrabold rounded-lg transition-all cursor-pointer ${
                     chartFilter === 'all' 
-                      ? 'bg-white text-indigo-700 shadow-xs' 
+                      ? 'bg-white text-indigo-700 shadow-xs font-black' 
                       : 'text-slate-500 hover:text-slate-850'
                   }`}
                 >
-                  Tous ({
-                    products.filter(p => {
-                      const matchesCategory = categoryFilter === 'All' || p.category === categoryFilter;
-                      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-                      return matchesCategory && matchesSearch;
-                    }).length
-                  })
+                  Tous ({products.length})
                 </button>
               </div>
 
@@ -1466,7 +1594,9 @@ export default function StockManager({
                     const minStockLvl = prod.minStockLevel ?? 0;
                     const costP = prod.costPrice ?? 0;
                     const unitP = prod.unitPrice ?? 0;
-                    const isLow = stockLvl <= minStockLvl;
+                    const isRupture = stockLvl <= 0;
+                    const isLow = stockLvl > 0 && stockLvl <= minStockLvl;
+                    const isCritical = isRupture || isLow;
                     const stockValue = stockLvl * costP;
                     const profitPercentage = costP > 0 ? ((unitP - costP) / costP) * 100 : 0;
                     
@@ -1500,13 +1630,18 @@ export default function StockManager({
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex items-center space-x-2">
-                            <span className={`font-mono font-black text-sm ${isLow ? 'text-rose-650 font-extrabold' : 'text-slate-800'}`}>
+                            <span className={`font-mono text-sm ${isRupture ? 'text-rose-650 font-black' : isLow ? 'text-amber-600 font-extrabold' : 'text-slate-800 font-bold'}`}>
                               {stockLvl.toLocaleString('fr-FR')} {prod.unit || ''}
                             </span>
-                            {isLow ? (
-                              <span className="bg-rose-50 text-rose-700 px-2 py-0.5 rounded text-[9px] font-extrabold tracking-wider uppercase animate-pulse flex items-center space-x-1 border border-rose-100">
-                                <AlertTriangle className="w-2.5 h-2.5" />
-                                <span>Alerte Stock</span>
+                            {isRupture ? (
+                              <span className="bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded text-[9px] font-black tracking-wider uppercase animate-pulse flex items-center space-x-1 shadow-2xs">
+                                <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
+                                <span>RUPTURE</span>
+                              </span>
+                            ) : isLow ? (
+                              <span className="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[9px] font-black tracking-wider uppercase flex items-center space-x-1 shadow-2xs">
+                                <AlertCircle className="w-2.5 h-2.5 text-amber-600" />
+                                <span>STOCK BAS</span>
                               </span>
                             ) : (
                               <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-bold">OK</span>
@@ -1532,16 +1667,26 @@ export default function StockManager({
                         </td>
                         <td className="py-4 px-6 text-center">
                           <div className="flex items-center justify-center space-x-1.5">
+                            {isCritical && (
+                              <button
+                                onClick={() => openDaModal(prod)}
+                                className="p-1 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[11px] font-black flex items-center space-x-1 transition shadow-xs cursor-pointer"
+                                title="Déclencher une Demande d'Achat (DA)"
+                              >
+                                <ShoppingCart className="w-3 h-3 text-indigo-600" />
+                                <span>Créer DA</span>
+                              </button>
+                            )}
                             <button
                               onClick={() => openProductForm(prod)}
-                              className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 rounded text-[11px] font-bold text-slate-700 flex items-center space-x-1 transition"
+                              className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 rounded text-[11px] font-bold text-slate-700 flex items-center space-x-1 transition cursor-pointer"
                             >
                               <Edit className="w-3 h-3" />
                               <span>Modifier</span>
                             </button>
                             <button
                               onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                              className="p-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-100 rounded text-[11px] font-bold flex items-center space-x-1 transition"
+                              className="p-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-100 rounded text-[11px] font-bold flex items-center space-x-1 transition cursor-pointer"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -2626,17 +2771,192 @@ export default function StockManager({
                 <button 
                   type="button"
                   onClick={() => setIsSupplierModalOpen(false)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2.5 px-4 rounded-xl text-xs"
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2.5 px-4 rounded-xl text-xs cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button 
                   type="submit"
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold p-2.5 px-6 rounded-xl text-xs flex items-center space-x-1"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold p-2.5 px-6 rounded-xl text-xs flex items-center space-x-1 cursor-pointer"
                 >
                   <CheckCircle className="w-4 h-4" />
                   <span>Enregistrer</span>
                 </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* 4. MODAL DEMANDE D'ACHAT (DA) POUR ARTICLE CRITIQUE */}
+      {isDaModalOpen && daProduct && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl border border-slate-100 shadow-2xl max-w-xl w-full overflow-hidden"
+          >
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <ShoppingCart className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black font-display text-slate-900 text-base">
+                    Déclencher une Demande d'Achat (DA)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Réapprovisionnement rapide vers le fournisseur référencé
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsDaModalOpen(false)}
+                className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-500 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmDA} className="p-6 space-y-4">
+              {/* Product summary card */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/70 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 font-mono">
+                      {daProduct.sku}
+                    </span>
+                    <h4 className="text-sm font-black text-slate-900">{daProduct.name}</h4>
+                  </div>
+                  <span className={`p-1 px-2 rounded text-[10px] font-black uppercase ${
+                    (daProduct.stockLevel ?? 0) <= 0 
+                      ? 'bg-rose-100 text-rose-700 border border-rose-200' 
+                      : 'bg-amber-100 text-amber-700 border border-amber-200'
+                  }`}>
+                    {(daProduct.stockLevel ?? 0) <= 0 ? 'RUPTURE (0)' : `STOCK BAS (${daProduct.stockLevel})`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 pt-1 border-t border-slate-200">
+                  <div>
+                    <span className="text-slate-400">Fournisseur : </span>
+                    <strong className="text-slate-800">{daProduct.supplierName || 'Non assigné'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Seuil min : </span>
+                    <strong className="text-slate-800">{daProduct.minStockLevel} {daProduct.unit || 'unités'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Quantité à Commander ({daProduct.unit || 'Unités'})
+                  </label>
+                  <input 
+                    type="number" 
+                    required
+                    min="1"
+                    value={daQuantity}
+                    onChange={(e) => setDaQuantity(Number(e.target.value))}
+                    className="w-full text-sm font-bold p-2.5 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Prix Unitaire Estimé (HT)
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      step="0.001"
+                      required
+                      value={daUnitCost}
+                      onChange={(e) => setDaUnitCost(Number(e.target.value))}
+                      className="w-full text-sm font-bold p-2.5 font-mono pr-12"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">TND</span>
+                  </div>
+                </div>
+
+                <div className="col-span-2 space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Dépôt de Réception / Livraison
+                  </label>
+                  <input 
+                    type="text"
+                    value={daDeliveryWarehouse}
+                    onChange={(e) => setDaDeliveryWarehouse(e.target.value)}
+                    placeholder="Entrepôt Central - Charguia II"
+                    className="w-full text-xs p-2.5"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Département Demandeur
+                  </label>
+                  <input 
+                    type="text"
+                    value={daDepartment}
+                    onChange={(e) => setDaDepartment(e.target.value)}
+                    className="w-full text-xs p-2.5"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Montant Estimé Total (HT)
+                  </label>
+                  <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-900 font-mono font-black text-sm text-right">
+                    {(daQuantity * daUnitCost).toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                  </div>
+                </div>
+
+                <div className="col-span-2 space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Motif / Justification
+                  </label>
+                  <textarea 
+                    rows={2}
+                    value={daNotes}
+                    onChange={(e) => setDaNotes(e.target.value)}
+                    className="w-full text-xs p-2.5"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                {onNavigateToPurchasing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDaModalOpen(false);
+                      onNavigateToPurchasing();
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1 cursor-pointer"
+                  >
+                    <span>Voir le module Achats</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <div className="flex items-center space-x-2 ml-auto">
+                  <button 
+                    type="button"
+                    onClick={() => setIsDaModalOpen(false)}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold p-2.5 px-4 rounded-xl text-xs cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    type="submit"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold p-2.5 px-6 rounded-xl text-xs flex items-center space-x-1.5 shadow-md cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Valider & Créer la DA</span>
+                  </button>
+                </div>
               </div>
             </form>
           </motion.div>

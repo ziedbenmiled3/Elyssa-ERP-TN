@@ -187,26 +187,99 @@ export function isDriverOrDelivery(emp: Partial<Employee>): boolean {
 
 export function isWarehouseOrPicking(emp: Partial<Employee>): boolean {
   if (!emp) return false;
+  const pole = (emp.pole || '').toString().toUpperCase();
   const job = (emp.jobTitle || '').toLowerCase();
   const role = (emp.role || '').toLowerCase();
   const dept = (emp.department || '').toLowerCase();
 
-  return (
+  // 1. Exclure formellement les profils de Direction, Finance, RH et Informatique
+  const isExcludedRole = 
+    job.includes('directeur') ||
+    job.includes('directrice') ||
+    job.includes('gérant') ||
+    job.includes('gerant') ||
+    job.includes('gérance') ||
+    job.includes('gerance') ||
+    job.includes('fondateur') ||
+    job.includes('président') ||
+    job.includes('president') ||
+    job.includes('daf') ||
+    job.includes('finance') ||
+    job.includes('financier') ||
+    job.includes('comptable') ||
+    job.includes('comptabilité') ||
+    job.includes('comptabilite') ||
+    job.includes('ressources humaines') ||
+    job.includes('paie') ||
+    job.includes('rh') ||
+    job.includes('recrutement') ||
+    job.includes('développeur') ||
+    job.includes('developpeur') ||
+    job.includes('ingénieur logiciel') ||
+    job.includes('dsi') ||
+    job.includes('it ') ||
+    job.includes('informatique') ||
+    job.includes('juridique') ||
+    job.includes('avocat') ||
+    job.includes('audit');
+
+  const isExcludedPoleOrDept =
+    pole === 'DIRECTION_IT' ||
+    pole === 'FINANCE_COMPTA' ||
+    pole === 'RH_SOCIAL' ||
+    dept.includes('direction') ||
+    dept.includes('finance') ||
+    dept.includes('comptab') ||
+    dept.includes('ressources humaines') ||
+    dept.includes('rh') ||
+    dept.includes('it') ||
+    dept.includes('dsi') ||
+    dept.includes('juridique');
+
+  // Si le profil correspond à une exclusion formelle et n'a pas explicitement un titre logistique
+  if ((isExcludedRole || isExcludedPoleOrDept) && 
+      !job.includes('magasinier') && 
+      !job.includes('préparateur') && 
+      !job.includes('preparateur') && 
+      !job.includes('dépôt') && 
+      !job.includes('depot') && 
+      !job.includes('chauffeur') && 
+      !job.includes('livreur') && 
+      !job.includes('cariste') && 
+      !job.includes('picking')) {
+    return false;
+  }
+
+  // 2. Inclusions strictes : Pôle LOGISTIQUE_TRANSPORT ou PRODUCTION_INDUSTRIE,
+  // ou poste contenant Magasinier, Préparateur, Dépôt, Logistique, Chauffeur, Opérateur
+  const isAllowedPole = pole === 'LOGISTIQUE_TRANSPORT' || pole === 'PRODUCTION_INDUSTRIE';
+  const isAllowedJobOrRole = 
     job.includes('magasinier') ||
     job.includes('préparateur') ||
     job.includes('preparateur') ||
     job.includes('dépôt') ||
     job.includes('depot') ||
-    job.includes('picking') ||
+    job.includes('logistique') ||
+    job.includes('chauffeur') ||
+    job.includes('livreur') ||
+    job.includes('opérateur') ||
+    job.includes('operateur') ||
     job.includes('cariste') ||
     job.includes('manutention') ||
     job.includes('gestionnaire de stock') ||
+    job.includes('picking') ||
     role.includes('magasinier') ||
     role.includes('préparateur') ||
+    role.includes('chauffeur') ||
+    role.includes('logistique') ||
+    role.includes('opérateur') ||
     dept.includes('magasin') ||
     dept.includes('dépôt') ||
-    dept.includes('stock')
-  );
+    dept.includes('logistique') ||
+    dept.includes('expédition') ||
+    dept.includes('expedition');
+
+  return isAllowedPole || isAllowedJobOrRole;
 }
 
 export function isProductionOrWorkshop(emp: Partial<Employee>): boolean {

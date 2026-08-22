@@ -184,6 +184,42 @@ export const INITIAL_PRODUCTS: Product[] = [
     createdDate: "2026-02-10",
     warehouseId: "WH-TUNIS-02",
     warehouse_location: "Magasin Principal Tunis"
+  },
+  {
+    id: "demo-prod_5",
+    sku: "PLA-BA13-30",
+    name: "Plaques de Plâtre BA13 Standard (120x300cm)",
+    category: "Gros Œuvre",
+    type: "PRODUIT_FINI",
+    unitPrice: 26.000,
+    costPrice: 18.500,
+    marginPercentage: 40.54,
+    stockLevel: 0,
+    minStockLevel: 50,
+    unit: "Plaque",
+    supplierId: "demo-sup_5",
+    supplierName: "Knauf Tunisie",
+    createdDate: "2026-03-01",
+    warehouseId: "WH-CHARGUIA-02",
+    warehouse_location: "Entrepôt Central - Charguia II"
+  },
+  {
+    id: "demo-prod_6",
+    sku: "COL-CAR-25",
+    name: "Mortier Colle C2TE Haute Performance (Sac 25kg)",
+    category: "Finition & Décoration",
+    type: "PRODUIT_FINI",
+    unitPrice: 21.000,
+    costPrice: 14.200,
+    marginPercentage: 47.89,
+    stockLevel: 12,
+    minStockLevel: 40,
+    unit: "Sac",
+    supplierId: "demo-sup_6",
+    supplierName: "Sika Tunisie",
+    createdDate: "2026-03-10",
+    warehouseId: "WH-SFAX-01",
+    warehouse_location: "Dépôt Régional - Sfax"
   }
 ];
 
@@ -320,6 +356,28 @@ export const INITIAL_SUPPLIERS: Supplier[] = [
     address: "Zone Industrielle Charguia I, Tunis",
     category: "Outillage Professionnel",
     paymentTerms: "30 jours fin de mois",
+    rating: 4.9
+  },
+  {
+    id: "demo-sup_5",
+    name: "Knauf Tunisie",
+    contactName: "Mehdi Trabelsi",
+    email: "contact@knauf.tn",
+    phone: "+216 71 940 300",
+    address: "Zone Industrielle Charguia II, Tunis",
+    category: "Plaques & Systèmes Plâtre",
+    paymentTerms: "30 jours",
+    rating: 4.8
+  },
+  {
+    id: "demo-sup_6",
+    name: "Sika Tunisie",
+    contactName: "Anis Khemir",
+    email: "commandes@tn.sika.com",
+    phone: "+216 70 022 700",
+    address: "Zone Industrielle Ksar Saïd, Manouba",
+    category: "Colles & Chimie du Bâtiment",
+    paymentTerms: "45 jours fin de mois",
     rating: 4.9
   }
 ];

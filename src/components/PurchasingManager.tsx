@@ -185,7 +185,76 @@ export default function PurchasingManager({
     }
   };
 
-  const suppliers = propSuppliers;
+  const DEMO_SUPPLIERS: SupplierPerformance[] = [
+    {
+      id: "demo-sup_1",
+      name: "SOPAL Tunisie",
+      category: "Plomberie & Robinetterie Industrielle",
+      totalVolume: 48500,
+      delayRate: 4.5,
+      conformityRate: 98.2,
+      score: 93,
+      status: "Rang A - Excellent"
+    },
+    {
+      id: "demo-sup_2",
+      name: "Les Ciments de Bizerte",
+      category: "Matériaux de Construction & Liants",
+      totalVolume: 82000,
+      delayRate: 18.5,
+      conformityRate: 92.0,
+      score: 70,
+      status: "Rang C - Critique"
+    },
+    {
+      id: "demo-sup_3",
+      name: "EL FOULADH Menzel Bourguiba",
+      category: "Métallurgie & Aciers FeE500",
+      totalVolume: 64200,
+      delayRate: 8.0,
+      conformityRate: 95.5,
+      score: 86,
+      status: "Rang B - Sous surveillance"
+    }
+  ];
+
+  const rawSuppliersList = (Array.isArray(propSuppliersRaw) && propSuppliersRaw.length > 0)
+    ? propSuppliersRaw
+    : (Array.isArray(suppliersPerformance) && suppliersPerformance.length > 0)
+      ? suppliersPerformance
+      : (isDemoCompany ? DEMO_SUPPLIERS : []);
+
+  const suppliers: SupplierPerformance[] = useMemo(() => {
+    return (rawSuppliersList || []).map((s: any, idx: number) => {
+      const name = String(s?.name || s?.supplierName || s?.supplier || `Fournisseur ${idx + 1}`);
+      const category = String(s?.category || 'Matières Premières');
+      const delayRate = typeof s?.delayRate === 'number' ? s.delayRate : Number(s?.delayRate || 0);
+      const conformityRate = typeof s?.conformityRate === 'number' 
+        ? s.conformityRate 
+        : (s?.nonConformityRate !== undefined ? Math.max(0, 100 - Number(s.nonConformityRate || 0)) : (Number(s?.score) || 95));
+      const score = typeof s?.score === 'number' 
+        ? s.score 
+        : Math.max(0, Math.min(100, Math.round(conformityRate - (delayRate * 1.2))));
+      let status: SupplierPerformance['status'] = s?.status;
+      if (!status || !['Rang A - Excellent', 'Rang B - Sous surveillance', 'Rang C - Critique'].includes(status)) {
+        if (score >= 90) status = 'Rang A - Excellent';
+        else if (score >= 75) status = 'Rang B - Sous surveillance';
+        else status = 'Rang C - Critique';
+      }
+      const totalVolume = typeof s?.totalVolume === 'number' ? s.totalVolume : (Number(s?.volume || s?.amount || 0) || 0);
+      return {
+        id: String(s?.id || `SUP-${String(idx + 1).padStart(3, '0')}`),
+        name,
+        category,
+        totalVolume,
+        delayRate,
+        conformityRate,
+        score,
+        status
+      };
+    });
+  }, [rawSuppliersList]);
+
   const setSuppliers = (val: any) => {
     if (typeof val === 'function') {
       onUpdateSuppliers(val(suppliers));
@@ -1477,11 +1546,15 @@ export default function PurchasingManager({
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={suppliers.map(s => ({
-                          name: s.name.split(' ')[0], // short name
-                          Qualite: s.conformityRate,
-                          Retard: s.delayRate,
-                        }))}
+                        data={suppliers.map(s => {
+                          const rawName = String(s?.name || 'Fournisseur');
+                          const shortName = rawName.includes(' ') ? rawName.split(' ')[0] : rawName;
+                          return {
+                            name: shortName || 'Fournisseur',
+                            Qualite: Number(s?.conformityRate ?? 0),
+                            Retard: Number(s?.delayRate ?? 0),
+                          };
+                        })}
                         margin={{ top: 10, right: 10, left: -20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -1576,7 +1649,7 @@ export default function PurchasingManager({
                       <div className="flex justify-between items-start">
                         <div className="flex flex-col gap-1 items-start">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {sup.id.startsWith('demo-') ? (
+                            {String(sup?.id || '').startsWith('demo-') ? (
                               <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.2 rounded border border-amber-200 uppercase">
                                 Démo
                               </span>

@@ -83,7 +83,7 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
   tenantId: DEMO_TENANT_ID,
   is_demo: true,
 
-  // 1. PRODUCTS (4 articles clés)
+  // 1. PRODUCTS (6 articles clés dont 2 en alerte critique / rupture)
   products: [
     {
       id: "demo-prod_1",
@@ -167,6 +167,48 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       createdDate: "2026-02-10",
       warehouseId: "WH-TUNIS-02",
       warehouse_location: "Magasin Principal Tunis",
+      is_demo: true
+    },
+    {
+      id: "demo-prod_5",
+      tenantId: DEMO_TENANT_ID,
+      sku: "PLA-BA13-30",
+      name: "Plaques de Plâtre BA13 Standard (120x300cm)",
+      category: "Gros Œuvre",
+      type: "PRODUIT_FINI",
+      stockLevel: 0,
+      stockQuantity: 0,
+      minStockLevel: 50,
+      unitPrice: 26.000,
+      costPrice: 18.500,
+      marginPercentage: 40.54,
+      unit: "Plaque",
+      supplierId: "demo-sup_5",
+      supplierName: "Knauf Tunisie",
+      createdDate: "2026-03-01",
+      warehouseId: "WH-CHARGUIA-02",
+      warehouse_location: "Entrepôt Central - Charguia II",
+      is_demo: true
+    },
+    {
+      id: "demo-prod_6",
+      tenantId: DEMO_TENANT_ID,
+      sku: "COL-CAR-25",
+      name: "Mortier Colle C2TE Haute Performance (Sac 25kg)",
+      category: "Finition & Décoration",
+      type: "PRODUIT_FINI",
+      stockLevel: 12,
+      stockQuantity: 12,
+      minStockLevel: 40,
+      unitPrice: 21.000,
+      costPrice: 14.200,
+      marginPercentage: 47.89,
+      unit: "Sac",
+      supplierId: "demo-sup_6",
+      supplierName: "Sika Tunisie",
+      createdDate: "2026-03-10",
+      warehouseId: "WH-SFAX-01",
+      warehouse_location: "Dépôt Régional - Sfax",
       is_demo: true
     }
   ],
@@ -535,18 +577,79 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
     }
   ],
 
-  // 8. BANK ACCOUNTS (Compte BIAT avec initialBalance: 145250.620 et solde calculé valide)
+  // 8. BANK ACCOUNTS (Registre multi-comptes trésorerie : banques, caisses et épargne)
   bankAccounts: [
     {
       id: "demo-ba_1",
       tenantId: DEMO_TENANT_ID,
-      bankName: "BIAT",
+      bankName: "BIAT - Courant Commercial",
       accountNumber: "03001010015920038472",
-      type: "Checking",
+      type: "COURANT",
+      accountTypeCategory: "COURANT",
+      sceAccount: "5321",
       initialBalance: 145250.620,
       currentBalance: 145250.620,
       currency: "TND",
-      status: "Active"
+      status: "Active",
+      is_demo: true
+    },
+    {
+      id: "demo-ba_2",
+      tenantId: DEMO_TENANT_ID,
+      bankName: "Attijari Bank - Exploitation",
+      accountNumber: "04019110024810041233",
+      type: "COURANT",
+      accountTypeCategory: "COURANT",
+      sceAccount: "5322",
+      initialBalance: 19750.000,
+      currentBalance: 19750.000,
+      currency: "TND",
+      status: "Active",
+      is_demo: true
+    },
+    {
+      id: "demo-ba_3",
+      tenantId: DEMO_TENANT_ID,
+      bankName: "BIAT Bourse - Compte Titres",
+      accountNumber: "03001010015920038499",
+      type: "TITRES",
+      accountTypeCategory: "TITRES",
+      isBvmtDedicated: true,
+      notes: "Compte de règlement dédié BVMT & Tunisie Clearing",
+      initialBalance: 12500.000,
+      currentBalance: 12500.000,
+      currency: "TND",
+      status: "Active",
+      is_demo: true
+    },
+    {
+      id: "demo-ba_4",
+      tenantId: DEMO_TENANT_ID,
+      bankName: "Caisse Principale (Siège)",
+      accountNumber: "CAISSE-SIEGE-5411",
+      type: "CAISSE",
+      accountTypeCategory: "CAISSE",
+      sceAccount: "5411",
+      initialBalance: 3450.000,
+      currentBalance: 3450.000,
+      currency: "TND",
+      status: "Active",
+      is_demo: true
+    },
+    {
+      id: "demo-ba_5",
+      tenantId: DEMO_TENANT_ID,
+      bankName: "Compte Épargne & DAT",
+      accountNumber: "03001010099988812345",
+      type: "EPARGNE",
+      accountTypeCategory: "EPARGNE",
+      sceAccount: "5313",
+      interestRate: "6.5%",
+      initialBalance: 50000.000,
+      currentBalance: 50000.000,
+      currency: "TND",
+      status: "Active",
+      is_demo: true
     }
   ],
 
@@ -794,6 +897,32 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       address: "Zone Industrielle Charguia I, Tunis",
       category: "Outillage Professionnel",
       paymentTerms: "30 jours fin de mois",
+      rating: 4.9,
+      is_demo: true
+    },
+    {
+      id: "demo-sup_5",
+      tenantId: DEMO_TENANT_ID,
+      name: "Knauf Tunisie",
+      contactName: "Mehdi Trabelsi",
+      email: "contact@knauf.tn",
+      phone: "+216 71 940 300",
+      address: "Zone Industrielle Charguia II, Tunis",
+      category: "Plaques & Systèmes Plâtre",
+      paymentTerms: "30 jours",
+      rating: 4.8,
+      is_demo: true
+    },
+    {
+      id: "demo-sup_6",
+      tenantId: DEMO_TENANT_ID,
+      name: "Sika Tunisie",
+      contactName: "Anis Khemir",
+      email: "commandes@tn.sika.com",
+      phone: "+216 70 022 700",
+      address: "Zone Industrielle Ksar Saïd, Manouba",
+      category: "Colles & Chimie du Bâtiment",
+      paymentTerms: "45 jours fin de mois",
       rating: 4.9,
       is_demo: true
     }

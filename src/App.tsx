@@ -1219,7 +1219,9 @@ const getCompleteDemoPayload = (companyName: string) => {
   ];
 
   const demoPerformance = [
-    { id: 'demo-perf_1', supplierId: 'demo-sup_1', name: 'SOPAL Tunisie', category: 'Plomberie & Chauffage', score: 92, delayRate: 5, nonConformityRate: 2 }
+    { id: 'demo-perf_1', supplierId: 'demo-sup_1', name: 'SOPAL Tunisie', category: 'Plomberie & Robinetterie Industrielle', score: 93, delayRate: 4.5, conformityRate: 98.2, totalVolume: 48500, status: 'Rang A - Excellent' },
+    { id: 'demo-perf_2', supplierId: 'demo-sup_2', name: 'Les Ciments de Bizerte', category: 'Matériaux de Construction & Liants', score: 70, delayRate: 18.5, conformityRate: 92.0, totalVolume: 82000, status: 'Rang C - Critique' },
+    { id: 'demo-perf_3', supplierId: 'demo-sup_3', name: 'EL FOULADH Menzel Bourguiba', category: 'Métallurgie & Aciers FeE500', score: 86, delayRate: 8.0, conformityRate: 95.5, totalVolume: 64200, status: 'Rang B - Sous surveillance' }
   ];
 
   const demoNomenclatures = [
@@ -1447,9 +1449,9 @@ const getCompleteDemoPayload = (companyName: string) => {
     ];
   }
 
-  const demoAccounts = customAccounts.length > 0 ? customAccounts : [
-    { id: 'demo-ba_1', bankName: 'BIAT', accountNumber: '03001010015920038472', accountType: 'Courant', balance: 145250.620, currency: 'TND' }
-  ];
+  const demoAccounts = customAccounts.length > 0 ? customAccounts : (DEMO_UNIVERSE.bankAccounts || [
+    { id: 'demo-ba_1', bankName: 'BIAT - Courant Commercial', accountNumber: '03001010015920038472', type: 'COURANT', accountTypeCategory: 'COURANT', sceAccount: '5321', initialBalance: 145250.620, currentBalance: 145250.620, currency: 'TND', status: 'Active' }
+  ]);
 
   const demoTxs = customTxs.length > 0 ? customTxs : [
     { id: 'demo-tx_1', accountId: 'demo-ba_1', date: '2026-06-01', amount: 12500, type: 'In', category: 'Vente', description: 'Virement client Poulina Group Holding', status: 'Cleared', method: 'Virement', reference: 'AV-10043' }
@@ -5004,7 +5006,9 @@ function AppMain() {
           { id: 'demo-po_1', requisitionId: 'demo-req_1', supplierName: 'SOPAL Tunisie', orderDate: '2026-06-12', totalAmount: 14800, status: 'Sent', paymentTerms: '60 jours fin de mois' }
         ];
         const demoPerformance = [
-          { id: 'demo-perf_1', supplierId: 'demo-sup_1', name: 'SOPAL Tunisie', category: 'Plomberie & Chauffage', score: 92, delayRate: 5, nonConformityRate: 2 }
+          { id: 'demo-perf_1', supplierId: 'demo-sup_1', name: 'SOPAL Tunisie', category: 'Plomberie & Robinetterie Industrielle', score: 93, delayRate: 4.5, conformityRate: 98.2, totalVolume: 48500, status: 'Rang A - Excellent' },
+          { id: 'demo-perf_2', supplierId: 'demo-sup_2', name: 'Les Ciments de Bizerte', category: 'Matériaux de Construction & Liants', score: 70, delayRate: 18.5, conformityRate: 92.0, totalVolume: 82000, status: 'Rang C - Critique' },
+          { id: 'demo-perf_3', supplierId: 'demo-sup_3', name: 'EL FOULADH Menzel Bourguiba', category: 'Métallurgie & Aciers FeE500', score: 86, delayRate: 8.0, conformityRate: 95.5, totalVolume: 64200, status: 'Rang B - Sous surveillance' }
         ];
         setPurchaseRequisitions(demoRequisitions);
         setPurchaseOrders(demoOrders);
@@ -6413,6 +6417,13 @@ function AppMain() {
     return (supplierPerformance || []).filter(item => Boolean(item && !item.is_demo && item.tenantId !== 'company_demo' && (!item.id || !String(item.id).startsWith('demo-')) && !String(item.name || item.supplierName || '').includes('Ciments de Bizerte') && !String(item.name || item.supplierName || '').includes('EL FOULADH')));
   }, [isDemoTenant, supplierPerformance]);
 
+  const tenantCompanyLocations = useMemo(() => {
+    if (isDemoTenant) {
+      return DEMO_UNIVERSE.companyLocations || companyLocations;
+    }
+    return companyLocations;
+  }, [isDemoTenant, companyLocations]);
+
   // Standalone Mobile PWA Route
   if (window.location.pathname === '/pocket-attendance' || window.location.pathname.startsWith('/pocket-attendance/')) {
     return <PocketAttendanceView />;
@@ -7346,6 +7357,9 @@ function AppMain() {
                   onUpdateCompanyLocations={setCompanyLocations}
                   activeTenantId={activeCompanyName}
                   isDemoCompany={isDemoCompany}
+                  purchaseRequisitions={tenantPurchaseRequisitions}
+                  onUpdatePurchaseRequisitions={setPurchaseRequisitions}
+                  onNavigateToPurchasing={() => setActiveTab('purchasing')}
                 />
               )}
 
@@ -7489,6 +7503,7 @@ function AppMain() {
                     currentUser={currentUser} 
                     isTrial={trialState.isTrial || isSimulationActive || isDemoCompany}
                     employees={tenantEmployees}
+                    companyLocations={tenantCompanyLocations}
                   />
                 </ErrorBoundary>
               )}
@@ -7552,7 +7567,12 @@ function AppMain() {
               )}
 
               {activeTab === 'investment' && (
-                <StockMarketManager />
+                <StockMarketManager 
+                  bankAccounts={tenantBankAccounts}
+                  onUpdateBankAccounts={setBankAccounts}
+                  currentTenantId={activeCompanyName}
+                  isDemo={isDemoCompany}
+                />
               )}
 
               {activeTab === 'reports' && (

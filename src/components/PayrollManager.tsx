@@ -621,10 +621,10 @@ export default function PayrollManager({
   ];
 
   const saveLocations = (newLocs: any[]) => {
+    localStorage.setItem('elyssa_company_locations', JSON.stringify(newLocs));
+    window.dispatchEvent(new Event('elyssa_locations_updated'));
     if (onUpdateCompanyLocations) {
       onUpdateCompanyLocations(newLocs);
-    } else {
-      localStorage.setItem('elyssa_company_locations', JSON.stringify(newLocs));
     }
   };
 

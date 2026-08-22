@@ -369,9 +369,14 @@ export interface BankAccount {
   id: string;
   tenantId?: string;
   is_demo?: boolean;
-  bankName: string; // e.g., "BIAT", "UIB", "Attijari Bank", "Caisse Principale (Espèces)"
+  bankName: string; // e.g., "BIAT - Courant Commercial", "Attijari Bank - Exploitation", "BIAT Bourse - Compte Titres", "Caisse Principale (Siège)", "Compte Épargne & DAT"
   accountNumber: string; // e.g., "RIB IBAN" or "CAISSE-01"
-  type: 'Checking' | 'Savings' | 'CashBox' | 'Other';
+  type: 'Checking' | 'Savings' | 'CashBox' | 'Titres' | 'Other' | 'COURANT' | 'CAISSE' | 'EPARGNE' | 'TITRES';
+  accountTypeCategory?: 'COURANT' | 'CAISSE' | 'EPARGNE' | 'TITRES' | 'AUTRE';
+  sceAccount?: string; // e.g., "5321", "5322", "5411", "5313"
+  interestRate?: number | string; // e.g., "6.5%" or 6.5
+  isBvmtDedicated?: boolean;
+  notes?: string;
   initialBalance: number; // in TND
   currentBalance: number; // calculated: initial + sum(In) - sum(Out)
   currency: string; // "TND"

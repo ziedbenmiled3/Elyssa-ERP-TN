@@ -37,6 +37,7 @@ interface WarehousePickingScreenProps {
   tenantId: string;
   currentUser?: any;
   employees?: Employee[];
+  companyLocations?: any[];
   isTrial?: boolean;
 }
 
@@ -44,25 +45,146 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
   tenantId,
   currentUser,
   employees = [],
+  companyLocations = [],
   isTrial = false
 }) => {
   const [pickingOrders, setPickingOrders] = useState<PickingOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Dynamic Warehouse Picking Staff from HR
+  // Dynamic HR Company Locations / Sites & Warehouses Registry
+  const [internalLocations, setInternalLocations] = useState<any[]>(() => {
+    if (Array.isArray(companyLocations) && companyLocations.length > 0) return companyLocations;
+    const saved = localStorage.getItem('elyssa_company_locations');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return [
+      { id: 'loc-maman', name: 'Siège MAMAN (Connexion Mère)', type: 'HQ', isMaman: true },
+      { id: 'loc-sfax', name: 'Succursale Sfax - Zone Industrielle Poudrière', type: 'Warehouse' },
+      { id: 'loc-sousse', name: 'Agence Sousse - Boulevard 14 Janvier', type: 'Agency' }
+    ];
+  });
+
+  // Sync internalLocations when props update
+  useEffect(() => {
+    if (Array.isArray(companyLocations) && companyLocations.length > 0) {
+      setInternalLocations(companyLocations);
+    }
+  }, [companyLocations]);
+
+  // Real-time synchronization when a site is added or modified in HR tab
+  useEffect(() => {
+    const handleLocUpdate = () => {
+      const saved = localStorage.getItem('elyssa_company_locations');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setInternalLocations(parsed);
+          }
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('elyssa_locations_updated', handleLocUpdate);
+    window.addEventListener('storage', handleLocUpdate);
+    return () => {
+      window.removeEventListener('elyssa_locations_updated', handleLocUpdate);
+      window.removeEventListener('storage', handleLocUpdate);
+    };
+  }, []);
+
+  // Dynamically derive depots/warehouses list directly from HR Company Locations
+  const warehouses = useMemo(() => {
+    return internalLocations.map((loc: any) => ({
+      id: loc.id || loc.code || loc.name,
+      name: loc.name || loc.code || 'Site RH',
+      type: loc.type || (loc.isWarehouse ? 'Warehouse' : 'Agency'),
+      isWarehouse: loc.isWarehouse || loc.type === 'Warehouse' || (loc.name || '').toLowerCase().includes('dépôt') || (loc.name || '').toLowerCase().includes('entrepôt'),
+      code: loc.code || '',
+      address: loc.address || ''
+    }));
+  }, [internalLocations]);
+
+  // Strict Business Filtering: ONLY Logistics, Picking, Warehouse, Drivers, Production Operators
+  // Strictly excludes Management, Finance, Accounting, HR, and IT/Developers
   const warehouseStaff = useMemo(() => {
     if (!Array.isArray(employees) || employees.length === 0) return [];
-    const list = employees.filter(emp => emp && isWarehouseOrPicking(emp));
-    if (list.length > 0) return list;
-    return employees;
+    return employees.filter(emp => emp && isWarehouseOrPicking(emp));
   }, [employees]);
 
-  const [activePreparateur, setActivePreparateur] = useState<string>(currentUser?.name || '');
+  // Helper to match an employee to a company location / site
+  const isEmployeeAttachedToLocation = (emp: Employee, loc: any): boolean => {
+    if (!emp || !loc) return false;
+    const locId = (loc.id || '').toLowerCase();
+    const locName = (loc.name || '').toLowerCase();
+    const locCode = (loc.code || '').toLowerCase();
+    const empBranch = (emp.branchId || emp.locationId || '').toLowerCase();
+    const empDept = (emp.department || '').toLowerCase();
+    const empJob = (emp.jobTitle || '').toLowerCase();
+
+    if (empBranch && (empBranch === locId || locId.includes(empBranch) || empBranch.includes(locId))) {
+      return true;
+    }
+
+    // Match by geographic zone keywords (sfax, sousse, tunis, charguia, rades, poudriere, maman)
+    const keywords = ['sfax', 'sousse', 'tunis', 'charguia', 'rades', 'radès', 'poudrière', 'poudriere', 'maman', 'bizerte', 'nabeul'];
+    for (const kw of keywords) {
+      if ((locId.includes(kw) || locName.includes(kw) || locCode.includes(kw)) &&
+          (empBranch.includes(kw) || empDept.includes(kw) || empJob.includes(kw))) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const [activePreparateur, setActivePreparateur] = useState<string>('');
 
   // Filters
   const [selectedWarehouseFilter, setSelectedWarehouseFilter] = useState<string>('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Active target warehouse object based on filter
+  const activeWarehouseObj = useMemo(() => {
+    if (selectedWarehouseFilter === 'ALL') return null;
+    return warehouses.find(w => w.id === selectedWarehouseFilter) || null;
+  }, [warehouses, selectedWarehouseFilter]);
+
+  // Geographic Auto-Assignment:
+  // When a specific site is selected, auto-select the agent attached to that location
+  useEffect(() => {
+    if (selectedWarehouseFilter === 'ALL' || !activeWarehouseObj) {
+      if (!activePreparateur && warehouseStaff.length > 0) {
+        const defaultUser = warehouseStaff.find(emp => emp.name === currentUser?.name) || warehouseStaff[0];
+        setActivePreparateur(defaultUser.name);
+      }
+      return;
+    }
+
+    const localAgents = warehouseStaff.filter(emp => isEmployeeAttachedToLocation(emp, activeWarehouseObj));
+    if (localAgents.length > 0) {
+      const isAlreadyLocal = localAgents.some(a => a.name === activePreparateur);
+      if (!isAlreadyLocal) {
+        setActivePreparateur(localAgents[0].name);
+      }
+    }
+  }, [selectedWarehouseFilter, activeWarehouseObj, warehouseStaff]);
+
+  // Initial preparateur default assignment
+  useEffect(() => {
+    if (!activePreparateur && warehouseStaff.length > 0) {
+      const matchingUser = warehouseStaff.find(emp => emp.name === currentUser?.name);
+      if (matchingUser) {
+        setActivePreparateur(matchingUser.name);
+      } else {
+        setActivePreparateur(warehouseStaff[0].name);
+      }
+    }
+  }, [warehouseStaff, currentUser]);
 
   // Date Filters
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'this_week' | 'custom'>('all');
@@ -76,14 +198,6 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
     setToast({ text, type });
     setTimeout(() => setToast(null), 4000);
   };
-
-  // Known warehouses list for filtering
-  const warehouses = [
-    { id: 'wh_charguia', name: 'Dépôt Charguia (Z.I.)' },
-    { id: 'wh_tunis', name: 'Magasin Tunis Principal' },
-    { id: 'wh_sfax', name: 'Dépôt Sfax - Poudrière' },
-    { id: 'wh_sousse', name: 'Stock Logistique Sousse' }
-  ];
 
   // SLA Quai Calculator for 'pret_chargement'
   const getQuaiSlaInfo = (preparedAt?: string) => {
@@ -149,10 +263,52 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
     showToast('Mode données réelles actif. Aucune donnée démo injectée.', 'info');
   };
 
+  // Helper to match order's warehouse to selected filter
+  const isOrderInWarehouse = (po: PickingOrder, whIdOrName: string): boolean => {
+    if (whIdOrName === 'ALL') return true;
+    if (po.warehouseId === whIdOrName) return true;
+
+    const targetWh = warehouses.find(w => w.id === whIdOrName);
+    const orderWhName = (po.warehouseName || '').toLowerCase();
+    const orderWhId = (po.warehouseId || '').toLowerCase();
+
+    if (targetWh) {
+      const targetName = (targetWh.name || '').toLowerCase();
+      const targetId = (targetWh.id || '').toLowerCase();
+      const targetCode = (targetWh.code || '').toLowerCase();
+
+      if (orderWhId === targetId || orderWhName.includes(targetName) || targetName.includes(orderWhName)) return true;
+      if (targetCode && orderWhName.includes(targetCode)) return true;
+
+      const keywords = ['sfax', 'sousse', 'tunis', 'charguia', 'rades', 'radès', 'poudrière', 'poudriere', 'bizerte', 'nabeul'];
+      for (const kw of keywords) {
+        if ((targetName.includes(kw) || targetId.includes(kw)) && (orderWhName.includes(kw) || orderWhId.includes(kw))) {
+          return true;
+        }
+      }
+    } else {
+      if (orderWhName.includes(whIdOrName.toLowerCase()) || orderWhId.includes(whIdOrName.toLowerCase())) return true;
+    }
+
+    return false;
+  };
+
+  // Determines the most appropriate operator for a given picking order based on warehouse geography
+  const getOperatorForOrder = (po: PickingOrder): string => {
+    if (activePreparateur) return activePreparateur;
+    const orderWh = warehouses.find(w => isOrderInWarehouse(po, w.id));
+    if (orderWh) {
+      const localAgent = warehouseStaff.find(emp => isEmployeeAttachedToLocation(emp, orderWh));
+      if (localAgent) return localAgent.name;
+    }
+    if (warehouseStaff.length > 0) return warehouseStaff[0].name;
+    return currentUser?.name || 'Chef de Dépôt';
+  };
+
   // Status Change Handler
   const handleUpdateStatus = async (pickingOrder: PickingOrder, newStatus: PickingOrderStatus) => {
     try {
-      const operator = activePreparateur || currentUser?.name || 'Chef de Dépôt';
+      const operator = getOperatorForOrder(pickingOrder);
       const defaultDock = pickingOrder.dockNumber && pickingOrder.dockNumber !== 'Quai Non Attribué'
         ? pickingOrder.dockNumber 
         : `Quai ${Math.floor(Math.random() * 3) + 1} - ${pickingOrder.warehouseName}`;
@@ -237,10 +393,8 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
   // Orders scoped to currently selected warehouse (or all warehouses if 'ALL')
   const warehouseOrders = useMemo(() => {
     if (selectedWarehouseFilter === 'ALL') return pickingOrders;
-    return pickingOrders.filter(po => 
-      po.warehouseId === selectedWarehouseFilter || po.warehouseName.includes(selectedWarehouseFilter)
-    );
-  }, [pickingOrders, selectedWarehouseFilter]);
+    return pickingOrders.filter(po => isOrderInWarehouse(po, selectedWarehouseFilter));
+  }, [pickingOrders, selectedWarehouseFilter, warehouses]);
 
   // Filtered picking orders (by warehouse, status, date, and search term)
   const filteredOrders = useMemo(() => {
@@ -488,14 +642,18 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
                 <select
                   value={activePreparateur}
                   onChange={(e) => setActivePreparateur(e.target.value)}
-                  className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
+                  className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer max-w-[280px] truncate"
                 >
                   <option value="" className="bg-slate-900 text-white">Sélectionner préparateur...</option>
-                  {warehouseStaff.map(emp => (
-                    <option key={emp.id} value={emp.name} className="bg-slate-900 text-white">
-                      {emp.name} ({emp.jobTitle || 'Magasinier'})
-                    </option>
-                  ))}
+                  {warehouseStaff.map(emp => {
+                    const assignedLoc = warehouses.find(w => isEmployeeAttachedToLocation(emp, w));
+                    const isLocal = activeWarehouseObj && isEmployeeAttachedToLocation(emp, activeWarehouseObj);
+                    return (
+                      <option key={emp.id} value={emp.name} className="bg-slate-900 text-white">
+                        {isLocal ? '📍 [Ce Dépôt] ' : ''}{emp.name} ({emp.jobTitle || 'Logistique'}{assignedLoc ? ` — 📍 ${assignedLoc.name.split('(')[0].trim()}` : ''})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             )}
@@ -831,6 +989,19 @@ export const WarehousePickingScreen: React.FC<WarehousePickingScreenProps> = ({
                   <div className="p-2.5 bg-emerald-950/30 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 font-mono flex items-center justify-between">
                     <span>Préparé par: {po.preparedBy}</span>
                     <span>{po.preparedAt && !isNaN(new Date(po.preparedAt).getTime()) ? new Date(po.preparedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                  </div>
+                )}
+
+                {/* Local Assigned Preparateur Indicator for pending/in-progress orders */}
+                {!isReady && !isCancelled && (
+                  <div className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-slate-300 flex items-center justify-between font-mono">
+                    <span className="flex items-center space-x-1.5 truncate">
+                      <UserCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>Préparateur assigné : <strong className="text-white">{getOperatorForOrder(po)}</strong></span>
+                    </span>
+                    <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-black uppercase shrink-0">
+                      Auto-Affecté
+                    </span>
                   </div>
                 )}
 

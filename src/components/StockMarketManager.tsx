@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Briefcase, ArrowUpRight, TrendingUp, TrendingDown, RefreshCw, AlertCircle, ShoppingCart, Activity, Shield, Settings, Wallet, LineChart as ChartIcon } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Briefcase, ArrowUpRight, TrendingUp, TrendingDown, RefreshCw, AlertCircle, ShoppingCart, Activity, Shield, Settings, Wallet, LineChart as ChartIcon, CheckCircle2, Building2 } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -9,6 +9,8 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts';
+import { BankAccount } from '../types';
+import { DEMO_UNIVERSE } from '../data/demoUniverse';
 
 // Data types
 type Stock = {
@@ -40,11 +42,78 @@ const MOCK_GRAPH_DATA = [
   { time: '14:00', price: 12.45 },
 ];
 
-export default function StockMarketManager() {
+export interface StockMarketManagerProps {
+  bankAccounts?: BankAccount[];
+  onUpdateBankAccounts?: (accounts: BankAccount[]) => void;
+  currentTenantId?: string;
+  isDemo?: boolean;
+}
+
+export default function StockMarketManager({
+  bankAccounts,
+  onUpdateBankAccounts,
+  currentTenantId,
+  isDemo = false
+}: StockMarketManagerProps) {
   const [activeTab, setActiveTab] = useState<'market' | 'portfolio' | 'tax' | 'config'>('market');
   const [selectedStock, setSelectedStock] = useState<Stock>(MARKET_DATA[0]);
   const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
   const [orderQty, setOrderQty] = useState<number>(100);
+  const [orderFeedback, setOrderFeedback] = useState<string | null>(null);
+
+  // Resolved list of bank accounts
+  const accounts: BankAccount[] = useMemo(() => {
+    if (Array.isArray(bankAccounts) && bankAccounts.length > 0) return bankAccounts;
+    const saved = localStorage.getItem('carthage_bank_accounts');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return DEMO_UNIVERSE.bankAccounts || [];
+  }, [bankAccounts]);
+
+  // Global Cumulative Treasury (Sum of all active accounts)
+  const globalCumulativeTreasury = useMemo(() => {
+    return accounts.reduce((sum, acc) => sum + (Number(acc.currentBalance) || 0), 0);
+  }, [accounts]);
+
+  // Specific Titres Account if available
+  const titresAccount = useMemo(() => {
+    return accounts.find(a => 
+      a.type === 'TITRES' || 
+      a.accountTypeCategory === 'TITRES' || 
+      a.isBvmtDedicated ||
+      (a.bankName || '').toLowerCase().includes('titre') ||
+      (a.bankName || '').toLowerCase().includes('bourse')
+    );
+  }, [accounts]);
+
+  // Available settlement accounts (all banking & titres accounts, excluding pure cash boxes)
+  const settlementAccounts = useMemo(() => {
+    const list = accounts.filter(a => {
+      const isCash = a.type === 'CAISSE' || a.type === 'CashBox' || a.accountTypeCategory === 'CAISSE' || (a.bankName || '').toLowerCase().includes('caisse');
+      return !isCash;
+    });
+    return list.length > 0 ? list : accounts;
+  }, [accounts]);
+
+  // Selected settlement account state
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>(() => {
+    return titresAccount?.id || accounts[0]?.id || '';
+  });
+
+  // Ensure selection is valid if accounts list updates
+  useEffect(() => {
+    if (!selectedBankAccountId && accounts.length > 0) {
+      setSelectedBankAccountId(titresAccount?.id || accounts[0].id);
+    }
+  }, [accounts, titresAccount, selectedBankAccountId]);
+
+  const selectedAccount = useMemo(() => {
+    return accounts.find(a => a.id === selectedBankAccountId) || titresAccount || accounts[0];
+  }, [accounts, selectedBankAccountId, titresAccount]);
 
   const formatTND = (val: number) => {
     return new Intl.NumberFormat('fr-TN', {
@@ -56,6 +125,34 @@ export default function StockMarketManager() {
 
   const estimatedTotal = orderQty * selectedStock.price;
 
+  // Order Execution Simulation & Sync
+  const handleTransmitOrder = () => {
+    if (!selectedAccount) return;
+    if (orderQty <= 0) return;
+
+    if (orderType === 'buy' && (selectedAccount.currentBalance || 0) < estimatedTotal) {
+      setOrderFeedback(`⚠️ Solde insuffisant sur ${selectedAccount.bankName} (${formatTND(selectedAccount.currentBalance)} dispo pour ${formatTND(estimatedTotal)} requis).`);
+      setTimeout(() => setOrderFeedback(null), 5000);
+      return;
+    }
+
+    if (onUpdateBankAccounts) {
+      const updated = accounts.map(a => {
+        if (a.id === selectedAccount.id) {
+          const newBal = orderType === 'buy' 
+            ? a.currentBalance - estimatedTotal 
+            : a.currentBalance + estimatedTotal;
+          return { ...a, currentBalance: Math.max(0, newBal) };
+        }
+        return a;
+      });
+      onUpdateBankAccounts(updated);
+    }
+
+    setOrderFeedback(`✅ Ordre ${orderType === 'buy' ? "d'achat" : "de vente"} de ${orderQty} ${selectedStock.symbol} transmis à la BVMT avec succès ! Règlement sur ${selectedAccount.bankName}.`);
+    setTimeout(() => setOrderFeedback(null), 5000);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in zoom-in duration-200">
       {/* Header & Tabs */}
@@ -63,10 +160,10 @@ export default function StockMarketManager() {
         <div>
           <h2 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-2">
             <Activity className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
-            Bourse & Investissements
+            Bourse & Investissements (BVMT)
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Plateforme de trading BVMT, gestion de portefeuille et placements
+            Plateforme de trading BVMT, gestion de portefeuille d'actifs et multi-comptes de trésorerie
           </p>
         </div>
         
@@ -115,28 +212,44 @@ export default function StockMarketManager() {
             Coût investi : 58 800,000 TND
           </span>
         </div>
+
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Compte Titres Dédié BVMT</span>
+          <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-2 font-mono">
+            {formatTND(titresAccount?.currentBalance ?? 12500)}
+          </p>
+          <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1 mt-2 bg-indigo-50 dark:bg-indigo-900/30 w-fit px-2 py-1 rounded-lg">
+            <Building2 className="w-3.5 h-3.5" /> {titresAccount ? titresAccount.bankName : 'BIAT Bourse - Compte Titres'}
+          </span>
+        </div>
+
         <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gains Latents</span>
           <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2">+1 659,000 <span className="text-sm font-bold opacity-80">TND</span></p>
           <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 mt-2 bg-emerald-50 dark:bg-emerald-900/30 w-fit px-2 py-1 rounded-lg">
-            <ArrowUpRight className="w-3.5 h-3.5" /> +2.82%
+            <ArrowUpRight className="w-3.5 h-3.5" /> +2.82% Rendement
           </span>
         </div>
+
         <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rendement Moyen</span>
-          <p className="text-2xl font-black text-slate-800 dark:text-white mt-2">6.85%</p>
-          <span className="text-xs text-slate-400 mt-2 block font-medium">
-            Dividendes & Plus-values
-          </span>
-        </div>
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trésorerie Disponible</span>
-          <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-2">145 250,620 <span className="text-sm font-bold opacity-80">TND</span></p>
-          <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1 mt-2 bg-indigo-50 dark:bg-indigo-900/30 w-fit px-2 py-1 rounded-lg">
-            <Wallet className="w-3.5 h-3.5" /> Synchronisé (Banque)
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trésorerie Globale Cumulée</span>
+          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono">
+            {formatTND(globalCumulativeTreasury)}
+          </p>
+          <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-bold flex items-center gap-1 mt-2 bg-emerald-50 dark:bg-emerald-900/30 w-fit px-2 py-1 rounded-lg">
+            <Wallet className="w-3.5 h-3.5" /> {accounts.length} Comptes Trésorerie Actifs
           </span>
         </div>
       </div>
+
+      {orderFeedback && (
+        <div className={`p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in duration-200 ${
+          orderFeedback.startsWith('⚠️') ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+        }`}>
+          <span>{orderFeedback}</span>
+          <button onClick={() => setOrderFeedback(null)} className="text-slate-400 hover:text-slate-600 font-black ml-4">✕</button>
+        </div>
+      )}
 
       {/* Main Grid View */}
       {activeTab === 'market' && (
@@ -280,7 +393,7 @@ export default function StockMarketManager() {
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex-1 flex flex-col relative overflow-hidden">
               <h3 className="font-black text-slate-800 dark:text-white flex items-center gap-2 mb-6">
                 <ShoppingCart className="w-5 h-5 text-indigo-500" />
-                Passage d'Ordre
+                Passage d'Ordre BVMT
               </h3>
 
               <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-6">
@@ -301,10 +414,38 @@ export default function StockMarketManager() {
               <div className="space-y-5 mb-8">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Compte de règlement</label>
-                  <select className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition">
-                    <option>Attijari Bank - Compte Titres (*** 472)</option>
-                    <option>BIAT - Compte Courant (*** 847)</option>
+                  <select 
+                    value={selectedBankAccountId}
+                    onChange={(e) => setSelectedBankAccountId(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                  >
+                    {settlementAccounts.map(acc => {
+                      const isTitres = acc.type === 'TITRES' || acc.accountTypeCategory === 'TITRES' || acc.isBvmtDedicated;
+                      return (
+                        <option key={acc.id} value={acc.id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+                          {isTitres ? '🎯 [Dédié BVMT] ' : ''}{acc.bankName} (RIB: {acc.accountNumber}) — Solde: {formatTND(acc.currentBalance)}
+                        </option>
+                      );
+                    })}
                   </select>
+
+                  {/* Active Selected Account Details Badge */}
+                  {selectedAccount && (
+                    <div className="mt-2.5 p-2.5 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-xl flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5 text-indigo-900 dark:text-indigo-300 font-semibold truncate">
+                        <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                        <span className="truncate">{selectedAccount.bankName}</span>
+                        {selectedAccount.sceAccount && (
+                          <span className="text-[9px] bg-indigo-200/60 dark:bg-indigo-800/60 text-indigo-800 dark:text-indigo-200 px-1 rounded font-mono font-bold">
+                            SCE {selectedAccount.sceAccount}
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-mono font-black text-indigo-700 dark:text-indigo-400 shrink-0">
+                        {formatTND(selectedAccount.currentBalance)}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-4">
@@ -336,7 +477,8 @@ export default function StockMarketManager() {
                   <span className="text-2xl font-black text-slate-900 dark:text-white">{formatTND(estimatedTotal)}</span>
                 </div>
                 <button 
-                  className={`w-full py-4 rounded-xl text-white font-black uppercase tracking-wider transition-all duration-200 active:scale-[0.98] ${
+                  onClick={handleTransmitOrder}
+                  className={`w-full py-4 rounded-xl text-white font-black uppercase tracking-wider transition-all duration-200 active:scale-[0.98] cursor-pointer ${
                     orderType === 'buy' 
                       ? 'bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20' 
                       : 'bg-rose-600 hover:bg-rose-700 shadow-xl shadow-rose-600/20'
@@ -359,7 +501,7 @@ export default function StockMarketManager() {
             {activeTab === 'tax' && 'Déclarations & Connexion Fiscale'}
             {activeTab === 'config' && 'Configuration API & Courtier'}
           </h3>
-          <p className="text-slate-500 font-medium">Ce module est en cours d'intégration avec l'infrastructure de production BVMT.</p>
+          <p className="text-slate-500 font-medium">Ce module est synchronisé avec les comptes de trésorerie de l'entreprise et l'infrastructure BVMT.</p>
         </div>
       )}
     </div>
