@@ -172,6 +172,23 @@ export default function SmartPOS({
   collaborators = [],
   tenantId
 }: SmartPOSProps) {
+  // Demo detection and Dynamic Cashier Resolution
+  const isDemoCompany = tenantId === 'company_demo' || !tenantId || tenantId === 'demo-tenant';
+
+  const activeCashierName = useMemo(() => {
+    // 1. In real production: use authenticated user identity
+    const liveName = currentUser?.displayName || currentUser?.name || (currentUser?.email ? currentUser.email.split('@')[0] : null);
+    if (liveName && liveName !== 'Caissier' && liveName !== 'Guest' && liveName.trim() !== '') {
+      return liveName;
+    }
+    // 2. In demo sandbox mode: default to assigned commercial collaborator "Mohamed Ali Gharbi"
+    if (isDemoCompany) {
+      const demoCommercial = collaborators?.find((c: any) => c.name?.includes('Gharbi') || c.id === 'demo-emp_3');
+      return demoCommercial?.name || 'Mohamed Ali Gharbi';
+    }
+    return liveName || 'Mohamed Ali Gharbi';
+  }, [currentUser, collaborators, isDemoCompany]);
+
   // Tabs for sub-sections
   const [posTab, setPosTab] = useState<'register' | 'history' | 'inventory' | 'sessions' | 'audit'>('register');
 
@@ -259,7 +276,7 @@ export default function SmartPOS({
         id: 'aud_1',
         timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
         action: 'INITIALISATION',
-        user: currentUser?.name || 'Administrateur',
+        user: activeCashierName,
         details: 'Module de Caisse Intelligente initialisé avec succès.',
         severity: 'info'
       }
@@ -279,7 +296,7 @@ export default function SmartPOS({
           id: `aud_${Date.now()}`,
           timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
           action: 'DÉVERROUILLAGE_PIN',
-          user: currentUser?.name || 'Collaborateur',
+          user: activeCashierName,
           details: 'Connexion sécurisée au terminal de caisse POS via authentification par Code PIN.',
           severity: 'info'
         };
@@ -297,7 +314,7 @@ export default function SmartPOS({
           id: `aud_${Date.now()}`,
           timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
           action: 'ÉCHEC_DÉVERROUILLAGE',
-          user: currentUser?.name || 'Collaborateur',
+          user: activeCashierName,
           details: 'Tentative infructueuse de connexion au terminal de caisse (PIN incorrect).',
           severity: 'warning'
         };
@@ -377,7 +394,7 @@ export default function SmartPOS({
       id: `aud_${Date.now()}`,
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
       action,
-      user: currentUser?.name || 'Caissier',
+      user: activeCashierName,
       details,
       severity
     };
@@ -632,7 +649,7 @@ export default function SmartPOS({
       id: `sess_${Date.now()}`,
       openedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
       closedAt: null,
-      openedBy: currentUser?.name || 'Caissier',
+      openedBy: activeCashierName,
       startingDrawer: openingDrawer,
       currentDrawer: JSON.parse(JSON.stringify(openingDrawer)), // clone
       theoreticalCash: totalOpeningCash,
@@ -763,7 +780,7 @@ export default function SmartPOS({
       warehouseLocation: warehouseLocation,
       deliveryAddress: deliveryAddress,
       status: 'Validated',
-      operator: currentUser?.name || 'Caissier'
+      operator: activeCashierName
     };
 
     // Update Drawer Cash Inventory
@@ -830,7 +847,7 @@ export default function SmartPOS({
       quantity: item.quantity,
       date: new Date().toISOString().split('T')[0],
       reference: `Vente POS Ticket ${ticketId}`,
-      operator: currentUser?.name || 'Caisse Intelligente'
+      operator: activeCashierName
     }));
     onUpdateStockMovements(prev => [...newStockMovements, ...prev]);
 
@@ -864,18 +881,18 @@ export default function SmartPOS({
     // C. FINANCE MANAGER DOUBLE-ENTRY ACCOUNTING TRANSACTIONS
     const accountingEntries: BankTransaction[] = [];
     payments.forEach((payment, idx) => {
-      let journalAccount = 'Caisse Centrale Espèces';
-      let targetBankAccountId = 'bank_caisse_cash';
+      let journalAccount = 'Caisse Point de Vente (5412)';
+      let targetBankAccountId = 'demo-ba_pos_caisse';
 
       if (payment.method === 'card') {
         journalAccount = 'Compte Courant (TPE)';
-        targetBankAccountId = 'bank_1'; // Standard bank
+        targetBankAccountId = 'demo-ba_1';
       } else if (payment.method === 'flouci') {
         journalAccount = 'Portefeuille Flouci Pay';
-        targetBankAccountId = 'bank_2'; // Secondary
+        targetBankAccountId = 'demo-ba_2';
       } else if (payment.method === 'cheque') {
         journalAccount = 'Chèques à Encaisser';
-        targetBankAccountId = 'bank_1';
+        targetBankAccountId = 'demo-ba_1';
       }
 
 
@@ -1119,7 +1136,7 @@ export default function SmartPOS({
       clientName: originalTx.clientName,
       status: 'Validated',
       originalTicketNumber: originalTx.ticketNumber,
-      operator: currentUser?.name || 'Caissier'
+      operator: activeCashierName
     };
 
     // Restore Stock quantities
@@ -1144,7 +1161,7 @@ export default function SmartPOS({
       quantity: item.quantity,
       date: new Date().toISOString().split('T')[0],
       reference: `Contre-passation POS ${avoirId}`,
-      operator: currentUser?.name || 'Caisse Intelligente'
+      operator: activeCashierName
     }));
     onUpdateStockMovements(prev => [...returnStockMovements, ...prev]);
 
@@ -1198,18 +1215,18 @@ export default function SmartPOS({
 
     // Post Negative Finance entries
     const financeEntries: BankTransaction[] = originalTx.payments.map((payment, idx) => {
-      let journalAccount = 'Caisse Centrale Espèces';
-      let targetBankAccountId = 'bank_caisse_cash';
+      let journalAccount = 'Caisse Point de Vente (5412)';
+      let targetBankAccountId = 'demo-ba_pos_caisse';
 
       if (payment.method === 'card') {
         journalAccount = 'Compte Courant (TPE)';
-        targetBankAccountId = 'bank_1';
+        targetBankAccountId = 'demo-ba_1';
       } else if (payment.method === 'flouci') {
         journalAccount = 'Portefeuille Flouci Pay';
-        targetBankAccountId = 'bank_2';
+        targetBankAccountId = 'demo-ba_2';
       } else if (payment.method === 'cheque') {
         journalAccount = 'Chèques à Encaisser';
-        targetBankAccountId = 'bank_1';
+        targetBankAccountId = 'demo-ba_1';
       }
 
       let method: TransactionMethod = 'Especes';
@@ -1389,7 +1406,7 @@ export default function SmartPOS({
             </div>
             <h3 className="text-xl font-extrabold text-white tracking-tight font-sans">Terminal de Caisse Sécurisé</h3>
             <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-              Bonjour <strong className="text-indigo-400">{currentUser?.name}</strong>. Veuillez saisir votre code PIN de caisse à 4 chiffres pour déverrouiller l'accès.
+              Bonjour <strong className="text-indigo-400">{activeCashierName}</strong>. Veuillez saisir votre code PIN de caisse à 4 chiffres pour déverrouiller l'accès.
             </p>
           </div>
 
@@ -1521,9 +1538,12 @@ export default function SmartPOS({
         {/* Live Session Status Bar */}
         <div className="flex flex-wrap items-center gap-3">
           {activeSession ? (
-            <div className="flex items-center gap-2 bg-emerald-950/40 border border-emerald-900/50 p-2 px-3 rounded-xl text-xs font-bold text-emerald-400">
+            <div className="flex flex-wrap items-center gap-2 bg-emerald-950/40 border border-emerald-900/50 p-2 px-3 rounded-xl text-xs font-bold text-emerald-400">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Session Ouverte par {activeSession.openedBy} ({formatTND(activeSession.theoreticalCash)} TND)</span>
+              <span>Session Ouverte par {activeSession.openedBy || activeCashierName} ({formatTND(activeSession.theoreticalCash)} TND)</span>
+              <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-900/60 text-emerald-300 border border-emerald-700/50">
+                Caisse Point de Vente (5412)
+              </span>
               {criticalAlertsCount > 0 && (
                 <div className="flex items-center gap-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] px-2 py-0.5 rounded-full animate-bounce">
                   <AlertTriangle className="w-3.5 h-3.5" />
@@ -1535,6 +1555,9 @@ export default function SmartPOS({
             <div className="bg-rose-950/40 border border-rose-900/50 p-2 px-3 rounded-xl text-xs font-bold text-rose-400 flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
               <span>Caisse Fermée</span>
+              <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-rose-900/60 text-rose-300 border border-rose-700/50">
+                Sous-compte 5412
+              </span>
             </div>
           )}
 
@@ -1560,7 +1583,7 @@ export default function SmartPOS({
                   id: `aud_${Date.now()}`,
                   timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
                   action: 'VERROUILLAGE_MANUEL',
-                  user: currentUser?.name || 'Collaborateur',
+                  user: activeCashierName,
                   details: 'Terminal de caisse POS verrouillé manuellement.',
                   severity: 'info'
                 };

@@ -79,6 +79,8 @@ export interface DemoUniverseType {
   pickingOrders?: PickingOrder[];
   assets?: any[];
   fleetInventory?: any[];
+  purchaseOrders?: any[];
+  purchaseRequisitions?: any[];
 }
 
 export const DEMO_UNIVERSE: DemoUniverseType = {
@@ -650,6 +652,20 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       sceAccount: "5411",
       initialBalance: 3450.000,
       currentBalance: 3450.000,
+      currency: "TND",
+      status: "Active",
+      is_demo: true
+    },
+    {
+      id: "demo-ba_pos_caisse",
+      tenantId: DEMO_TENANT_ID,
+      bankName: "Caisse Point de Vente (5412)",
+      accountNumber: "CAISSE-POS-5412",
+      type: "CAISSE",
+      accountTypeCategory: "CAISSE",
+      sceAccount: "5412",
+      initialBalance: 375.500,
+      currentBalance: 375.500,
       currency: "TND",
       status: "Active",
       is_demo: true
@@ -1563,6 +1579,109 @@ export const DEMO_UNIVERSE: DemoUniverseType = {
       sceAccount: "223",
       immobCode: "IMM-2023-004",
       location: "Atelier Usine Tunis"
+    }
+  ],
+
+  // 10. PURCHASE ORDERS (Bons de Commande valorisés - 67 581,000 TND TTC total)
+  purchaseOrders: [
+    {
+      id: "demo-po_1",
+      tenantId: DEMO_TENANT_ID,
+      orderNumber: "PO-2026-0101",
+      supplierId: "demo-sup_1",
+      supplierName: "Les Ciments de Bizerte",
+      requisitionId: "demo-req_1",
+      itemDescription: "Approvisionnement Ciment CPJ 45 (500 Sacs)",
+      quantity: 500,
+      unitCost: 11.200,
+      vatRate: 19,
+      fodecActive: true,
+      amountHT: 5600.000,
+      amountTTC: 6665.000,
+      totalAmount: 6665.000,
+      status: "Reçu conforme",
+      orderDate: "2026-08-12",
+      deliveryDueDate: "2026-08-20",
+      paymentTerms: "Chèque à 60 Jours",
+      notes: "500 Sacs Ciment CPJ 45 à 11.200 TND HT = 5 600,000 TND HT | 6 665,000 TND TTC",
+      is_demo: true
+    },
+    {
+      id: "demo-po_2",
+      tenantId: DEMO_TENANT_ID,
+      orderNumber: "PO-2026-0102",
+      supplierId: "demo-sup_2",
+      supplierName: "EL FOULADH Menzel Bourguiba",
+      requisitionId: "demo-req_2",
+      itemDescription: "Réapprovisionnement Rond à béton Ø12mm (200 Barres)",
+      quantity: 200,
+      unitCost: 21.000,
+      vatRate: 19,
+      fodecActive: true,
+      amountHT: 4200.000,
+      amountTTC: 4999.000,
+      totalAmount: 4999.000,
+      status: "Envoyé",
+      orderDate: "2026-08-14",
+      deliveryDueDate: "2026-08-25",
+      paymentTerms: "Traite 90 Jours",
+      notes: "200 Barres Rond à béton Ø12mm à 21.000 TND HT = 4 200,000 TND HT | 4 999,000 TND TTC",
+      is_demo: true
+    },
+    {
+      id: "demo-po_import",
+      tenantId: DEMO_TENANT_ID,
+      orderNumber: "PO-2026-0103-IMP",
+      supplierId: "demo-sup_import",
+      supplierName: "Marseille Chimie & Outillage SAS",
+      requisitionId: "demo-req_import",
+      itemDescription: "Matières premières & Outillage haute résistance (Dossier IMP-RADES-2026-081)",
+      quantity: 500,
+      unitCost: 94.000,
+      vatRate: 19,
+      fodecActive: false,
+      amountHT: 47000.000,
+      amountTTC: 55917.000,
+      totalAmount: 55917.000,
+      status: "Envoyé",
+      orderDate: "2026-08-01",
+      deliveryDueDate: "2026-08-28",
+      paymentTerms: "Crédoc BIAT (L/C Confirmée)",
+      notes: "Lié au dossier douane IMP-RADES-2026-081 et Crédoc BIAT = 55 917,000 TND TTC",
+      is_demo: true
+    }
+  ],
+
+  purchaseRequisitions: [
+    {
+      id: "demo-req_1",
+      tenantId: DEMO_TENANT_ID,
+      requestNumber: "DA-2026-0041",
+      requestedBy: "Sami Mansour",
+      department: "Logistique & Dépôt",
+      title: "Approvisionnement Ciment CPJ 45 500 Sacs",
+      totalEstimatedCost: 5600.000,
+      priority: "High",
+      status: "Approved",
+      requestDate: "2026-08-10",
+      approvalDate: "2026-08-11",
+      approvedBy: "Khaled Ben Amor",
+      is_demo: true
+    },
+    {
+      id: "demo-req_2",
+      tenantId: DEMO_TENANT_ID,
+      requestNumber: "DA-2026-0042",
+      requestedBy: "Hamza Ben Salem",
+      department: "Logistique & Dépôt",
+      title: "Réapprovisionnement Rond à béton Ø12mm 200 Barres",
+      totalEstimatedCost: 4200.000,
+      priority: "High",
+      status: "Approved",
+      requestDate: "2026-08-12",
+      approvalDate: "2026-08-13",
+      approvedBy: "Khaled Ben Amor",
+      is_demo: true
     }
   ]
 };

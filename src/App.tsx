@@ -1215,7 +1215,9 @@ const getCompleteDemoPayload = (companyName: string) => {
   ];
 
   const demoOrders = [
-    { id: 'demo-po_1', requisitionId: 'demo-req_1', supplierName: 'SOPAL Tunisie', orderDate: '2026-06-12', totalAmount: 14800, status: 'Sent', paymentTerms: '60 jours fin de mois' }
+    { id: 'demo-po_1', requisitionId: 'demo-req_1', supplierName: 'Les Ciments de Bizerte', itemDescription: 'Approvisionnement Ciment CPJ 45 (500 Sacs)', quantity: 500, unitCost: 11.200, vatRate: 19, fodecActive: true, amountHT: 5600.000, amountTTC: 6665.000, totalAmount: 6665.000, orderDate: '2026-08-12', deliveryDueDate: '2026-08-20', status: 'Reçu conforme', paymentTerms: 'Chèque à 60 Jours', is_demo: true, notes: '500 Sacs Ciment CPJ 45 à 11.200 TND HT = 5 600,000 TND HT | 6 665,000 TND TTC' },
+    { id: 'demo-po_2', requisitionId: 'demo-req_2', supplierName: 'EL FOULADH Menzel Bourguiba', itemDescription: 'Réapprovisionnement Rond à béton Ø12mm (200 Barres)', quantity: 200, unitCost: 21.000, vatRate: 19, fodecActive: true, amountHT: 4200.000, amountTTC: 4999.000, totalAmount: 4999.000, orderDate: '2026-08-14', deliveryDueDate: '2026-08-25', status: 'Envoyé', paymentTerms: 'Traite 90 Jours', is_demo: true, notes: '200 Barres Rond à béton Ø12mm à 21.000 TND HT = 4 200,000 TND HT | 4 999,000 TND TTC' },
+    { id: 'demo-po_import', requisitionId: 'demo-req_import', supplierName: 'Marseille Chimie & Outillage SAS', itemDescription: 'Matières premières & Outillage haute résistance (Dossier IMP-RADES-2026-081)', quantity: 500, unitCost: 94.000, vatRate: 19, fodecActive: false, amountHT: 47000.000, amountTTC: 55917.000, totalAmount: 55917.000, orderDate: '2026-08-01', deliveryDueDate: '2026-08-28', status: 'Envoyé', paymentTerms: 'Crédoc BIAT (L/C Confirmée)', is_demo: true, notes: 'Lié au dossier douane IMP-RADES-2026-081 et Crédoc BIAT = 55 917,000 TND TTC' }
   ];
 
   const demoPerformance = [
@@ -5003,7 +5005,9 @@ function AppMain() {
           { id: 'demo-req_1', title: 'Achat de 5 tonnes de carton ondulé', requester: 'Sami Mansour (Démo)', department: 'Logistique', estimatedCost: 15000, priority: 'High', status: 'Approved', creationDate: '2026-06-10' }
         ];
         const demoOrders = [
-          { id: 'demo-po_1', requisitionId: 'demo-req_1', supplierName: 'SOPAL Tunisie', orderDate: '2026-06-12', totalAmount: 14800, status: 'Sent', paymentTerms: '60 jours fin de mois' }
+          { id: 'demo-po_1', requisitionId: 'demo-req_1', supplierName: 'Les Ciments de Bizerte', itemDescription: 'Approvisionnement Ciment CPJ 45 (500 Sacs)', quantity: 500, unitCost: 11.200, vatRate: 19, fodecActive: true, amountHT: 5600.000, amountTTC: 6665.000, totalAmount: 6665.000, orderDate: '2026-08-12', deliveryDueDate: '2026-08-20', status: 'Reçu conforme', paymentTerms: 'Chèque à 60 Jours', is_demo: true, notes: '500 Sacs Ciment CPJ 45 à 11.200 TND HT = 5 600,000 TND HT | 6 665,000 TND TTC' },
+          { id: 'demo-po_2', requisitionId: 'demo-req_2', supplierName: 'EL FOULADH Menzel Bourguiba', itemDescription: 'Réapprovisionnement Rond à béton Ø12mm (200 Barres)', quantity: 200, unitCost: 21.000, vatRate: 19, fodecActive: true, amountHT: 4200.000, amountTTC: 4999.000, totalAmount: 4999.000, orderDate: '2026-08-14', deliveryDueDate: '2026-08-25', status: 'Envoyé', paymentTerms: 'Traite 90 Jours', is_demo: true, notes: '200 Barres Rond à béton Ø12mm à 21.000 TND HT = 4 200,000 TND HT | 4 999,000 TND TTC' },
+          { id: 'demo-po_import', requisitionId: 'demo-req_import', supplierName: 'Marseille Chimie & Outillage SAS', itemDescription: 'Matières premières & Outillage haute résistance (Dossier IMP-RADES-2026-081)', quantity: 500, unitCost: 94.000, vatRate: 19, fodecActive: false, amountHT: 47000.000, amountTTC: 55917.000, totalAmount: 55917.000, orderDate: '2026-08-01', deliveryDueDate: '2026-08-28', status: 'Envoyé', paymentTerms: 'Crédoc BIAT (L/C Confirmée)', is_demo: true, notes: 'Lié au dossier douane IMP-RADES-2026-081 et Crédoc BIAT = 55 917,000 TND TTC' }
         ];
         const demoPerformance = [
           { id: 'demo-perf_1', supplierId: 'demo-sup_1', name: 'SOPAL Tunisie', category: 'Plomberie & Robinetterie Industrielle', score: 93, delayRate: 4.5, conformityRate: 98.2, totalVolume: 48500, status: 'Rang A - Excellent' },
